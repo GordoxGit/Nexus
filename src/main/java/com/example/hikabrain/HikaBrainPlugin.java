@@ -24,6 +24,7 @@ public class HikaBrainPlugin extends JavaPlugin {
         instance = this;
         saveDefaultConfig();
         loadAllowedWorlds();
+        if (getConfig().getBoolean("debug", false)) getLogger().setLevel(java.util.logging.Level.FINE);
 
         this.gameManager = new GameManager(this);
         getServer().getPluginManager().registerEvents(new GameListener(gameManager), this);

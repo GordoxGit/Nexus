@@ -23,6 +23,8 @@ public class HBCommand implements CommandExecutor, TabCompleter {
         s.sendMessage(ChatColor.YELLOW + "/hb list" + ChatColor.GRAY + " - Liste des arènes sauvegardées");
         s.sendMessage(ChatColor.YELLOW + "/hb setbed" + ChatColor.GRAY + " - Donne l'outil pour définir les lits");
         s.sendMessage(ChatColor.YELLOW + "/hb setbroke" + ChatColor.GRAY + " - Donne l'outil pour définir la zone cassable");
+        s.sendMessage(ChatColor.YELLOW + "/hb snapshotbroke" + ChatColor.GRAY + " - Regénère le snapshot du pont");
+        s.sendMessage(ChatColor.YELLOW + "/hb resetbroke" + ChatColor.GRAY + " - Réinitialise manuellement le pont");
         s.sendMessage(ChatColor.YELLOW + "/hb join [red|blue]" + ChatColor.GRAY + " - Rejoindre une équipe");
         s.sendMessage(ChatColor.YELLOW + "/hb leave" + ChatColor.GRAY + " - Quitter la partie");
         s.sendMessage(ChatColor.DARK_GRAY + "Admin: create, setspawn, setbuildpos, setpoints, settimer, save, load, start, stop");
@@ -71,6 +73,18 @@ public class HBCommand implements CommandExecutor, TabCompleter {
                 Player p = (Player) sender;
                 p.getInventory().addItem(GameListener.brokeSelectorItem());
                 sender.sendMessage(ChatColor.GREEN + "Pelle 'setbroke' ajoutée. Clic gauche = pos1, clic droit = pos2.");
+                return true;
+            }
+            case "snapshotbroke": {
+                if (needAdmin(sender)) return true;
+                game.snapshotBroke();
+                sender.sendMessage(ChatColor.GREEN + "Snapshot broke lancé.");
+                return true;
+            }
+            case "resetbroke": {
+                if (needAdmin(sender)) return true;
+                game.resetBroke();
+                sender.sendMessage(ChatColor.GREEN + "Reset broke lancé.");
                 return true;
             }
 case "join": {
@@ -160,7 +174,7 @@ case "join": {
 
     @Override
     public List<String> onTabComplete(CommandSender sender, org.bukkit.command.Command command, String alias, String[] args) {
-        if (args.length == 1) return Arrays.asList("help","list","setbed","join","leave","create","setspawn","setbuildpos","setpoints","settimer","save","load","start","stop","setbroke");
+        if (args.length == 1) return Arrays.asList("help","list","setbed","join","leave","create","setspawn","setbuildpos","setpoints","settimer","save","load","start","stop","setbroke","snapshotbroke","resetbroke");
         if (args.length == 2) {
             switch (args[0].toLowerCase()) {
                 case "setspawn": return Arrays.asList("red","blue");

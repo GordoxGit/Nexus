@@ -1,6 +1,8 @@
 allowed-worlds:
   - Hika
 
+debug: false
+
 # Zone de pont cassable (définie via /hb setbroke)
 broke:
   pos1:
@@ -13,3 +15,7 @@ broke:
     x: ~
     y: ~
     z: ~
+  reset:
+    enabled: true
+    batchPerTick: 1500
+    snapshotOnLoad: true
