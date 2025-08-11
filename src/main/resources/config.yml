@@ -1,0 +1,15 @@
+allowed-worlds:
+  - Hika
+
+# Zone de pont cassable (définie via /hb setbroke)
+broke:
+  pos1:
+    world: ~
+    x: ~
+    y: ~
+    z: ~
+  pos2:
+    world: ~
+    x: ~
+    y: ~
+    z: ~
