@@ -22,13 +22,17 @@ public class GameManager {
     private Arena arena;
 
     private final HikaScoreboard scoreboard = new HikaScoreboard();
+    private final BridgeResetService bridgeReset;
     private BukkitRunnable timerTask;
     private int timeRemaining; // seconds
     private int freezeMoveTicks = 0; // block movement & scoring during countdown
 
     private Location build1, build2;
 
-    public GameManager(HikaBrainPlugin plugin) { this.plugin = plugin; }
+    public GameManager(HikaBrainPlugin plugin) {
+        this.plugin = plugin;
+        this.bridgeReset = new BridgeResetService(plugin, this);
+    }
 
     public Arena arena() { return arena; }
     public boolean isWorldAllowed(World w) { return plugin.isWorldAllowed(w); }
@@ -73,6 +77,7 @@ public class GameManager {
         File file = new File(new File(plugin.getDataFolder(), "arenas"), name + ".yml");
         if (!file.exists()) throw new IOException("Arena file not found: " + name);
         arena = Arena.loadFrom(file);
+        bridgeReset.init(arena.name());
         return true;
     }
 
@@ -331,14 +336,16 @@ public class GameManager {
             Player p = Bukkit.getPlayer(u);
             if (p != null) { tp(p, arena.spawnBlue()); giveKit(p, Team.BLUE); }
         }
-
-        if (arena.redScore() >= arena.targetPoints() || arena.blueScore() >= arena.targetPoints()) {
-            Bukkit.broadcastMessage((arena.redScore() > arena.blueScore()?ChatColor.RED:ChatColor.BLUE) + "[HB] Victoire !");
-            stop(true);
-            return;
-        }
-
-        startFreezeCountdown();
+        setFrozen(true);
+        bridgeReset.reset(() -> {
+            setFrozen(false);
+            if (arena.redScore() >= arena.targetPoints() || arena.blueScore() >= arena.targetPoints()) {
+                Bukkit.broadcastMessage((arena.redScore() > arena.blueScore()?ChatColor.RED:ChatColor.BLUE) + "[HB] Victoire !");
+                stop(true);
+            } else {
+                startFreezeCountdown();
+            }
+        });
     }
 
     public void shutdown() { if (timerTask != null) timerTask.cancel(); }
@@ -351,6 +358,9 @@ public class GameManager {
         plugin.getConfig().set(path + ".y", l.getBlockY());
         plugin.getConfig().set(path + ".z", l.getBlockZ());
         plugin.saveConfig();
+        if (plugin.getConfig().getBoolean("broke.reset.snapshotOnLoad", true)) {
+            bridgeReset.init(arena != null ? arena.name() : null);
+        }
     }
     public org.bukkit.Location readBrokePoint(String path) {
         org.bukkit.configuration.file.FileConfiguration c = plugin.getConfig();
@@ -371,5 +381,9 @@ public class GameManager {
         int x = l.getBlockX(), y = l.getBlockY(), z = l.getBlockZ();
         return x>=x1 && x<=x2 && y>=y1 && y<=y2 && z>=z1 && z<=z2;
     }
+
+    public void snapshotBroke() { bridgeReset.snapshot(); }
+    public void resetBroke() { setFrozen(true); bridgeReset.reset(() -> setFrozen(false)); }
+    public void setFrozen(boolean f) { freezeMoveTicks = f ? Integer.MAX_VALUE : 0; }
 
 }
