@@ -22,6 +22,7 @@ public class HBCommand implements CommandExecutor, TabCompleter {
         s.sendMessage(ChatColor.YELLOW + "/hb help" + ChatColor.GRAY + " - Affiche l'aide");
         s.sendMessage(ChatColor.YELLOW + "/hb list" + ChatColor.GRAY + " - Liste des arènes sauvegardées");
         s.sendMessage(ChatColor.YELLOW + "/hb setbed" + ChatColor.GRAY + " - Donne l'outil pour définir les lits");
+        s.sendMessage(ChatColor.YELLOW + "/hb setbroke" + ChatColor.GRAY + " - Donne l'outil pour définir la zone cassable");
         s.sendMessage(ChatColor.YELLOW + "/hb join [red|blue]" + ChatColor.GRAY + " - Rejoindre une équipe");
         s.sendMessage(ChatColor.YELLOW + "/hb leave" + ChatColor.GRAY + " - Quitter la partie");
         s.sendMessage(ChatColor.DARK_GRAY + "Admin: create, setspawn, setbuildpos, setpoints, settimer, save, load, start, stop");

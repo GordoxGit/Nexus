@@ -164,9 +164,17 @@ public class GameListener implements Listener {
 
     @EventHandler
     public void onBreak(BlockBreakEvent e) {
+        if (isBrokeSelector(e.getPlayer().getInventory().getItemInMainHand())) {
+            e.setCancelled(true);
+            return;
+        }
+        if (game.arena() != null && game.arena().isActive()
+                && game.inBrokeRegion(e.getBlock().getLocation())) {
+            e.setCancelled(false);
+            return;
+        }
         if (game.arena() == null || !game.arena().isActive()) return;
         if (notAllowedWorld(e.getPlayer())) return;
-        if (game.inBrokeRegion(e.getBlock().getLocation())) { e.setCancelled(false); return; }
         if (!game.canBuild(e.getBlock().getLocation())) { e.setCancelled(true); return; }
         if (!game.wasPlaced(e.getBlock().getLocation())) e.setCancelled(true);
     }
@@ -199,6 +207,30 @@ public class GameListener implements Listener {
         Block foot = normalizeToBedFoot(e.getBed());
         if (game.arena().bedRed()!=null && foot.getLocation().equals(game.arena().bedRed())) { e.setCancelled(true); e.getPlayer().sendMessage(ChatColor.RED + "Tu ne peux pas dormir sur le lit ROUGE de l'arène."); return; }
         if (game.arena().bedBlue()!=null && foot.getLocation().equals(game.arena().bedBlue())) { e.setCancelled(true); e.getPlayer().sendMessage(ChatColor.RED + "Tu ne peux pas dormir sur le lit BLEU de l'arène."); }
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onInteractSetBroke(PlayerInteractEvent e) {
+        EquipmentSlot hand = e.getHand();
+        ItemStack item = hand == EquipmentSlot.OFF_HAND ?
+                e.getPlayer().getInventory().getItemInOffHand() :
+                e.getPlayer().getInventory().getItemInMainHand();
+        if (!isBrokeSelector(item)) return;
+        Action act = e.getAction();
+        if (!(act == Action.LEFT_CLICK_BLOCK || act == Action.RIGHT_CLICK_BLOCK)) return;
+        Block b = e.getClickedBlock();
+        if (b == null) return;
+        Player p = e.getPlayer();
+        if (!ensureWorldForBroke(b.getWorld(), p)) return;
+        if (act == Action.LEFT_CLICK_BLOCK) {
+            game.saveBrokePoint("broke.pos1", b.getLocation());
+            p.sendMessage(ChatColor.YELLOW + "setbroke pos1: " + b.getX() + "," + b.getY() + "," + b.getZ());
+        } else {
+            game.saveBrokePoint("broke.pos2", b.getLocation());
+            p.sendMessage(ChatColor.YELLOW + "setbroke pos2: " + b.getX() + "," + b.getY() + "," + b.getZ());
+        }
+        e.setUseInteractedBlock(Event.Result.DENY);
+        e.setCancelled(true);
     }
 
     private boolean ensureWorldForBroke(World w, Player p) {
