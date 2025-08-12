@@ -50,3 +50,12 @@ themes:
     red:   { primary: "#f97316", secondary: "#c2410c" }
     blue:  { primary: "#fde047", secondary: "#facc15" }
     soundBank: "D"
+
+scored:
+  title: "&cÉquipe ROUGE &7marque le point!"
+  title-blue: "&9Équipe BLEUE &7marque le point!"
+  subtitle: "&7Score: {red} - {blue}"
+  timings:
+    fadeIn: 10
+    stay: 80
+    fadeOut: 10

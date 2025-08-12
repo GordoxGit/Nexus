@@ -3,7 +3,7 @@ plugins {
 }
 
 group = "com.hikabrain"
-version = "1.1.9"
+version = "1.1.9.1"
 
 repositories {
     mavenCentral()
