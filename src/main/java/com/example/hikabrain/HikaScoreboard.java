@@ -47,27 +47,21 @@ public class HikaScoreboard {
 
     public void update(Arena arena, Player p, int timeRemaining) {
         if (arena == null) return;
-        int redAlive = arena.players().get(Team.RED).size();
-        int blueAlive = arena.players().get(Team.BLUE).size();
-        int players = redAlive + blueAlive;
         String mmss = String.format("%02d:%02d", Math.max(0, timeRemaining) / 60, Math.max(0, timeRemaining) % 60);
+        int teamSize = plugin.game().teamSize();
+        int capacity = teamSize * 2;
+        int inArena = plugin.game().playersInArena(arena);
+        String mode = teamSize + "v" + teamSize;
         lines[0].setPrefix(ChatColor.GRAY + "Map: " + ChatColor.WHITE + arena.name());
-        lines[1].setPrefix(ChatColor.GRAY + "Mode: " + ChatColor.WHITE + "Normal");
+        lines[1].setPrefix(ChatColor.GRAY + "Mode: " + ChatColor.WHITE + mode);
         lines[2].setPrefix(ChatColor.GRAY + "Temps: " + ChatColor.WHITE + mmss);
-        lines[3].setPrefix(ChatColor.RED + "Rouge: " + ChatColor.WHITE + arena.redScore() +
-                ChatColor.BLUE + " Bleu: " + ChatColor.WHITE + arena.blueScore());
-        lines[4].setPrefix(ChatColor.RED + "Vivs R: " + ChatColor.WHITE + redAlive +
-                ChatColor.BLUE + " Vivs B: " + ChatColor.WHITE + blueAlive);
-        lines[5].setPrefix(ChatColor.GRAY + "Série: " + ChatColor.WHITE + "0");
-        lines[6].setPrefix(ChatColor.RED + "Lit R: " + ChatColor.GREEN + "✓");
-        lines[7].setPrefix(ChatColor.BLUE + "Lit B: " + ChatColor.GREEN + "✓");
-        lines[8].setPrefix(ChatColor.GRAY + "Kills: " + ChatColor.WHITE + "0 " +
-                ChatColor.GRAY + "Morts: " + ChatColor.WHITE + "0");
-        lines[9].setPrefix(ChatColor.GRAY + "Ping: " + ChatColor.WHITE + p.getPing() + "ms");
-        lines[10].setPrefix(ChatColor.GRAY + "Joueurs: " + ChatColor.WHITE + players + "/" + 8);
-        lines[11].setPrefix(ChatColor.GRAY + "Serveur: " + ChatColor.AQUA + plugin.serverDisplayName());
-        lines[12].setPrefix(ChatColor.DARK_GRAY + "─────────────");
-        lines[13].setPrefix(ChatColor.GRAY + "/hb help");
-        lines[14].setPrefix(ChatColor.DARK_GRAY + plugin.serverDomain());
+        lines[3].setPrefix(ChatColor.RED + "Rouge: " + ChatColor.WHITE + arena.redScore() + " " +
+                ChatColor.BLUE + "Bleu: " + ChatColor.WHITE + arena.blueScore());
+        lines[4].setPrefix(ChatColor.GRAY + "Série: " + ChatColor.WHITE + "0");
+        lines[5].setPrefix(ChatColor.GRAY + "Joueurs: " + ChatColor.WHITE + inArena + "/" + capacity);
+        lines[6].setPrefix(ChatColor.DARK_GRAY + "──────────────");
+        lines[7].setPrefix(ChatColor.GRAY + "/hb help");
+        lines[8].setPrefix(ChatColor.DARK_GRAY + plugin.serverDomain());
+        for (int i = 9; i < 15; i++) lines[i].setPrefix("");
     }
 }

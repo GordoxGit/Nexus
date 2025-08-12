@@ -29,9 +29,11 @@ public class TablistServiceImpl implements TablistService {
         if (arena == null) return;
         int time = plugin.game().timeRemaining();
         String mmss = String.format("%02d:%02d", Math.max(0, time) / 60, Math.max(0, time) % 60);
+        int teamSize = plugin.game().teamSize();
+        String mode = teamSize + "v" + teamSize;
         String header = ChatColor.AQUA + "" + ChatColor.BOLD + plugin.serverDisplayName().toUpperCase() + "\n" +
-                ChatColor.GRAY + "HikaBrain " + ChatColor.DARK_GRAY + "• " + ChatColor.GRAY + arena.name() +
-                ChatColor.DARK_GRAY + " • " + ChatColor.GRAY + "Normal";
+                ChatColor.GRAY + "HikaBrain " + ChatColor.DARK_GRAY + "• " + ChatColor.GRAY + arena.name() + " " +
+                ChatColor.DARK_GRAY + "• " + ChatColor.GRAY + mode;
         String footer = ChatColor.GRAY + "Rouge: " + ChatColor.WHITE + arena.redScore() + "  " +
                 ChatColor.GRAY + "Bleu: " + ChatColor.WHITE + arena.blueScore() + "  " + ChatColor.DARK_GRAY + "|  " +
                 ChatColor.GRAY + "Temps: " + ChatColor.WHITE + mmss + "\n" +
@@ -54,7 +56,7 @@ public class TablistServiceImpl implements TablistService {
             Player p = Bukkit.getPlayer(u);
             if (p != null) {
                 p.setPlayerListHeaderFooter(header, footer);
-                p.setPlayerListName(ChatColor.GRAY + "[SPEC] " + p.getName());
+                p.setPlayerListName(ChatColor.GRAY + "[SPEC] " + ChatColor.WHITE + p.getName());
             }
         }
     }

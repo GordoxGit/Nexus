@@ -33,6 +33,7 @@ public class Arena {
     public String name() { return name; }
     public String worldName() { return worldName; }
     public void worldName(String n) { worldName = n; }
+    public World world() { return worldName != null ? Bukkit.getWorld(worldName) : null; }
     public Location spawnRed() { return spawnRed; }
     public void spawnRed(Location l) { spawnRed = l; }
     public Location spawnBlue() { return spawnBlue; }
