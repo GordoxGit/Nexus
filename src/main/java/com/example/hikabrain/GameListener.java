@@ -68,8 +68,8 @@ public class GameListener implements Listener {
     private static final NamespacedKey CAT_KEY = new NamespacedKey(HikaBrainPlugin.get(), "hb_cat");
     private static final NamespacedKey ARENA_KEY = new NamespacedKey(HikaBrainPlugin.get(), "hb_arena");
     private final java.util.Set<java.util.UUID> compassCooldown = java.util.Collections.newSetFromMap(new java.util.concurrent.ConcurrentHashMap<>());
-    private boolean isLobbyWorld(World w) {
-        return HikaBrainPlugin.get().lobby() != null && HikaBrainPlugin.get().lobby().getWorld().equals(w);
+    private boolean isAllowedWorld(World w) {
+        return HikaBrainPlugin.get().isWorldAllowed(w);
     }
 
     private static final NamespacedKey COMPASS_KEY = new NamespacedKey(HikaBrainPlugin.get(), "hb_compass");
@@ -156,7 +156,13 @@ public class GameListener implements Listener {
 
     @EventHandler
     public void onJoin(PlayerJoinEvent e) {
-        HikaBrainPlugin.get().lobbyService().apply(e.getPlayer());
+        Player p = e.getPlayer();
+        if (HikaBrainPlugin.get().isWorldAllowed(p.getWorld())) {
+            HikaBrainPlugin.get().lobbyService().apply(p);
+        } else {
+            HikaBrainPlugin.get().scoreboard().hide(p);
+            HikaBrainPlugin.get().tablist().remove(p);
+        }
     }
 
     @EventHandler
@@ -173,7 +179,9 @@ public class GameListener implements Listener {
     @EventHandler
     public void onLobbyRespawn(PlayerRespawnEvent e) {
         if (game.arena() == null || !game.arena().isActive()) {
-            HikaBrainPlugin.get().lobbyService().apply(e.getPlayer());
+            if (HikaBrainPlugin.get().isWorldAllowed(e.getPlayer().getWorld())) {
+                HikaBrainPlugin.get().lobbyService().apply(e.getPlayer());
+            }
         }
     }
 
@@ -267,7 +275,7 @@ public class GameListener implements Listener {
 
     @EventHandler
     public void onCompassDrop(PlayerDropItemEvent e) {
-        if (isLobbyCompass(e.getItemDrop().getItemStack()) && isLobbyWorld(e.getPlayer().getWorld())) {
+        if (isLobbyCompass(e.getItemDrop().getItemStack()) && isAllowedWorld(e.getPlayer().getWorld())) {
             e.setCancelled(true);
         }
     }
@@ -304,7 +312,7 @@ public class GameListener implements Listener {
             }
             return;
         }
-        if (!isLobbyWorld(((Player) e.getWhoClicked()).getWorld())) return;
+        if (!isAllowedWorld(((Player) e.getWhoClicked()).getWorld())) return;
         if (isLobbyCompass(e.getCurrentItem()) || isLobbyCompass(e.getCursor())) e.setCancelled(true);
     }
 
@@ -314,7 +322,7 @@ public class GameListener implements Listener {
             e.setCancelled(true);
             return;
         }
-        if (!isLobbyWorld(((Player) e.getWhoClicked()).getWorld())) return;
+        if (!isAllowedWorld(((Player) e.getWhoClicked()).getWorld())) return;
         if (isLobbyCompass(e.getOldCursor())) { e.setCancelled(true); return; }
         for (ItemStack it : e.getNewItems().values()) {
             if (isLobbyCompass(it)) { e.setCancelled(true); return; }
@@ -326,7 +334,7 @@ public class GameListener implements Listener {
         Action act = e.getAction();
         if (!(act == Action.RIGHT_CLICK_AIR || act == Action.RIGHT_CLICK_BLOCK || act == Action.LEFT_CLICK_AIR || act == Action.LEFT_CLICK_BLOCK)) return;
         Player p = e.getPlayer();
-        if (!isLobbyWorld(p.getWorld())) return;
+        if (!isAllowedWorld(p.getWorld())) return;
         if (!isLobbyCompass(p.getInventory().getItemInMainHand()) && !isLobbyCompass(p.getInventory().getItemInOffHand())) return;
         e.setCancelled(true);
         e.setUseItemInHand(Event.Result.DENY);

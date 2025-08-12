@@ -40,6 +40,7 @@ public class CompassGuiService {
 
     /** Open the main mode selection menu. */
     public void openModeMenu(Player p) {
+        if (!plugin.isWorldAllowed(p.getWorld())) return;
         Inventory inv = Bukkit.createInventory(holder, 54, ChatColor.AQUA + "Choix du mode");
         addMode(inv, 10, 1);
         addMode(inv, 12, 2);
@@ -51,6 +52,7 @@ public class CompassGuiService {
 
     /** Open arena list for given team size. */
     public void openArenaList(Player p, int teamSize) {
+        if (!plugin.isWorldAllowed(p.getWorld())) return;
         Inventory inv = Bukkit.createInventory(holder, 54,
                 ChatColor.AQUA + "Arènes " + ChatColor.GRAY + "(" + ChatColor.WHITE + teamSize + "v" + teamSize + ChatColor.GRAY + ")");
         int slot = 10;
