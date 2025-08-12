@@ -102,7 +102,7 @@ public class HikaBrainPlugin extends JavaPlugin {
 
     private void loadServerInfo() {
         serverDisplayName = getConfig().getString("server.display-name", "Heneria");
-        serverDomain = getConfig().getString("server.domain", "play.heneria.net");
+        serverDomain = getConfig().getString("server.domain", "heneria.com");
     }
 
     public static HikaBrainPlugin get() { return instance; }

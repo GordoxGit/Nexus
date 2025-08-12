@@ -298,6 +298,22 @@ public class GameManager {
         return Team.SPECTATOR;
     }
 
+    public int playersInArena(Arena a) {
+        if (a == null || a.buildRegion() == null) return 0;
+        Cuboid c = a.buildRegion();
+        World w = a.world();
+        return (int) Bukkit.getOnlinePlayers().stream()
+                .filter(p -> p.getWorld().equals(w))
+                .filter(p -> teamOf(p) != Team.SPECTATOR)
+                .filter(p -> c.contains(p.getLocation()))
+                .count();
+    }
+
+    public int teamSize() {
+        if (arena == null) return 0;
+        return Math.max(arena.players().get(Team.RED).size(), arena.players().get(Team.BLUE).size());
+    }
+
     public boolean canBuild(Location l) { return arena != null && arena.buildRegion() != null && arena.buildRegion().contains(l); }
 
     public void trackPlaced(Location l) { arena.placedBlocks().add(l.getBlock().getLocation()); }
