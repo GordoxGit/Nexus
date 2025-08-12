@@ -35,16 +35,35 @@ public class UiServiceImpl implements UiService {
     private final Map<UUID, Deque<ActionbarEntry>> actionbars = new HashMap<>();
     private final Map<Arena, Scoreboard> boards = new HashMap<>();
 
+    private boolean bossbarEnabled;
+    private boolean actionbarEnabled;
+    private boolean scoreboardEnabled;
+
     public UiServiceImpl(HikaBrainPlugin plugin, ThemeService theme, FeedbackService fx) {
         this.plugin = plugin;
         this.theme = theme;
         this.fx = fx;
+        reload();
         new BukkitRunnable(){
             @Override public void run(){ tickActionbars(); }
         }.runTaskTimer(plugin, 10L, 10L);
     }
 
+    public void reload() {
+        actionbarEnabled = plugin.getConfig().getBoolean("ui.actionbar", true);
+        bossbarEnabled = plugin.getConfig().getBoolean("ui.bossbar", false);
+        scoreboardEnabled = plugin.getConfig().getBoolean("ui.scoreboard", true);
+    }
+
     private void tickActionbars() {
+        if (!actionbarEnabled) {
+            for (UUID id : actionbars.keySet()) {
+                Player p = Bukkit.getPlayer(id);
+                if (p != null) p.spigot().sendMessage(ChatMessageType.ACTION_BAR, new TextComponent(""));
+            }
+            actionbars.clear();
+            return;
+        }
         Iterator<Map.Entry<UUID, Deque<ActionbarEntry>>> it = actionbars.entrySet().iterator();
         while (it.hasNext()) {
             Map.Entry<UUID, Deque<ActionbarEntry>> e = it.next();
@@ -67,6 +86,7 @@ public class UiServiceImpl implements UiService {
 
     @Override
     public void pushActionbar(Player p, Component c, int ttlTicks) {
+        if (!actionbarEnabled) return;
         actionbars.computeIfAbsent(p.getUniqueId(), k -> new ArrayDeque<>()).add(new ActionbarEntry(c, ttlTicks));
     }
 
@@ -74,6 +94,11 @@ public class UiServiceImpl implements UiService {
     public void setBossPhase(GamePhase phase, float progress) {
         Arena a = plugin.game().arena();
         if (a == null) return;
+        if (!bossbarEnabled) {
+            BossBar bb = bossbars.remove(a);
+            if (bb != null) bb.removeAll();
+            return;
+        }
         BossBar bar = bossbars.computeIfAbsent(a, k -> Bukkit.createBossBar("", BarColor.WHITE, BarStyle.SOLID));
         if (phase == null) {
             bar.removeAll();
@@ -111,6 +136,19 @@ public class UiServiceImpl implements UiService {
     @Override
     public void updateSidebar(Arena a) {
         if (a == null) return;
+        if (!scoreboardEnabled) {
+            Scoreboard sb = boards.remove(a);
+            if (sb != null) {
+                Scoreboard empty = Bukkit.getScoreboardManager().getNewScoreboard();
+                for (UUID u : a.players().getOrDefault(Team.RED, java.util.Collections.emptySet())) {
+                    Player p = Bukkit.getPlayer(u); if (p != null) p.setScoreboard(empty);
+                }
+                for (UUID u : a.players().getOrDefault(Team.BLUE, java.util.Collections.emptySet())) {
+                    Player p = Bukkit.getPlayer(u); if (p != null) p.setScoreboard(empty);
+                }
+            }
+            return;
+        }
         Scoreboard sb = boards.computeIfAbsent(a, k -> Bukkit.getScoreboardManager().getNewScoreboard());
         Objective obj = sb.getObjective("hb");
         if (obj == null) {

@@ -10,6 +10,7 @@ import org.bukkit.entity.Player;
 
 import com.example.hikabrain.ui.FeedbackServiceImpl;
 import com.example.hikabrain.ui.ThemeServiceImpl;
+import com.example.hikabrain.ui.UiServiceImpl;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -99,6 +100,7 @@ public class HBCommand implements CommandExecutor, TabCompleter {
                     pl.reloadConfig();
                     if (pl.theme() instanceof ThemeServiceImpl ts) ts.reload();
                     if (pl.fx() instanceof FeedbackServiceImpl fs) fs.reload();
+                    if (pl.ui() instanceof UiServiceImpl us) us.reload();
                     sender.sendMessage(ChatColor.GREEN + "UI rechargée.");
                     return true;
                 }
