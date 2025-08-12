@@ -2,8 +2,8 @@ plugins {
     java
 }
 
-group = "com.hikabrain"
-version = "1.1.9.1"
+group = "com.example"
+version = "1.2.3"
 
 repositories {
     mavenCentral()

@@ -120,7 +120,7 @@ public class GameManager {
         arena.players().get(t).add(p.getUniqueId());
         p.sendMessage((t==Team.RED?ChatColor.RED:ChatColor.BLUE) + "Tu rejoins " + t.name());
         plugin.scoreboard().show(p, arena);
-        plugin.scoreboard().update(arena);
+        plugin.scoreboard().updatePlayers(arena);
         plugin.tablist().update(arena);
     }
 
@@ -129,7 +129,7 @@ public class GameManager {
         for (Set<UUID> s : arena.players().values()) s.remove(p.getUniqueId());
         plugin.scoreboard().hide(p);
         plugin.tablist().remove(p);
-        plugin.scoreboard().update(arena);
+        plugin.scoreboard().updatePlayers(arena);
         plugin.tablist().update(arena);
         p.sendMessage(ChatColor.GRAY + "Tu as quitté la partie.");
     }
@@ -365,7 +365,7 @@ public class GameManager {
         if (arena == null || !arena.isActive()) return;
         if (isFrozen()) return;
         if (t == Team.RED) arena.redScore(arena.redScore()+1); else if (t == Team.BLUE) arena.blueScore(arena.blueScore()+1);
-        plugin.scoreboard().update(arena);
+        plugin.scoreboard().updateScore(arena);
         plugin.tablist().update(arena);
         plugin.fx().playTeamPreset(t, Presets.SCORE_BED);
 
