@@ -17,6 +17,7 @@ public class Arena {
     private Cuboid buildRegion;
     private int targetPoints = 5;
     private int timeLimitMinutes = 15;
+    private int teamSize = 2;
     private boolean active = false;
 
     private final Map<Team, Set<java.util.UUID>> players = new EnumMap<>(Team.class);
@@ -48,6 +49,8 @@ public class Arena {
     public void targetPoints(int n) { targetPoints = n; }
     public int timeLimitMinutes() { return timeLimitMinutes; }
     public void timeLimitMinutes(int m) { timeLimitMinutes = m; }
+    public int teamSize() { return teamSize; }
+    public void teamSize(int s) { teamSize = s; }
     public boolean isConfigured() { return worldName!=null && spawnRed!=null && spawnBlue!=null && bedRed!=null && bedBlue!=null && buildRegion!=null; }
     public boolean isActive() { return active; }
     public void setActive(boolean a) { active=a; }
@@ -67,6 +70,7 @@ public class Arena {
         saveCub(cfg, "build", buildRegion);
         cfg.set("targetPoints", targetPoints);
         cfg.set("timeLimitMinutes", timeLimitMinutes);
+        cfg.set("teamSize", teamSize);
         cfg.save(file);
     }
     public static Arena loadFrom(File file) throws IOException {
@@ -82,6 +86,7 @@ public class Arena {
         a.buildRegion = loadCub(cfg, "build");
         a.targetPoints = cfg.getInt("targetPoints", 5);
         a.timeLimitMinutes = cfg.getInt("timeLimitMinutes", 15);
+        a.teamSize = cfg.getInt("teamSize", 2);
         return a;
     }
     private static void saveLoc(YamlConfiguration cfg, String path, Location l) {

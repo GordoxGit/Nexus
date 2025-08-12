@@ -38,12 +38,14 @@ public class HikaBrainPlugin extends JavaPlugin {
     private String serverDisplayName;
     private String serverDomain;
     private final Set<String> allowedWorlds = new HashSet<>(); // lower-case
+    private org.bukkit.Location lobbyLocation;
 
     @Override
     public void onEnable() {
         instance = this;
         saveDefaultConfig();
         loadAllowedWorlds();
+        loadLobby();
         loadServerInfo();
         loadUiStyle();
         if (getConfig().getBoolean("debug", false)) getLogger().setLevel(java.util.logging.Level.FINE);
@@ -108,6 +110,19 @@ public class HikaBrainPlugin extends JavaPlugin {
         serverDomain = getConfig().getString("server.domain", "heneria.com");
     }
 
+    private void loadLobby() {
+        org.bukkit.configuration.ConfigurationSection sec = getConfig().getConfigurationSection("lobby");
+        if (sec == null) { lobbyLocation = null; return; }
+        World w = Bukkit.getWorld(sec.getString("world", ""));
+        if (w == null) { lobbyLocation = null; return; }
+        double x = sec.getDouble("x", 0.5);
+        double y = sec.getDouble("y", 80.0);
+        double z = sec.getDouble("z", 0.5);
+        float yaw = (float) sec.getDouble("yaw", 0.0);
+        float pitch = (float) sec.getDouble("pitch", 0.0);
+        lobbyLocation = new org.bukkit.Location(w, x, y, z, yaw, pitch);
+    }
+
     private void loadUiStyle() {
         org.bukkit.configuration.ConfigurationSection sec = getConfig().getConfigurationSection("ui.style");
         if (sec == null) sec = getConfig().createSection("ui.style");
@@ -128,4 +143,16 @@ public class HikaBrainPlugin extends JavaPlugin {
     public void reloadUiStyle() { loadUiStyle(); }
     public boolean isWorldAllowed(World w) { return w != null && allowedWorlds.contains(w.getName().toLowerCase(Locale.ROOT)); }
     public String allowedWorldsPretty() { return String.join(", ", allowedWorlds); }
+    public org.bukkit.Location lobby() { return lobbyLocation; }
+    public void setLobby(org.bukkit.Location l) {
+        lobbyLocation = l;
+        org.bukkit.configuration.file.FileConfiguration cfg = getConfig();
+        cfg.set("lobby.world", l.getWorld().getName());
+        cfg.set("lobby.x", l.getX());
+        cfg.set("lobby.y", l.getY());
+        cfg.set("lobby.z", l.getZ());
+        cfg.set("lobby.yaw", l.getYaw());
+        cfg.set("lobby.pitch", l.getPitch());
+        saveConfig();
+    }
 }

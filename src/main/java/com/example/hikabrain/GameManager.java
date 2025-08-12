@@ -48,9 +48,10 @@ public class GameManager {
     public ThemeService theme() { return plugin.theme(); }
     public FeedbackService fx() { return plugin.fx(); }
 
-    public Arena createArena(String name, World w) {
+    public Arena createArena(String name, World w, int teamSize) {
         arena = new Arena(name);
         arena.worldName(w.getName());
+        arena.teamSize(teamSize);
         return arena;
     }
 
@@ -117,6 +118,10 @@ public class GameManager {
             int bc = arena.players().get(Team.BLUE).size();
             t = rc <= bc ? Team.RED : Team.BLUE;
         }
+        if (arena.players().get(t).size() >= arena.teamSize()) {
+            p.sendMessage(ChatColor.RED + "Equipe pleine");
+            return;
+        }
         arena.players().get(t).add(p.getUniqueId());
         p.sendMessage((t==Team.RED?ChatColor.RED:ChatColor.BLUE) + "Tu rejoins " + t.name());
         plugin.scoreboard().show(p, arena);
@@ -131,6 +136,7 @@ public class GameManager {
         plugin.tablist().remove(p);
         plugin.scoreboard().updatePlayers(arena);
         plugin.tablist().update(arena);
+        if (HikaBrainPlugin.get().lobby() != null) tp(p, HikaBrainPlugin.get().lobby());
         p.sendMessage(ChatColor.GRAY + "Tu as quitté la partie.");
     }
 
@@ -230,6 +236,20 @@ public class GameManager {
 
     private void endCleanup() {
         flushPlacedBlocks();
+        if (arena != null) {
+            Location lobby = HikaBrainPlugin.get().lobby();
+            for (Team t : Team.values()) {
+                for (UUID u : arena.players().getOrDefault(t, java.util.Collections.emptySet())) {
+                    Player p = Bukkit.getPlayer(u);
+                    if (p != null) {
+                        plugin.scoreboard().hide(p);
+                        plugin.tablist().remove(p);
+                        if (lobby != null) tp(p, lobby);
+                    }
+                }
+                arena.players().getOrDefault(t, java.util.Collections.emptySet()).clear();
+            }
+        }
         plugin.scoreboard().clear();
     }
 
@@ -311,7 +331,7 @@ public class GameManager {
 
     public int teamSize() {
         if (arena == null) return 0;
-        return Math.max(arena.players().get(Team.RED).size(), arena.players().get(Team.BLUE).size());
+        return arena.teamSize();
     }
 
     public boolean canBuild(Location l) { return arena != null && arena.buildRegion() != null && arena.buildRegion().contains(l); }
