@@ -27,6 +27,7 @@ import org.bukkit.event.player.PlayerRespawnEvent;
 import org.bukkit.event.player.PlayerDropItemEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerChangedWorldEvent;
+import org.bukkit.event.player.PlayerTeleportEvent;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryDragEvent;
 import org.bukkit.inventory.EquipmentSlot;
@@ -62,6 +63,14 @@ public class GameListener implements Listener {
     private final GameManager game;
     public GameListener(GameManager game) { this.game = game; }
     private boolean notAllowedWorld(Player p) { return !game.isWorldAllowed(p.getWorld()); }
+
+    private static final NamespacedKey GUI_KEY = new NamespacedKey(HikaBrainPlugin.get(), "hb_gui");
+    private static final NamespacedKey CAT_KEY = new NamespacedKey(HikaBrainPlugin.get(), "hb_cat");
+    private static final NamespacedKey ARENA_KEY = new NamespacedKey(HikaBrainPlugin.get(), "hb_arena");
+    private final java.util.Set<java.util.UUID> compassCooldown = java.util.Collections.newSetFromMap(new java.util.concurrent.ConcurrentHashMap<>());
+    private boolean isLobbyWorld(World w) {
+        return HikaBrainPlugin.get().lobby() != null && HikaBrainPlugin.get().lobby().getWorld().equals(w);
+    }
 
     private static final NamespacedKey COMPASS_KEY = new NamespacedKey(HikaBrainPlugin.get(), "hb_compass");
     private static boolean isLobbyCompass(ItemStack it) {
@@ -258,26 +267,81 @@ public class GameListener implements Listener {
 
     @EventHandler
     public void onCompassDrop(PlayerDropItemEvent e) {
-        if (isLobbyCompass(e.getItemDrop().getItemStack())) e.setCancelled(true);
+        if (isLobbyCompass(e.getItemDrop().getItemStack()) && isLobbyWorld(e.getPlayer().getWorld())) {
+            e.setCancelled(true);
+        }
     }
 
-    @EventHandler(ignoreCancelled = true)
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onCompassClick(InventoryClickEvent e) {
+        if (e.getView().getTopInventory().getHolder() instanceof com.example.hikabrain.ui.compass.CompassGuiService.Holder) {
+            e.setCancelled(true);
+            if (e.getClickedInventory() != e.getView().getTopInventory()) return;
+            if (!e.isLeftClick()) return;
+            ItemStack it = e.getCurrentItem();
+            if (it == null) return;
+            ItemMeta m = it.getItemMeta();
+            if (m == null) return;
+            PersistentDataContainer pdc = m.getPersistentDataContainer();
+            String gui = pdc.get(GUI_KEY, PersistentDataType.STRING);
+            Player p = (Player) e.getWhoClicked();
+            if (gui == null) return;
+            switch (gui) {
+                case "mode":
+                    Integer cat = pdc.get(CAT_KEY, PersistentDataType.INTEGER);
+                    if (cat != null) HikaBrainPlugin.get().compassGui().openArenaList(p, cat);
+                    break;
+                case "list":
+                    String arena = pdc.get(ARENA_KEY, PersistentDataType.STRING);
+                    if (arena != null) HikaBrainPlugin.get().compassGui().attemptJoin(p, arena);
+                    break;
+                case "back":
+                    HikaBrainPlugin.get().compassGui().openModeMenu(p);
+                    break;
+                case "close":
+                    p.closeInventory();
+                    break;
+            }
+            return;
+        }
+        if (!isLobbyWorld(((Player) e.getWhoClicked()).getWorld())) return;
         if (isLobbyCompass(e.getCurrentItem()) || isLobbyCompass(e.getCursor())) e.setCancelled(true);
     }
 
-    @EventHandler(ignoreCancelled = true)
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onCompassDrag(InventoryDragEvent e) {
+        if (e.getView().getTopInventory().getHolder() instanceof com.example.hikabrain.ui.compass.CompassGuiService.Holder) {
+            e.setCancelled(true);
+            return;
+        }
+        if (!isLobbyWorld(((Player) e.getWhoClicked()).getWorld())) return;
         if (isLobbyCompass(e.getOldCursor())) { e.setCancelled(true); return; }
         for (ItemStack it : e.getNewItems().values()) {
             if (isLobbyCompass(it)) { e.setCancelled(true); return; }
         }
     }
 
-    @EventHandler
-    public void onCompassUse(PlayerInteractEvent e) {
-        if (e.getItem() != null && isLobbyCompass(e.getItem()) && e.getAction().toString().contains("RIGHT_CLICK")) {
-            HikaBrainPlugin.get().compassGui().open(e.getPlayer());
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onCompassInteract(PlayerInteractEvent e) {
+        Action act = e.getAction();
+        if (!(act == Action.RIGHT_CLICK_AIR || act == Action.RIGHT_CLICK_BLOCK || act == Action.LEFT_CLICK_AIR || act == Action.LEFT_CLICK_BLOCK)) return;
+        Player p = e.getPlayer();
+        if (!isLobbyWorld(p.getWorld())) return;
+        if (!isLobbyCompass(p.getInventory().getItemInMainHand()) && !isLobbyCompass(p.getInventory().getItemInOffHand())) return;
+        e.setCancelled(true);
+        e.setUseItemInHand(Event.Result.DENY);
+        e.setUseInteractedBlock(Event.Result.DENY);
+        HikaBrainPlugin.get().compassGui().openModeMenu(p);
+        java.util.UUID id = p.getUniqueId();
+        compassCooldown.add(id);
+        org.bukkit.Bukkit.getScheduler().runTaskLater(HikaBrainPlugin.get(), () -> compassCooldown.remove(id), 5L);
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onCompassTeleport(PlayerTeleportEvent e) {
+        if (!compassCooldown.contains(e.getPlayer().getUniqueId())) return;
+        PlayerTeleportEvent.TeleportCause c = e.getCause();
+        if (c == PlayerTeleportEvent.TeleportCause.UNKNOWN || c == PlayerTeleportEvent.TeleportCause.PLUGIN) {
             e.setCancelled(true);
         }
     }
