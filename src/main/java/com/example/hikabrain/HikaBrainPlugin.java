@@ -5,6 +5,7 @@ import org.bukkit.World;
 import org.bukkit.command.CommandMap;
 import org.bukkit.command.PluginCommand;
 import org.bukkit.plugin.java.JavaPlugin;
+import org.bukkit.configuration.file.YamlConfiguration;
 
 import com.example.hikabrain.ui.FeedbackService;
 import com.example.hikabrain.ui.FeedbackServiceImpl;
@@ -27,6 +28,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
+import java.io.File;
 
 public class HikaBrainPlugin extends JavaPlugin {
 
@@ -50,6 +52,7 @@ public class HikaBrainPlugin extends JavaPlugin {
     public void onEnable() {
         instance = this;
         saveDefaultConfig();
+        migrateWorldIds();
         loadAllowedWorlds();
         loadLobby();
         loadServerInfo();
@@ -111,7 +114,14 @@ public class HikaBrainPlugin extends JavaPlugin {
         List<String> list = getConfig().getStringList("allowed-worlds");
         allowedWorlds.clear();
         for (String w : list) if (w != null && !w.isEmpty()) allowedWorlds.add(w.toLowerCase(Locale.ROOT));
-        if (allowedWorlds.isEmpty()) allowedWorlds.add("hika"); // default
+        if (allowedWorlds.isEmpty()) allowedWorlds.add("world_hika"); // default
+        allowedWorlds.removeIf(w -> {
+            if (Bukkit.getWorld(w) == null) {
+                getLogger().severe("Allowed world not found: " + w);
+                return true;
+            }
+            return false;
+        });
     }
 
     private void loadServerInfo() {
@@ -166,5 +176,41 @@ public class HikaBrainPlugin extends JavaPlugin {
         cfg.set("lobby.yaw", l.getYaw());
         cfg.set("lobby.pitch", l.getPitch());
         saveConfig();
+    }
+
+    private void migrateWorldIds() {
+        org.bukkit.configuration.file.FileConfiguration cfg = getConfig();
+        boolean changed = false;
+        java.util.List<String> aw = cfg.getStringList("allowed-worlds");
+        boolean listChanged = false;
+        for (int i = 0; i < aw.size(); i++) {
+            String w = aw.get(i);
+            if ("hika".equalsIgnoreCase(w)) { aw.set(i, "world_hika"); listChanged = true; }
+        }
+        if (listChanged) { cfg.set("allowed-worlds", aw); changed = true; }
+
+        String lw = cfg.getString("lobby.world");
+        if ("hika".equalsIgnoreCase(lw)) { cfg.set("lobby.world", "world_hika"); changed = true; }
+
+        int migrated = 0;
+        File dir = new File(getDataFolder(), "arenas");
+        if (dir.exists()) {
+            File[] files = dir.listFiles((d,n) -> n.toLowerCase(java.util.Locale.ROOT).endsWith(".yml"));
+            if (files != null) {
+                for (File f : files) {
+                    try {
+                        YamlConfiguration yml = YamlConfiguration.loadConfiguration(f);
+                        String w = yml.getString("world");
+                        if ("hika".equalsIgnoreCase(w)) {
+                            yml.set("world", "world_hika");
+                            yml.save(f);
+                            migrated++;
+                        }
+                    } catch (Exception ignored) {}
+                }
+            }
+        }
+        if (changed) saveConfig();
+        if (migrated > 0) getLogger().info("Migrated world ids to world_hika: " + migrated + " arenas updated.");
     }
 }

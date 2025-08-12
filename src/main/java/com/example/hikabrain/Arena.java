@@ -79,6 +79,11 @@ public class Arena {
         if (name == null) throw new IOException("Missing arena name");
         Arena a = new Arena(name);
         a.worldName = cfg.getString("world");
+        if ("hika".equalsIgnoreCase(a.worldName)) {
+            a.worldName = "world_hika";
+            cfg.set("world", "world_hika");
+            cfg.save(file);
+        }
         a.spawnRed = loadLoc(cfg, "spawn.red");
         a.spawnBlue = loadLoc(cfg, "spawn.blue");
         a.bedRed = loadLoc(cfg, "bed.red");
