@@ -12,6 +12,10 @@ import com.example.hikabrain.ui.ThemeService;
 import com.example.hikabrain.ui.ThemeServiceImpl;
 import com.example.hikabrain.ui.UiService;
 import com.example.hikabrain.ui.UiServiceImpl;
+import com.example.hikabrain.ui.scoreboard.ScoreboardService;
+import com.example.hikabrain.ui.scoreboard.ScoreboardServiceImpl;
+import com.example.hikabrain.ui.tablist.TablistService;
+import com.example.hikabrain.ui.tablist.TablistServiceImpl;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
@@ -27,6 +31,10 @@ public class HikaBrainPlugin extends JavaPlugin {
     private UiService ui;
     private ThemeService theme;
     private FeedbackService fx;
+    private ScoreboardService scoreboard;
+    private TablistService tablist;
+    private String serverDisplayName;
+    private String serverDomain;
     private final Set<String> allowedWorlds = new HashSet<>(); // lower-case
 
     @Override
@@ -34,11 +42,14 @@ public class HikaBrainPlugin extends JavaPlugin {
         instance = this;
         saveDefaultConfig();
         loadAllowedWorlds();
+        loadServerInfo();
         if (getConfig().getBoolean("debug", false)) getLogger().setLevel(java.util.logging.Level.FINE);
 
         this.theme = new ThemeServiceImpl(this);
         this.fx = new FeedbackServiceImpl(this);
         this.ui = new UiServiceImpl(this, theme, fx);
+        this.scoreboard = new ScoreboardServiceImpl(this);
+        this.tablist = new TablistServiceImpl(this);
 
         this.gameManager = new GameManager(this);
         getServer().getPluginManager().registerEvents(new GameListener(gameManager), this);
@@ -77,6 +88,7 @@ public class HikaBrainPlugin extends JavaPlugin {
 
     @Override
     public void onDisable() {
+        if (scoreboard != null) scoreboard.clear();
         if (gameManager != null) gameManager.shutdown();
         getLogger().info("HikaBrain disabled.");
     }
@@ -88,11 +100,21 @@ public class HikaBrainPlugin extends JavaPlugin {
         if (allowedWorlds.isEmpty()) allowedWorlds.add("hika"); // default
     }
 
+    private void loadServerInfo() {
+        serverDisplayName = getConfig().getString("server.display-name", "Heneria");
+        serverDomain = getConfig().getString("server.domain", "play.heneria.net");
+    }
+
     public static HikaBrainPlugin get() { return instance; }
     public GameManager game() { return gameManager; }
     public UiService ui() { return ui; }
     public ThemeService theme() { return theme; }
     public FeedbackService fx() { return fx; }
+    public ScoreboardService scoreboard() { return scoreboard; }
+    public TablistService tablist() { return tablist; }
+    public String serverDisplayName() { return serverDisplayName; }
+    public String serverDomain() { return serverDomain; }
+    public void reloadServerInfo() { loadServerInfo(); }
     public boolean isWorldAllowed(World w) { return w != null && allowedWorlds.contains(w.getName().toLowerCase(Locale.ROOT)); }
     public String allowedWorldsPretty() { return String.join(", ", allowedWorlds); }
 }

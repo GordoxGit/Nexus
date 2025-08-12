@@ -3,6 +3,10 @@ allowed-worlds:
 
 debug: false
 
+server:
+  display-name: "Heneria"
+  domain: "play.heneria.net"
+
 # Zone de pont cassable (définie via /hb setbroke)
 broke:
   pos1:
