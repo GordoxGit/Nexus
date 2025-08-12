@@ -3,7 +3,7 @@ plugins {
 }
 
 group = "com.hikabrain"
-version = "1.1.7"
+version = "1.1.9"
 
 repositories {
     mavenCentral()
@@ -12,6 +12,7 @@ repositories {
 
 dependencies {
     compileOnly("org.spigotmc:spigot-api:1.21-R0.1-SNAPSHOT")
+    compileOnly("net.kyori:adventure-api:4.17.0")
     testImplementation("junit:junit:4.13.2")
 }
 
