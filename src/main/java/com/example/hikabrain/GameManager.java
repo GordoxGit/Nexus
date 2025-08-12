@@ -124,6 +124,7 @@ public class GameManager {
         }
         arena.players().get(t).add(p.getUniqueId());
         p.sendMessage((t==Team.RED?ChatColor.RED:ChatColor.BLUE) + "Tu rejoins " + t.name());
+        plugin.tablist().remove(p);
         plugin.scoreboard().show(p, arena);
         plugin.scoreboard().updatePlayers(arena);
         plugin.tablist().update(arena);
@@ -136,7 +137,7 @@ public class GameManager {
         plugin.tablist().remove(p);
         plugin.scoreboard().updatePlayers(arena);
         plugin.tablist().update(arena);
-        if (HikaBrainPlugin.get().lobby() != null) tp(p, HikaBrainPlugin.get().lobby());
+        HikaBrainPlugin.get().lobbyService().apply(p);
         p.sendMessage(ChatColor.GRAY + "Tu as quitté la partie.");
     }
 
@@ -237,14 +238,13 @@ public class GameManager {
     private void endCleanup() {
         flushPlacedBlocks();
         if (arena != null) {
-            Location lobby = HikaBrainPlugin.get().lobby();
             for (Team t : Team.values()) {
                 for (UUID u : arena.players().getOrDefault(t, java.util.Collections.emptySet())) {
                     Player p = Bukkit.getPlayer(u);
                     if (p != null) {
                         plugin.scoreboard().hide(p);
                         plugin.tablist().remove(p);
-                        if (lobby != null) tp(p, lobby);
+                        HikaBrainPlugin.get().lobbyService().apply(p);
                     }
                 }
                 arena.players().getOrDefault(t, java.util.Collections.emptySet()).clear();

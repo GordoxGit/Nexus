@@ -25,6 +25,10 @@ import org.bukkit.event.player.PlayerMoveEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.player.PlayerRespawnEvent;
 import org.bukkit.event.player.PlayerDropItemEvent;
+import org.bukkit.event.player.PlayerJoinEvent;
+import org.bukkit.event.player.PlayerChangedWorldEvent;
+import org.bukkit.event.inventory.InventoryClickEvent;
+import org.bukkit.event.inventory.InventoryDragEvent;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.ItemFlag;
 import org.bukkit.inventory.ItemStack;
@@ -58,6 +62,15 @@ public class GameListener implements Listener {
     private final GameManager game;
     public GameListener(GameManager game) { this.game = game; }
     private boolean notAllowedWorld(Player p) { return !game.isWorldAllowed(p.getWorld()); }
+
+    private static final NamespacedKey COMPASS_KEY = new NamespacedKey(HikaBrainPlugin.get(), "hb_compass");
+    private static boolean isLobbyCompass(ItemStack it) {
+        if (it == null) return false;
+        ItemMeta m = it.getItemMeta();
+        if (m == null) return false;
+        Byte b = m.getPersistentDataContainer().get(COMPASS_KEY, PersistentDataType.BYTE);
+        return b != null && b == (byte)1;
+    }
 
     public static ItemStack bedSelectorItem() {
         ItemStack hoe = new ItemStack(Material.STONE_HOE);
@@ -130,6 +143,29 @@ public class GameListener implements Listener {
         e.setUseInteractedBlock(Event.Result.DENY);
         e.setUseItemInHand(Event.Result.DENY);
         e.setCancelled(true);
+    }
+
+    @EventHandler
+    public void onJoin(PlayerJoinEvent e) {
+        HikaBrainPlugin.get().lobbyService().apply(e.getPlayer());
+    }
+
+    @EventHandler
+    public void onWorldChange(PlayerChangedWorldEvent e) {
+        Player p = e.getPlayer();
+        if (HikaBrainPlugin.get().isWorldAllowed(p.getWorld()) && (game.arena() == null || !game.arena().isActive())) {
+            HikaBrainPlugin.get().lobbyService().apply(p);
+        } else {
+            HikaBrainPlugin.get().scoreboard().hide(p);
+            HikaBrainPlugin.get().tablist().remove(p);
+        }
+    }
+
+    @EventHandler
+    public void onLobbyRespawn(PlayerRespawnEvent e) {
+        if (game.arena() == null || !game.arena().isActive()) {
+            HikaBrainPlugin.get().lobbyService().apply(e.getPlayer());
+        }
     }
 
     @EventHandler
@@ -218,6 +254,32 @@ public class GameListener implements Listener {
         if (t == Team.RED && game.arena().spawnRed() != null) e.setRespawnLocation(game.arena().spawnRed());
         else if (t == Team.BLUE && game.arena().spawnBlue() != null) e.setRespawnLocation(game.arena().spawnBlue());
         org.bukkit.Bukkit.getScheduler().runTaskLater(HikaBrainPlugin.get(), () -> game.restock(p, t), 1L);
+    }
+
+    @EventHandler
+    public void onCompassDrop(PlayerDropItemEvent e) {
+        if (isLobbyCompass(e.getItemDrop().getItemStack())) e.setCancelled(true);
+    }
+
+    @EventHandler(ignoreCancelled = true)
+    public void onCompassClick(InventoryClickEvent e) {
+        if (isLobbyCompass(e.getCurrentItem()) || isLobbyCompass(e.getCursor())) e.setCancelled(true);
+    }
+
+    @EventHandler(ignoreCancelled = true)
+    public void onCompassDrag(InventoryDragEvent e) {
+        if (isLobbyCompass(e.getOldCursor())) { e.setCancelled(true); return; }
+        for (ItemStack it : e.getNewItems().values()) {
+            if (isLobbyCompass(it)) { e.setCancelled(true); return; }
+        }
+    }
+
+    @EventHandler
+    public void onCompassUse(PlayerInteractEvent e) {
+        if (e.getItem() != null && isLobbyCompass(e.getItem()) && e.getAction().toString().contains("RIGHT_CLICK")) {
+            HikaBrainPlugin.get().compassGui().open(e.getPlayer());
+            e.setCancelled(true);
+        }
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)

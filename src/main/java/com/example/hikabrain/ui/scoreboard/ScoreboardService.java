@@ -16,4 +16,8 @@ public interface ScoreboardService {
     default void updateScore(Arena arena) {}
     default void updateTimer(Arena arena) {}
     default void updatePlayers(Arena arena) {}
+
+    /** Lobby specific helpers */
+    default void showLobby(Player p) {}
+    default void updateLobby() {}
 }

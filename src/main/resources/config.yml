@@ -1,8 +1,8 @@
 allowed-worlds:
-  - Hika
+  - world_hika
 
 lobby:
-  world: Hika
+  world: world_hika
   x: 0.5
   y: 80.0
   z: 0.5
@@ -47,6 +47,9 @@ ui:
     brand_sub: "HikaBrain"
     domain: "heneria.com"
     gradient_title: false
+    separator: "§8────────"
+    update_interval_ticks: 20
+  lobby:
     separator: "§8────────"
     update_interval_ticks: 20
 
