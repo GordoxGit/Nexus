@@ -96,24 +96,39 @@ public class GameListener implements Listener {
         return foot.getLocation().add(data.getFacing().getModX(), 0, data.getFacing().getModZ()).getBlock();
     }
 
-    @EventHandler
-    public void onInteract(PlayerInteractEvent e) {
-        if (e.getHand() != EquipmentSlot.HAND) return;
-        if (e.getItem() == null || !isBedSelector(e.getItem())) return;
-        if (!(e.getAction() == Action.RIGHT_CLICK_BLOCK || e.getAction() == Action.LEFT_CLICK_BLOCK)) return;
-        if (e.getClickedBlock() == null) return;
-        Player p = e.getPlayer();
-        if (!p.hasPermission("hikabrain.admin")) { p.sendMessage(ChatColor.RED + "Permission: hikabrain.admin"); return; }
-        if (notAllowedWorld(p)) { p.sendMessage(ChatColor.RED + "Actif uniquement dans: " + HikaBrainPlugin.get().allowedWorldsPretty()); return; }
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onBedInteract(PlayerInteractEvent e) {
+        Action act = e.getAction();
+        if (!(act == Action.RIGHT_CLICK_BLOCK || act == Action.LEFT_CLICK_BLOCK)) return;
+        Block clicked = e.getClickedBlock();
+        if (clicked == null) return;
+        if (!(Tag.BEDS.isTagged(clicked.getType()) || clicked.getBlockData() instanceof Bed)) return;
 
-        Block b = e.getClickedBlock();
-        if (!b.getType().name().endsWith("_BED")) { p.sendMessage(ChatColor.RED + "Clique un lit."); return; }
-        b = normalizeToBedFoot(b);
-        if (e.getAction() == Action.RIGHT_CLICK_BLOCK) {
-            if (game.setBed(Team.RED, b.getLocation())) p.sendMessage(ChatColor.GREEN + "Lit ROUGE enregistré.");
-        } else {
-            if (game.setBed(Team.BLUE, b.getLocation())) p.sendMessage(ChatColor.GREEN + "Lit BLEU enregistré.");
+        EquipmentSlot hand = e.getHand();
+        ItemStack item = hand == EquipmentSlot.OFF_HAND ?
+                e.getPlayer().getInventory().getItemInOffHand() :
+                e.getPlayer().getInventory().getItemInMainHand();
+
+        if (isBedSelector(item)) {
+            Player p = e.getPlayer();
+            if (!p.hasPermission("hikabrain.admin")) { p.sendMessage(ChatColor.RED + "Permission: hikabrain.admin"); deny(e); return; }
+            if (notAllowedWorld(p)) { p.sendMessage(ChatColor.RED + "Actif uniquement dans: " + HikaBrainPlugin.get().allowedWorldsPretty()); deny(e); return; }
+            Block b = normalizeToBedFoot(clicked);
+            if (act == Action.RIGHT_CLICK_BLOCK) {
+                if (game.setBed(Team.RED, b.getLocation())) p.sendMessage(ChatColor.GREEN + "Lit ROUGE enregistré.");
+            } else {
+                if (game.setBed(Team.BLUE, b.getLocation())) p.sendMessage(ChatColor.GREEN + "Lit BLEU enregistré.");
+            }
+            deny(e);
+            return;
         }
+
+        deny(e);
+    }
+
+    private void deny(PlayerInteractEvent e) {
+        e.setUseInteractedBlock(Event.Result.DENY);
+        e.setUseItemInHand(Event.Result.DENY);
         e.setCancelled(true);
     }
 
@@ -168,6 +183,11 @@ public class GameListener implements Listener {
             e.setCancelled(true);
             return;
         }
+        if ((Tag.BEDS.isTagged(e.getBlock().getType()) || e.getBlock().getBlockData() instanceof Bed)
+                && !isBedSelector(e.getPlayer().getInventory().getItemInMainHand())) {
+            e.setCancelled(true);
+            return;
+        }
         if (game.arena() != null && game.arena().isActive()
                 && game.inBrokeRegion(e.getBlock().getLocation())) {
             e.setCancelled(false);
@@ -200,13 +220,26 @@ public class GameListener implements Listener {
         org.bukkit.Bukkit.getScheduler().runTaskLater(HikaBrainPlugin.get(), () -> game.restock(p, t), 1L);
     }
 
-    @EventHandler
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onBedEnter(PlayerBedEnterEvent e) {
         if (game.arena() == null) return;
         if (notAllowedWorld(e.getPlayer())) return;
+        if (isBedSelector(e.getPlayer().getInventory().getItemInMainHand()) ||
+                isBedSelector(e.getPlayer().getInventory().getItemInOffHand())) {
+            e.setUseBed(Event.Result.DENY);
+            e.setCancelled(true);
+            return;
+        }
         Block foot = normalizeToBedFoot(e.getBed());
-        if (game.arena().bedRed()!=null && foot.getLocation().equals(game.arena().bedRed())) { e.setCancelled(true); e.getPlayer().sendMessage(ChatColor.RED + "Tu ne peux pas dormir sur le lit ROUGE de l'arène."); return; }
-        if (game.arena().bedBlue()!=null && foot.getLocation().equals(game.arena().bedBlue())) { e.setCancelled(true); e.getPlayer().sendMessage(ChatColor.RED + "Tu ne peux pas dormir sur le lit BLEU de l'arène."); }
+        if (game.arena().bedRed()!=null && foot.getLocation().equals(game.arena().bedRed())) {
+            e.setUseBed(Event.Result.DENY);
+            e.setCancelled(true);
+            return;
+        }
+        if (game.arena().bedBlue()!=null && foot.getLocation().equals(game.arena().bedBlue())) {
+            e.setUseBed(Event.Result.DENY);
+            e.setCancelled(true);
+        }
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
