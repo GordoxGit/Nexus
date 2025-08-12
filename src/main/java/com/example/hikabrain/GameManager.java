@@ -12,6 +12,11 @@ import org.bukkit.inventory.meta.LeatherArmorMeta;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.NamespacedKey;
 
+import com.example.hikabrain.ui.FeedbackService;
+import com.example.hikabrain.ui.ThemeService;
+import com.example.hikabrain.ui.UiService;
+import com.example.hikabrain.ui.model.Presets;
+
 import java.io.File;
 import java.io.IOException;
 import java.util.*;
@@ -36,6 +41,10 @@ public class GameManager {
 
     public Arena arena() { return arena; }
     public boolean isWorldAllowed(World w) { return plugin.isWorldAllowed(w); }
+
+    public UiService ui() { return plugin.ui(); }
+    public ThemeService theme() { return plugin.theme(); }
+    public FeedbackService fx() { return plugin.fx(); }
 
     public Arena createArena(String name, World w) {
         arena = new Arena(name);
@@ -78,6 +87,8 @@ public class GameManager {
         if (!file.exists()) throw new IOException("Arena file not found: " + name);
         arena = Arena.loadFrom(file);
         bridgeReset.init(arena.name());
+        String tid = plugin.getConfig().getString("arenas." + name + ".ui.theme", plugin.getConfig().getString("ui.theme", "classic"));
+        plugin.theme().applyTheme(arena, tid);
         return true;
     }
 
@@ -123,14 +134,7 @@ public class GameManager {
             if (freezeMoveTicks <= 0 || arena == null || !arena.isActive()) { cancel(); return; }
             freezeMoveTicks--;
         }}.runTaskTimer(plugin, 1L, 1L);
-
-        broadcastTitle(ChatColor.GOLD + "3", ChatColor.GRAY + "Préparez-vous");
-        broadcastSound(Sound.BLOCK_NOTE_BLOCK_PLING, 1f, 1.2f);
-        new BukkitRunnable(){int c=2; public void run(){
-            if (arena == null || !arena.isActive()) { cancel(); return; }
-            if (c>0){ broadcastTitle(ChatColor.GOLD + String.valueOf(c), ""); broadcastSound(Sound.BLOCK_NOTE_BLOCK_PLING, 1f, 1.2f); c--; }
-            else { broadcastTitle(ChatColor.GREEN + "GO!", ""); broadcastSound(Sound.BLOCK_NOTE_BLOCK_PLING, 1f, 1.8f); this.cancel(); }
-        }}.runTaskTimer(plugin, 20L, 20L);
+        plugin.ui().showIntroCountdown(arena, 3);
     }
 
     public void start() {
@@ -143,6 +147,7 @@ public class GameManager {
         timeRemaining = arena.timeLimitMinutes() * 60;
         scoreboard.setScores(0,0);
         scoreboard.setTime(timeRemaining);
+        plugin.ui().updateSidebar(arena);
 
         for (UUID u : arena.players().get(Team.RED)) {
             Player p = Bukkit.getPlayer(u);
@@ -164,6 +169,7 @@ public class GameManager {
                 if (arena == null || !arena.isActive()) { cancel(); return; }
                 timeRemaining--; if (timeRemaining < 0) { endByTime(); cancel(); return; }
                 scoreboard.setTime(timeRemaining);
+                plugin.ui().updateSidebar(arena);
             }
         };
         timerTask.runTaskTimer(plugin, 20L, 20L);
@@ -320,6 +326,8 @@ public class GameManager {
         if (isFrozen()) return;
         if (t == Team.RED) arena.redScore(arena.redScore()+1); else if (t == Team.BLUE) arena.blueScore(arena.blueScore()+1);
         scoreboard.setScores(arena.redScore(), arena.blueScore());
+        plugin.ui().updateSidebar(arena);
+        plugin.fx().playTeamPreset(t, Presets.SCORE_BED);
 
         String teamName = (t==Team.RED?"Rouge":"Bleue");
         String msg = (t==Team.RED?ChatColor.RED:ChatColor.BLUE) + "L'équipe " + teamName + " a marqué !";

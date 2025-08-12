@@ -6,6 +6,13 @@ import org.bukkit.command.CommandMap;
 import org.bukkit.command.PluginCommand;
 import org.bukkit.plugin.java.JavaPlugin;
 
+import com.example.hikabrain.ui.FeedbackService;
+import com.example.hikabrain.ui.FeedbackServiceImpl;
+import com.example.hikabrain.ui.ThemeService;
+import com.example.hikabrain.ui.ThemeServiceImpl;
+import com.example.hikabrain.ui.UiService;
+import com.example.hikabrain.ui.UiServiceImpl;
+
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import java.util.HashSet;
@@ -17,6 +24,9 @@ public class HikaBrainPlugin extends JavaPlugin {
 
     private static HikaBrainPlugin instance;
     private GameManager gameManager;
+    private UiService ui;
+    private ThemeService theme;
+    private FeedbackService fx;
     private final Set<String> allowedWorlds = new HashSet<>(); // lower-case
 
     @Override
@@ -25,6 +35,10 @@ public class HikaBrainPlugin extends JavaPlugin {
         saveDefaultConfig();
         loadAllowedWorlds();
         if (getConfig().getBoolean("debug", false)) getLogger().setLevel(java.util.logging.Level.FINE);
+
+        this.theme = new ThemeServiceImpl(this);
+        this.fx = new FeedbackServiceImpl(this);
+        this.ui = new UiServiceImpl(this, theme, fx);
 
         this.gameManager = new GameManager(this);
         getServer().getPluginManager().registerEvents(new GameListener(gameManager), this);
@@ -76,6 +90,9 @@ public class HikaBrainPlugin extends JavaPlugin {
 
     public static HikaBrainPlugin get() { return instance; }
     public GameManager game() { return gameManager; }
+    public UiService ui() { return ui; }
+    public ThemeService theme() { return theme; }
+    public FeedbackService fx() { return fx; }
     public boolean isWorldAllowed(World w) { return w != null && allowedWorlds.contains(w.getName().toLowerCase(Locale.ROOT)); }
     public String allowedWorldsPretty() { return String.join(", ", allowedWorlds); }
 }

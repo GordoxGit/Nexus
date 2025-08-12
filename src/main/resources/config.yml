@@ -19,3 +19,34 @@ broke:
     enabled: true
     batchPerTick: 1500
     snapshotOnLoad: true
+
+ui:
+  theme: classic
+  scoreboard: true
+  actionbar: true
+  bossbar: false
+
+feedback:
+  throttle_ticks: 5
+  presets:
+    hit_soft: { sound: "ENTITY_ARROW_HIT_PLAYER:1.0:1.5", particle: "DUST:#ffffff:12" }
+    score_bed: { sound: "BLOCK_AMETHYST_BLOCK_CHIME:1.0:1.3", particle: "DUST:#ff3b30:32" }
+    clutch_save: { sound: "ENTITY_ENDERMAN_TELEPORT:0.8:1.8", particle: "CLOUD:8" }
+
+themes:
+  classic:
+    red:   { primary: "#ff3b30", secondary: "#b91c1c" }
+    blue:  { primary: "#0a84ff", secondary: "#1d4ed8" }
+    soundBank: "A"
+  neon:
+    red:   { primary: "#ff1761", secondary: "#b1003a" }
+    blue:  { primary: "#00e0ff", secondary: "#008db3" }
+    soundBank: "B"
+  ice:
+    red:   { primary: "#f87171", secondary: "#ef4444" }
+    blue:  { primary: "#93c5fd", secondary: "#3b82f6" }
+    soundBank: "C"
+  desert:
+    red:   { primary: "#f97316", secondary: "#c2410c" }
+    blue:  { primary: "#fde047", secondary: "#facc15" }
+    soundBank: "D"

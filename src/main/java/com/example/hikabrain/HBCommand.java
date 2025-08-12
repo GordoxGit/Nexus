@@ -8,6 +8,9 @@ import org.bukkit.command.CommandSender;
 import org.bukkit.command.TabCompleter;
 import org.bukkit.entity.Player;
 
+import com.example.hikabrain.ui.FeedbackServiceImpl;
+import com.example.hikabrain.ui.ThemeServiceImpl;
+
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -27,6 +30,8 @@ public class HBCommand implements CommandExecutor, TabCompleter {
         s.sendMessage(ChatColor.YELLOW + "/hb resetbroke" + ChatColor.GRAY + " - Réinitialise manuellement le pont");
         s.sendMessage(ChatColor.YELLOW + "/hb join [red|blue]" + ChatColor.GRAY + " - Rejoindre une équipe");
         s.sendMessage(ChatColor.YELLOW + "/hb leave" + ChatColor.GRAY + " - Quitter la partie");
+        s.sendMessage(ChatColor.YELLOW + "/hb ui reload" + ChatColor.GRAY + " - Recharge la configuration UI");
+        s.sendMessage(ChatColor.YELLOW + "/hb theme <id>" + ChatColor.GRAY + " - Applique un thème");
         s.sendMessage(ChatColor.DARK_GRAY + "Admin: create, setspawn, setbuildpos, setpoints, settimer, save, load, start, stop");
     }
 
@@ -85,6 +90,30 @@ public class HBCommand implements CommandExecutor, TabCompleter {
                 if (needAdmin(sender)) return true;
                 game.resetBroke();
                 sender.sendMessage(ChatColor.GREEN + "Reset broke lancé.");
+                return true;
+            }
+            case "ui": {
+                if (args.length >= 2 && args[1].equalsIgnoreCase("reload")) {
+                    if (needAdmin(sender)) return true;
+                    HikaBrainPlugin pl = HikaBrainPlugin.get();
+                    pl.reloadConfig();
+                    if (pl.theme() instanceof ThemeServiceImpl ts) ts.reload();
+                    if (pl.fx() instanceof FeedbackServiceImpl fs) fs.reload();
+                    sender.sendMessage(ChatColor.GREEN + "UI rechargée.");
+                    return true;
+                }
+                sender.sendMessage(ChatColor.RED + "Usage: /hb ui reload");
+                return true;
+            }
+            case "theme": {
+                if (needAdmin(sender)) return true;
+                if (args.length < 2) {
+                    sender.sendMessage(ChatColor.YELLOW + "Thèmes: " + String.join(", ", HikaBrainPlugin.get().theme().available()));
+                    return true;
+                }
+                if (game.arena() == null) { sender.sendMessage(ChatColor.RED + "Aucune arène."); return true; }
+                HikaBrainPlugin.get().theme().applyTheme(game.arena(), args[1]);
+                sender.sendMessage(ChatColor.GREEN + "Thème appliqué: " + args[1]);
                 return true;
             }
 case "join": {
@@ -174,7 +203,7 @@ case "join": {
 
     @Override
     public List<String> onTabComplete(CommandSender sender, org.bukkit.command.Command command, String alias, String[] args) {
-        if (args.length == 1) return Arrays.asList("help","list","setbed","join","leave","create","setspawn","setbuildpos","setpoints","settimer","save","load","start","stop","setbroke","snapshotbroke","resetbroke");
+        if (args.length == 1) return Arrays.asList("help","list","setbed","join","leave","create","setspawn","setbuildpos","setpoints","settimer","save","load","start","stop","setbroke","snapshotbroke","resetbroke","ui","theme");
         if (args.length == 2) {
             switch (args[0].toLowerCase()) {
                 case "setspawn": return Arrays.asList("red","blue");
@@ -182,6 +211,8 @@ case "join": {
                 case "setpoints": return Arrays.asList("5","10");
                 case "settimer": return Arrays.asList("10","15","20");
                 case "join": return Arrays.asList("red","blue");
+                case "ui": return Arrays.asList("reload");
+                case "theme": return new ArrayList<>(HikaBrainPlugin.get().theme().available());
             }
         }
         return new ArrayList<>();
