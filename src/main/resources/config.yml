@@ -29,6 +29,13 @@ ui:
   scoreboard: true
   actionbar: true
   bossbar: false
+  style:
+    brand_title: "Heneria"
+    brand_sub: "HikaBrain"
+    domain: "heneria.com"
+    gradient_title: false
+    separator: "§8────────"
+    update_interval_ticks: 20
 
 feedback:
   throttle_ticks: 5

@@ -28,7 +28,7 @@ public class HikaScoreboard {
     public void rebuild() {
         ScoreboardManager m = Bukkit.getScoreboardManager();
         board = m.getNewScoreboard();
-        String title = ChatColor.AQUA + plugin.serverDisplayName() + ChatColor.DARK_GRAY + " • " + ChatColor.WHITE + "HikaBrain";
+        String title = ChatColor.AQUA + plugin.style().brandTitle() + ChatColor.DARK_GRAY + " • " + ChatColor.WHITE + plugin.style().brandSub();
         obj = board.registerNewObjective("hb", "dummy", title);
         obj.setDisplaySlot(DisplaySlot.SIDEBAR);
         for (int i = 0; i < 15; i++) {
@@ -55,13 +55,13 @@ public class HikaScoreboard {
         lines[0].setPrefix(ChatColor.GRAY + "Map: " + ChatColor.WHITE + arena.name());
         lines[1].setPrefix(ChatColor.GRAY + "Mode: " + ChatColor.WHITE + mode);
         lines[2].setPrefix(ChatColor.GRAY + "Temps: " + ChatColor.WHITE + mmss);
-        lines[3].setPrefix(ChatColor.RED + "Rouge: " + ChatColor.WHITE + arena.redScore() + " " +
+        lines[3].setPrefix(ChatColor.RED + "Rouge: " + ChatColor.WHITE + arena.redScore() + "  " +
                 ChatColor.BLUE + "Bleu: " + ChatColor.WHITE + arena.blueScore());
         lines[4].setPrefix(ChatColor.GRAY + "Série: " + ChatColor.WHITE + "0");
         lines[5].setPrefix(ChatColor.GRAY + "Joueurs: " + ChatColor.WHITE + inArena + "/" + capacity);
-        lines[6].setPrefix(ChatColor.DARK_GRAY + "──────────────");
+        lines[6].setPrefix(plugin.style().separator());
         lines[7].setPrefix(ChatColor.GRAY + "/hb help");
-        lines[8].setPrefix(ChatColor.DARK_GRAY + plugin.serverDomain());
+        lines[8].setPrefix(ChatColor.DARK_GRAY + plugin.style().domain());
         for (int i = 9; i < 15; i++) lines[i].setPrefix("");
     }
 }

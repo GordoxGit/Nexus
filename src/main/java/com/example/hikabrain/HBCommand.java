@@ -99,6 +99,7 @@ public class HBCommand implements CommandExecutor, TabCompleter {
                     HikaBrainPlugin pl = HikaBrainPlugin.get();
                     pl.reloadConfig();
                     pl.reloadServerInfo();
+                    pl.reloadUiStyle();
                     if (pl.theme() instanceof ThemeServiceImpl ts) ts.reload();
                     if (pl.fx() instanceof FeedbackServiceImpl fs) fs.reload();
                     if (pl.ui() instanceof UiServiceImpl us) us.reload();

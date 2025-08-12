@@ -13,9 +13,10 @@ import com.example.hikabrain.ui.ThemeServiceImpl;
 import com.example.hikabrain.ui.UiService;
 import com.example.hikabrain.ui.UiServiceImpl;
 import com.example.hikabrain.ui.scoreboard.ScoreboardService;
-import com.example.hikabrain.ui.scoreboard.ScoreboardServiceImpl;
+import com.example.hikabrain.ui.scoreboard.ScoreboardServiceV2;
 import com.example.hikabrain.ui.tablist.TablistService;
-import com.example.hikabrain.ui.tablist.TablistServiceImpl;
+import com.example.hikabrain.ui.tablist.TablistServiceV2;
+import com.example.hikabrain.ui.style.UiStyle;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
@@ -33,6 +34,7 @@ public class HikaBrainPlugin extends JavaPlugin {
     private FeedbackService fx;
     private ScoreboardService scoreboard;
     private TablistService tablist;
+    private UiStyle uiStyle;
     private String serverDisplayName;
     private String serverDomain;
     private final Set<String> allowedWorlds = new HashSet<>(); // lower-case
@@ -43,13 +45,14 @@ public class HikaBrainPlugin extends JavaPlugin {
         saveDefaultConfig();
         loadAllowedWorlds();
         loadServerInfo();
+        loadUiStyle();
         if (getConfig().getBoolean("debug", false)) getLogger().setLevel(java.util.logging.Level.FINE);
 
         this.theme = new ThemeServiceImpl(this);
         this.fx = new FeedbackServiceImpl(this);
         this.ui = new UiServiceImpl(this, theme, fx);
-        this.scoreboard = new ScoreboardServiceImpl(this);
-        this.tablist = new TablistServiceImpl(this);
+        this.scoreboard = new ScoreboardServiceV2(this);
+        this.tablist = new TablistServiceV2(this);
 
         this.gameManager = new GameManager(this);
         getServer().getPluginManager().registerEvents(new GameListener(gameManager), this);
@@ -105,6 +108,12 @@ public class HikaBrainPlugin extends JavaPlugin {
         serverDomain = getConfig().getString("server.domain", "heneria.com");
     }
 
+    private void loadUiStyle() {
+        org.bukkit.configuration.ConfigurationSection sec = getConfig().getConfigurationSection("ui.style");
+        if (sec == null) sec = getConfig().createSection("ui.style");
+        uiStyle = new UiStyle(sec);
+    }
+
     public static HikaBrainPlugin get() { return instance; }
     public GameManager game() { return gameManager; }
     public UiService ui() { return ui; }
@@ -112,9 +121,11 @@ public class HikaBrainPlugin extends JavaPlugin {
     public FeedbackService fx() { return fx; }
     public ScoreboardService scoreboard() { return scoreboard; }
     public TablistService tablist() { return tablist; }
+    public UiStyle style() { return uiStyle; }
     public String serverDisplayName() { return serverDisplayName; }
     public String serverDomain() { return serverDomain; }
     public void reloadServerInfo() { loadServerInfo(); }
+    public void reloadUiStyle() { loadUiStyle(); }
     public boolean isWorldAllowed(World w) { return w != null && allowedWorlds.contains(w.getName().toLowerCase(Locale.ROOT)); }
     public String allowedWorldsPretty() { return String.join(", ", allowedWorlds); }
 }

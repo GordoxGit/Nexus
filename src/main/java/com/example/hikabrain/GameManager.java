@@ -153,16 +153,16 @@ public class GameManager {
         arena.setActive(true);
         arena.redScore(0); arena.blueScore(0);
         timeRemaining = arena.timeLimitMinutes() * 60;
-        plugin.scoreboard().update(arena);
+        plugin.scoreboard().render(arena);
         plugin.tablist().update(arena);
 
         for (UUID u : arena.players().get(Team.RED)) {
             Player p = Bukkit.getPlayer(u);
-            if (p != null) { tp(p, arena.spawnRed()); giveKit(p, Team.RED); plugin.scoreboard().show(p, arena); }
+            if (p != null) { tp(p, arena.spawnRed()); giveKit(p, Team.RED); }
         }
         for (UUID u : arena.players().get(Team.BLUE)) {
             Player p = Bukkit.getPlayer(u);
-            if (p != null) { tp(p, arena.spawnBlue()); giveKit(p, Team.BLUE); plugin.scoreboard().show(p, arena); }
+            if (p != null) { tp(p, arena.spawnBlue()); giveKit(p, Team.BLUE); }
         }
 
         new BukkitRunnable(){ @Override public void run(){
@@ -175,7 +175,7 @@ public class GameManager {
             @Override public void run() {
                 if (arena == null || !arena.isActive()) { cancel(); return; }
                 timeRemaining--; if (timeRemaining < 0) { endByTime(); cancel(); return; }
-                plugin.scoreboard().update(arena);
+                plugin.scoreboard().tick(arena);
                 plugin.tablist().update(arena);
             }
         };

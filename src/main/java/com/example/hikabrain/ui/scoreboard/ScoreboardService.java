@@ -9,4 +9,11 @@ public interface ScoreboardService {
     void update(Arena arena);
     void reload();
     void clear();
+
+    /** New methods for v2 implementation */
+    default void render(Arena arena) {}
+    default void tick(Arena arena) {}
+    default void updateScore(Arena arena) {}
+    default void updateTimer(Arena arena) {}
+    default void updatePlayers(Arena arena) {}
 }
