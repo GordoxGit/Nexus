@@ -7,4 +7,7 @@ public interface TablistService {
     void update(Arena arena);
     void remove(Player p);
     void reload();
+
+    /** Lobby profile helpers */
+    default void showLobby(Player p) {}
 }

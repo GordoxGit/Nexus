@@ -16,6 +16,8 @@ import com.example.hikabrain.ui.scoreboard.ScoreboardService;
 import com.example.hikabrain.ui.scoreboard.ScoreboardServiceV2;
 import com.example.hikabrain.ui.tablist.TablistService;
 import com.example.hikabrain.ui.tablist.TablistServiceV2;
+import com.example.hikabrain.ui.compass.CompassGuiService;
+import com.example.hikabrain.lobby.LobbyService;
 import com.example.hikabrain.ui.style.UiStyle;
 
 import java.lang.reflect.Constructor;
@@ -34,6 +36,8 @@ public class HikaBrainPlugin extends JavaPlugin {
     private FeedbackService fx;
     private ScoreboardService scoreboard;
     private TablistService tablist;
+    private CompassGuiService compassGui;
+    private LobbyService lobbyService;
     private UiStyle uiStyle;
     private String serverDisplayName;
     private String serverDomain;
@@ -55,6 +59,8 @@ public class HikaBrainPlugin extends JavaPlugin {
         this.ui = new UiServiceImpl(this, theme, fx);
         this.scoreboard = new ScoreboardServiceV2(this);
         this.tablist = new TablistServiceV2(this);
+        this.compassGui = new CompassGuiService(this);
+        this.lobbyService = new LobbyService(this);
 
         this.gameManager = new GameManager(this);
         getServer().getPluginManager().registerEvents(new GameListener(gameManager), this);
@@ -136,6 +142,8 @@ public class HikaBrainPlugin extends JavaPlugin {
     public FeedbackService fx() { return fx; }
     public ScoreboardService scoreboard() { return scoreboard; }
     public TablistService tablist() { return tablist; }
+    public CompassGuiService compassGui() { return compassGui; }
+    public LobbyService lobbyService() { return lobbyService; }
     public UiStyle style() { return uiStyle; }
     public String serverDisplayName() { return serverDisplayName; }
     public String serverDomain() { return serverDomain; }

@@ -9,10 +9,13 @@ import org.bukkit.ChatColor;
 import org.bukkit.entity.Player;
 import org.bukkit.scheduler.BukkitRunnable;
 
+import java.util.HashSet;
+import java.util.Set;
 import java.util.UUID;
 
 public class TablistServiceV2 implements TablistService {
     private final HikaBrainPlugin plugin;
+    private final Set<UUID> lobbyPlayers = new HashSet<>();
 
     public TablistServiceV2(HikaBrainPlugin plugin) {
         this.plugin = plugin;
@@ -23,6 +26,10 @@ public class TablistServiceV2 implements TablistService {
                 if (a != null) update(a);
             }
         }.runTaskTimer(plugin, interval, interval);
+        int lobbyInterval = plugin.getConfig().getInt("ui.lobby.update_interval_ticks", 20);
+        new BukkitRunnable(){
+            @Override public void run(){ updateLobby(); }
+        }.runTaskTimer(plugin, lobbyInterval, lobbyInterval);
     }
 
     @Override
@@ -68,11 +75,33 @@ public class TablistServiceV2 implements TablistService {
         if (p != null) {
             p.setPlayerListName(p.getName());
             p.setPlayerListHeaderFooter("", "");
+            lobbyPlayers.remove(p.getUniqueId());
         }
     }
 
     @Override
     public void reload() {
         update(plugin.game().arena());
+        updateLobby();
+    }
+
+    @Override
+    public void showLobby(Player p) {
+        lobbyPlayers.add(p.getUniqueId());
+        updateLobbyPlayer(p);
+    }
+
+    private void updateLobby() {
+        for (UUID u : new HashSet<>(lobbyPlayers)) {
+            Player p = Bukkit.getPlayer(u);
+            if (p != null) updateLobbyPlayer(p);
+        }
+    }
+
+    private void updateLobbyPlayer(Player p) {
+        String header = ChatColor.AQUA + "" + ChatColor.BOLD + "HENERIA\n" + ChatColor.GRAY + "Lobby " + ChatColor.DARK_GRAY + "• " + ChatColor.GRAY + "HikaBrain";
+        String footer = ChatColor.GRAY + "Connectés: " + ChatColor.WHITE + Bukkit.getOnlinePlayers().size() + "  " + ChatColor.DARK_GRAY + "|  " + ChatColor.GRAY + "Monde: " + ChatColor.WHITE + p.getWorld().getName() + "\n" + ChatColor.DARK_GRAY + plugin.serverDomain();
+        p.setPlayerListHeaderFooter(header, footer);
+        p.setPlayerListName(p.getName());
     }
 }
