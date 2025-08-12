@@ -27,7 +27,6 @@ public class GameManager {
     private final HikaBrainPlugin plugin;
     private Arena arena;
 
-    private final HikaScoreboard scoreboard = new HikaScoreboard();
     private final BridgeResetService bridgeReset;
     private BukkitRunnable timerTask;
     private int timeRemaining; // seconds
@@ -106,6 +105,7 @@ public class GameManager {
 
     public void setTargetPoints(int n) { if (arena != null) arena.targetPoints(n); }
     public void setTimeLimitMinutes(int m) { if (arena != null) arena.timeLimitMinutes(m); }
+    public int timeRemaining() { return timeRemaining; }
 
     public void join(Player p, Team preferred) {
         if (arena == null) { p.sendMessage(ChatColor.RED + "[HB] Aucune arène chargée."); return; }
@@ -119,13 +119,18 @@ public class GameManager {
         }
         arena.players().get(t).add(p.getUniqueId());
         p.sendMessage((t==Team.RED?ChatColor.RED:ChatColor.BLUE) + "Tu rejoins " + t.name());
-        scoreboard.show(p);
+        plugin.scoreboard().show(p, arena);
+        plugin.scoreboard().update(arena);
+        plugin.tablist().update(arena);
     }
 
     public void leave(Player p) {
         if (arena == null) return;
         for (Set<UUID> s : arena.players().values()) s.remove(p.getUniqueId());
-        scoreboard.hide(p);
+        plugin.scoreboard().hide(p);
+        plugin.tablist().remove(p);
+        plugin.scoreboard().update(arena);
+        plugin.tablist().update(arena);
         p.sendMessage(ChatColor.GRAY + "Tu as quitté la partie.");
     }
 
@@ -148,17 +153,16 @@ public class GameManager {
         arena.setActive(true);
         arena.redScore(0); arena.blueScore(0);
         timeRemaining = arena.timeLimitMinutes() * 60;
-        scoreboard.setScores(0,0);
-        scoreboard.setTime(timeRemaining);
-        plugin.ui().updateSidebar(arena);
+        plugin.scoreboard().update(arena);
+        plugin.tablist().update(arena);
 
         for (UUID u : arena.players().get(Team.RED)) {
             Player p = Bukkit.getPlayer(u);
-            if (p != null) { tp(p, arena.spawnRed()); giveKit(p, Team.RED); scoreboard.show(p); }
+            if (p != null) { tp(p, arena.spawnRed()); giveKit(p, Team.RED); plugin.scoreboard().show(p, arena); }
         }
         for (UUID u : arena.players().get(Team.BLUE)) {
             Player p = Bukkit.getPlayer(u);
-            if (p != null) { tp(p, arena.spawnBlue()); giveKit(p, Team.BLUE); scoreboard.show(p); }
+            if (p != null) { tp(p, arena.spawnBlue()); giveKit(p, Team.BLUE); plugin.scoreboard().show(p, arena); }
         }
 
         new BukkitRunnable(){ @Override public void run(){
@@ -171,8 +175,8 @@ public class GameManager {
             @Override public void run() {
                 if (arena == null || !arena.isActive()) { cancel(); return; }
                 timeRemaining--; if (timeRemaining < 0) { endByTime(); cancel(); return; }
-                scoreboard.setTime(timeRemaining);
-                plugin.ui().updateSidebar(arena);
+                plugin.scoreboard().update(arena);
+                plugin.tablist().update(arena);
             }
         };
         timerTask.runTaskTimer(plugin, 20L, 20L);
@@ -226,7 +230,7 @@ public class GameManager {
 
     private void endCleanup() {
         flushPlacedBlocks();
-        scoreboard.hideAll();
+        plugin.scoreboard().clear();
     }
 
     private void tp(Player p, Location l) { if (l != null) p.teleport(l, PlayerTeleportEvent.TeleportCause.PLUGIN); }
@@ -345,8 +349,8 @@ public class GameManager {
         if (arena == null || !arena.isActive()) return;
         if (isFrozen()) return;
         if (t == Team.RED) arena.redScore(arena.redScore()+1); else if (t == Team.BLUE) arena.blueScore(arena.blueScore()+1);
-        scoreboard.setScores(arena.redScore(), arena.blueScore());
-        plugin.ui().updateSidebar(arena);
+        plugin.scoreboard().update(arena);
+        plugin.tablist().update(arena);
         plugin.fx().playTeamPreset(t, Presets.SCORE_BED);
 
         String teamName = (t==Team.RED?"Rouge":"Bleue");

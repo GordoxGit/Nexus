@@ -98,9 +98,12 @@ public class HBCommand implements CommandExecutor, TabCompleter {
                     if (needAdmin(sender)) return true;
                     HikaBrainPlugin pl = HikaBrainPlugin.get();
                     pl.reloadConfig();
+                    pl.reloadServerInfo();
                     if (pl.theme() instanceof ThemeServiceImpl ts) ts.reload();
                     if (pl.fx() instanceof FeedbackServiceImpl fs) fs.reload();
                     if (pl.ui() instanceof UiServiceImpl us) us.reload();
+                    pl.scoreboard().reload();
+                    pl.tablist().reload();
                     sender.sendMessage(ChatColor.GREEN + "UI rechargée.");
                     return true;
                 }
