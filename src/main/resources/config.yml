@@ -1,6 +1,19 @@
 allowed-worlds:
   - Hika
 
+lobby:
+  world: Hika
+  x: 0.5
+  y: 80.0
+  z: 0.5
+  yaw: 0.0
+  pitch: 0.0
+
+compass:
+  gui:
+    rows: 6
+    category_row: 1
+
 debug: false
 
 server:

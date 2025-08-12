@@ -29,11 +29,12 @@ public class HBCommand implements CommandExecutor, TabCompleter {
         s.sendMessage(ChatColor.YELLOW + "/hb setbroke" + ChatColor.GRAY + " - Donne l'outil pour définir la zone cassable");
         s.sendMessage(ChatColor.YELLOW + "/hb snapshotbroke" + ChatColor.GRAY + " - Regénère le snapshot du pont");
         s.sendMessage(ChatColor.YELLOW + "/hb resetbroke" + ChatColor.GRAY + " - Réinitialise manuellement le pont");
+        s.sendMessage(ChatColor.YELLOW + "/hb setlobby" + ChatColor.GRAY + " - Définit la position du lobby");
         s.sendMessage(ChatColor.YELLOW + "/hb join [red|blue]" + ChatColor.GRAY + " - Rejoindre une équipe");
         s.sendMessage(ChatColor.YELLOW + "/hb leave" + ChatColor.GRAY + " - Quitter la partie");
         s.sendMessage(ChatColor.YELLOW + "/hb ui reload" + ChatColor.GRAY + " - Recharge la configuration UI");
         s.sendMessage(ChatColor.YELLOW + "/hb theme <id>" + ChatColor.GRAY + " - Applique un thème");
-        s.sendMessage(ChatColor.DARK_GRAY + "Admin: create, setspawn, setbuildpos, setpoints, settimer, save, load, start, stop");
+        s.sendMessage(ChatColor.DARK_GRAY + "Admin: create, setspawn, setbuildpos, setpoints, settimer, setlobby, save, load, start, stop");
     }
 
     private boolean needAdmin(CommandSender s) {
@@ -142,12 +143,23 @@ case "join": {
             case "create": {
                 if (needAdmin(sender)) return true;
                 if (!(sender instanceof Player)) { sender.sendMessage("In-game only"); return true; }
-                if (args.length < 2) { sender.sendMessage(ChatColor.RED + "Usage: /hb create <nom>"); return true; }
+                if (args.length < 3) { sender.sendMessage(ChatColor.RED + "Usage: /hb create <nom> <teamSize>"); return true; }
+                int ts;
+                try { ts = Integer.parseInt(args[2]); } catch (NumberFormatException ex) { sender.sendMessage(ChatColor.RED + "teamSize invalide"); return true; }
+                if (ts < 1 || ts > 4) { sender.sendMessage(ChatColor.RED + "teamSize doit être 1-4"); return true; }
                 Player p = (Player) sender;
                 if (!ensureAllowedWorld(p, sender)) return true;
                 World w = p.getWorld();
-                game.createArena(args[1], w);
-                sender.sendMessage(ChatColor.GREEN + "Arène '" + args[1] + "' créée pour " + w.getName());
+                game.createArena(args[1], w, ts);
+                sender.sendMessage(ChatColor.GREEN + "Arène '" + args[1] + "' créée (mode " + ts + "v" + ts + ") pour " + w.getName());
+                return true;
+            }
+            case "setlobby": {
+                if (needAdmin(sender)) return true;
+                if (!(sender instanceof Player)) { sender.sendMessage("In-game only"); return true; }
+                Player p = (Player) sender;
+                HikaBrainPlugin.get().setLobby(p.getLocation());
+                sender.sendMessage(ChatColor.GREEN + "Lobby défini.");
                 return true;
             }
             case "setspawn": {
@@ -209,7 +221,7 @@ case "join": {
 
     @Override
     public List<String> onTabComplete(CommandSender sender, org.bukkit.command.Command command, String alias, String[] args) {
-        if (args.length == 1) return Arrays.asList("help","list","setbed","join","leave","create","setspawn","setbuildpos","setpoints","settimer","save","load","start","stop","setbroke","snapshotbroke","resetbroke","ui","theme");
+        if (args.length == 1) return Arrays.asList("help","list","setbed","join","leave","create","setspawn","setbuildpos","setpoints","settimer","save","load","start","stop","setbroke","snapshotbroke","resetbroke","ui","theme","setlobby");
         if (args.length == 2) {
             switch (args[0].toLowerCase()) {
                 case "setspawn": return Arrays.asList("red","blue");
@@ -220,6 +232,9 @@ case "join": {
                 case "ui": return Arrays.asList("reload");
                 case "theme": return new ArrayList<>(HikaBrainPlugin.get().theme().available());
             }
+        }
+        if (args.length == 3 && args[0].equalsIgnoreCase("create")) {
+            return Arrays.asList("1","2","3","4");
         }
         return new ArrayList<>();
     }
