@@ -248,18 +248,15 @@ public class GameListener implements Listener {
             e.setCancelled(true);
             return;
         }
-        if ((Tag.BEDS.isTagged(e.getBlock().getType()) || e.getBlock().getBlockData() instanceof Bed)
-                && !isBedSelector(e.getPlayer().getInventory().getItemInMainHand())) {
+        Block b = e.getBlock();
+        boolean isBed = Tag.BEDS.isTagged(b.getType());
+        if (isBed && !isBedSelector(e.getPlayer().getInventory().getItemInMainHand())) {
             if (game.arena() == null || !game.arena().isActive()) {
-                Block foot = normalizeToBedFoot(e.getBlock());
-                if (game.arena() != null) {
-                    if (game.arena().bedRed() != null && foot.getLocation().equals(game.arena().bedRed())) { e.setCancelled(true); return; }
-                    if (game.arena().bedBlue() != null && foot.getLocation().equals(game.arena().bedBlue())) { e.setCancelled(true); return; }
-                }
-                return; // allow breaking other beds when not active
+                return; // allow breaking any beds outside active games
             }
-            e.setCancelled(true);
-            return;
+            Block foot = normalizeToBedFoot(b);
+            if (game.arena().bedRed() != null && foot.getLocation().equals(game.arena().bedRed())) { e.setCancelled(true); return; }
+            if (game.arena().bedBlue() != null && foot.getLocation().equals(game.arena().bedBlue())) { e.setCancelled(true); return; }
         }
         if (game.arena() != null && game.arena().isActive()
                 && game.inBrokeRegion(e.getBlock().getLocation())) {
@@ -366,23 +363,22 @@ public class GameListener implements Listener {
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onCompassInteract(PlayerInteractEvent e) {
-        Action act = e.getAction();
-        if (!(act == Action.RIGHT_CLICK_AIR || act == Action.RIGHT_CLICK_BLOCK || act == Action.LEFT_CLICK_AIR || act == Action.LEFT_CLICK_BLOCK)) return;
+        if (e.getHand() != EquipmentSlot.HAND) return;
         Player p = e.getPlayer();
         if (!isAllowedWorld(p.getWorld())) return;
-        if (!isLobbyCompass(p.getInventory().getItemInMainHand()) && !isLobbyCompass(p.getInventory().getItemInOffHand())) return;
-        e.setCancelled(true);
+        if (!isLobbyCompass(e.getItem())) return;
         e.setUseItemInHand(Event.Result.DENY);
         e.setUseInteractedBlock(Event.Result.DENY);
+        e.setCancelled(true);
         HikaBrainPlugin.get().compassGui().openModeMenu(p);
         long tick = System.currentTimeMillis();
-        p.setMetadata("hb_compass_click", new FixedMetadataValue(HikaBrainPlugin.get(), tick));
-        org.bukkit.Bukkit.getScheduler().runTaskLater(HikaBrainPlugin.get(), () -> p.removeMetadata("hb_compass_click", HikaBrainPlugin.get()), 5L);
+        p.setMetadata("hb_menu_click", new FixedMetadataValue(HikaBrainPlugin.get(), tick));
+        org.bukkit.Bukkit.getScheduler().runTaskLater(HikaBrainPlugin.get(), () -> p.removeMetadata("hb_menu_click", HikaBrainPlugin.get()), 5L);
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onCompassTeleport(PlayerTeleportEvent e) {
-        List<MetadataValue> list = e.getPlayer().getMetadata("hb_compass_click");
+        List<MetadataValue> list = e.getPlayer().getMetadata("hb_menu_click");
         if (list.isEmpty()) return;
         long tick = System.currentTimeMillis();
         long last = list.get(0).asLong();
@@ -396,22 +392,22 @@ public class GameListener implements Listener {
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onBedEnter(PlayerBedEnterEvent e) {
-        if (admin.isEnabled(e.getPlayer())) return;
-        if (game.arena() == null) return;
-        if (notAllowedWorld(e.getPlayer())) return;
-        if (isBedSelector(e.getPlayer().getInventory().getItemInMainHand()) ||
-                isBedSelector(e.getPlayer().getInventory().getItemInOffHand())) {
+        Player p = e.getPlayer();
+        if (admin.isEnabled(p)) return;
+        if (game.arena() == null || !game.arena().isActive()) return;
+        if (notAllowedWorld(p)) return;
+        if (isBedSelector(p.getInventory().getItemInMainHand()) || isBedSelector(p.getInventory().getItemInOffHand())) {
             e.setUseBed(Event.Result.DENY);
             e.setCancelled(true);
             return;
         }
         Block foot = normalizeToBedFoot(e.getBed());
-        if (game.arena().bedRed()!=null && foot.getLocation().equals(game.arena().bedRed())) {
+        if (game.arena().bedRed() != null && foot.getLocation().equals(game.arena().bedRed())) {
             e.setUseBed(Event.Result.DENY);
             e.setCancelled(true);
             return;
         }
-        if (game.arena().bedBlue()!=null && foot.getLocation().equals(game.arena().bedBlue())) {
+        if (game.arena().bedBlue() != null && foot.getLocation().equals(game.arena().bedBlue())) {
             e.setUseBed(Event.Result.DENY);
             e.setCancelled(true);
         }
