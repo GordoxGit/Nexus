@@ -296,8 +296,18 @@ public class GameListener implements Listener {
     @EventHandler
     public void onCompassDrop(PlayerDropItemEvent e) {
         Player p = e.getPlayer();
-        if (p.isOp() || admin.isEnabled(p)) return;
-        if (game.arena() != null && game.arena().isActive()) return;
+
+        // Operators or players in admin mode can drop anything.
+        if (p.isOp() || admin.isEnabled(p)) {
+            return;
+        }
+
+        // During an active game, drop behaviour is handled elsewhere.
+        if (game.arena() != null && game.arena().isActive()) {
+            return;
+        }
+
+        // Only block dropping the lobby item in allowed worlds.
         if (isLobbyCompass(e.getItemDrop().getItemStack()) && isAllowedWorld(p.getWorld())) {
             e.setCancelled(true);
         }
@@ -361,16 +371,17 @@ public class GameListener implements Listener {
         }
     }
 
-    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    @EventHandler(priority = EventPriority.HIGHEST)
     public void onCompassInteract(PlayerInteractEvent e) {
         Action action = e.getAction();
-        if (action != Action.RIGHT_CLICK_AIR && action != Action.RIGHT_CLICK_BLOCK) return;
+        if (action != Action.RIGHT_CLICK_AIR && action != Action.RIGHT_CLICK_BLOCK) {
+            return;
+        }
         if (e.getHand() != EquipmentSlot.HAND) return;
         Player p = e.getPlayer();
         if (!isAllowedWorld(p.getWorld())) return;
         if (!isLobbyCompass(e.getItem())) return;
-        e.setUseItemInHand(Event.Result.DENY);
-        e.setUseInteractedBlock(Event.Result.DENY);
+        // Cancel to prevent default item behaviour (e.g. compass sound).
         e.setCancelled(true);
         HikaBrainPlugin.get().compassGui().openModeMenu(p);
         long tick = System.currentTimeMillis();

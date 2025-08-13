@@ -32,10 +32,11 @@ public class LobbyService {
         }
     }
 
-    /** Give the navigation compass and clear inventory. */
-    public void giveCompass(Player p) {
+    /** Give the lobby selector item and clear inventory. */
+    public void giveLobbyItem(Player p) {
         p.getInventory().clear();
-        ItemStack it = new ItemStack(Material.RECOVERY_COMPASS);
+        // Use a clock as lobby selector instead of the recovery compass.
+        ItemStack it = new ItemStack(Material.CLOCK);
         ItemMeta meta = it.getItemMeta();
         if (meta != null) {
             try {
@@ -51,10 +52,10 @@ public class LobbyService {
         p.getInventory().setItem(4, it);
     }
 
-    /** Apply full lobby profile: teleport, compass, scoreboard and tablist. */
+    /** Apply full lobby profile: teleport, lobby item, scoreboard and tablist. */
     public void apply(Player p) {
         teleport(p);
-        giveCompass(p);
+        giveLobbyItem(p);
         plugin.scoreboard().showLobby(p);
         plugin.tablist().showLobby(p);
     }
