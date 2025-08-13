@@ -7,7 +7,6 @@ description: Hikabrain mini-game for Spigot 1.21 (world-restricted)
 commands:
   hb:
     description: HikaBrain main command
-    usage: /hb help
     aliases: [hikabrain]
 
 permissions:
