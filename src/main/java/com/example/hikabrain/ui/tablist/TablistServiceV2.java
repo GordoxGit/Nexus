@@ -8,6 +8,9 @@ import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.entity.Player;
 import org.bukkit.scheduler.BukkitRunnable;
+import org.bukkit.scheduler.BukkitTask;
+
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import java.util.HashSet;
 import java.util.Set;
@@ -16,18 +19,36 @@ import java.util.UUID;
 public class TablistServiceV2 implements TablistService {
     private final HikaBrainPlugin plugin;
     private final Set<UUID> lobbyPlayers = new HashSet<>();
+    private BukkitTask arenaTask;
+    private BukkitTask lobbyTask;
+    private final AtomicBoolean debugLogged = new AtomicBoolean();
+    private final AtomicBoolean warnLogged = new AtomicBoolean();
+    private int nullTicks = 0;
 
     public TablistServiceV2(HikaBrainPlugin plugin) {
         this.plugin = plugin;
         int interval = plugin.style().updateIntervalTicks();
-        new BukkitRunnable(){
+        arenaTask = new BukkitRunnable(){
             @Override public void run(){
-                Arena a = plugin.game().arena();
-                if (a != null) update(a);
+                if (!plugin.isEnabled()) return;
+                var game = plugin.game();
+                Arena a = (game != null) ? game.arena() : null;
+                if (a == null) {
+                    if (debugLogged.compareAndSet(false, true)) {
+                        plugin.getLogger().fine("Tablist update skipped: game or arena not initialized");
+                    }
+                    nullTicks++;
+                    if (nullTicks >= 200 && warnLogged.compareAndSet(false, true)) {
+                        plugin.getLogger().warning("TablistService still waiting for game initialization");
+                    }
+                    return;
+                }
+                nullTicks = 0;
+                update(a);
             }
         }.runTaskTimer(plugin, interval, interval);
         int lobbyInterval = plugin.getConfig().getInt("ui.lobby.update_interval_ticks", 20);
-        new BukkitRunnable(){
+        lobbyTask = new BukkitRunnable(){
             @Override public void run(){ updateLobby(); }
         }.runTaskTimer(plugin, lobbyInterval, lobbyInterval);
     }
@@ -83,6 +104,15 @@ public class TablistServiceV2 implements TablistService {
     public void reload() {
         update(plugin.game().arena());
         updateLobby();
+    }
+
+    @Override
+    public void clear() {
+        if (arenaTask != null) arenaTask.cancel();
+        if (lobbyTask != null) lobbyTask.cancel();
+        for (Player p : Bukkit.getOnlinePlayers()) {
+            remove(p);
+        }
     }
 
     @Override
