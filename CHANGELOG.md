@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.3.0 - Gameplay & UX Finalization
+- **Feat:** Replaced lobby navigation compass with a clock.
+- **Feat:** Implemented instant respawn in arenas, removing the death screen.
+- **Fix:** Corrected item drop logic; dropping is now only restricted during active games.
+- **Fix:** Removed redundant navigation item from lobby inventory.
+- **Chore:** General code cleanup and UX improvements for Heneria.
+
 ## 1.2.11
 - Fix command registration (/hb)
 - Add recovery compass on join

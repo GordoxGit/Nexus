@@ -293,9 +293,19 @@ public class GameListener implements Listener {
 
     @EventHandler
     public void onDeath(PlayerDeathEvent e) {
-        e.setKeepInventory(true);
-        e.getDrops().clear();
-        e.setDeathMessage(null);
+        Player player = e.getEntity();
+        if (game.arena() != null && game.arena().isActive() && game.teamOf(player) != Team.SPECTATOR) {
+            e.setKeepInventory(true);
+            e.getDrops().clear();
+            e.setDeathMessage(null);
+
+            // Planifier le respawn pour le prochain tick serveur pour éviter tout conflit.
+            org.bukkit.Bukkit.getScheduler().runTask(HikaBrainPlugin.get(), () -> {
+                if (player.isOnline()) {
+                    player.spigot().respawn();
+                }
+            });
+        }
     }
 
     @EventHandler
@@ -308,24 +318,19 @@ public class GameListener implements Listener {
         org.bukkit.Bukkit.getScheduler().runTaskLater(HikaBrainPlugin.get(), () -> game.restock(p, t), 1L);
     }
 
-    @EventHandler
-    public void onCompassDrop(PlayerDropItemEvent e) {
-        Player p = e.getPlayer();
+    @EventHandler(priority = EventPriority.NORMAL)
+    public void onItemDrop(PlayerDropItemEvent e) {
+        Player player = e.getPlayer();
 
-        // Operators or players in admin mode can drop anything.
-        if (p.isOp() || admin.isEnabled(p)) {
-            return;
-        }
-
-        // During an active game, drop behaviour is handled elsewhere.
+        // Le drop est autorisé par défaut, sauf dans une condition précise.
         if (game.arena() != null && game.arena().isActive()) {
-            return;
+            // Si le joueur est un participant actif...
+            if (game.teamOf(player) != Team.SPECTATOR) {
+                // ... on annule le drop.
+                e.setCancelled(true);
+            }
         }
-
-        // Only block dropping the lobby item in allowed worlds.
-        if (isLobbyCompass(e.getItemDrop().getItemStack()) && isAllowedWorld(p.getWorld())) {
-            e.setCancelled(true);
-        }
+        // Pour tous les autres cas (lobby, spectateur, etc.), l'événement n'est pas annulé.
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
