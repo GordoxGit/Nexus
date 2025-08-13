@@ -1,5 +1,6 @@
 package com.example.hikabrain;
 
+import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
@@ -167,7 +168,11 @@ public class GameListener implements Listener {
     public void onJoin(PlayerJoinEvent e) {
         Player p = e.getPlayer();
         if (HikaBrainPlugin.get().isWorldAllowed(p.getWorld())) {
-            HikaBrainPlugin.get().lobbyService().apply(p);
+            Bukkit.getScheduler().runTaskLater(HikaBrainPlugin.get(), () -> {
+                if (p.isOnline()) {
+                    HikaBrainPlugin.get().lobbyService().apply(p);
+                }
+            }, 1L);
         } else {
             HikaBrainPlugin.get().scoreboard().hide(p);
             HikaBrainPlugin.get().tablist().remove(p);
@@ -300,7 +305,7 @@ public class GameListener implements Listener {
             e.setDeathMessage(null);
 
             // Planifier le respawn pour le prochain tick serveur pour éviter tout conflit.
-            org.bukkit.Bukkit.getScheduler().runTask(HikaBrainPlugin.get(), () -> {
+            Bukkit.getScheduler().runTask(HikaBrainPlugin.get(), () -> {
                 if (player.isOnline()) {
                     player.spigot().respawn();
                 }
@@ -315,22 +320,16 @@ public class GameListener implements Listener {
         Team t = game.teamOf(p);
         if (t == Team.RED && game.arena().spawnRed() != null) e.setRespawnLocation(game.arena().spawnRed());
         else if (t == Team.BLUE && game.arena().spawnBlue() != null) e.setRespawnLocation(game.arena().spawnBlue());
-        org.bukkit.Bukkit.getScheduler().runTaskLater(HikaBrainPlugin.get(), () -> game.restock(p, t), 1L);
+        Bukkit.getScheduler().runTaskLater(HikaBrainPlugin.get(), () -> game.restock(p, t), 1L);
     }
 
     @EventHandler(priority = EventPriority.NORMAL)
     public void onItemDrop(PlayerDropItemEvent e) {
         Player player = e.getPlayer();
 
-        // Le drop est autorisé par défaut, sauf dans une condition précise.
-        if (game.arena() != null && game.arena().isActive()) {
-            // Si le joueur est un participant actif...
-            if (game.teamOf(player) != Team.SPECTATOR) {
-                // ... on annule le drop.
-                e.setCancelled(true);
-            }
+        if (game.arena() != null && game.arena().isActive() && game.teamOf(player) != Team.SPECTATOR) {
+            e.setCancelled(true);
         }
-        // Pour tous les autres cas (lobby, spectateur, etc.), l'événement n'est pas annulé.
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
@@ -406,7 +405,7 @@ public class GameListener implements Listener {
         HikaBrainPlugin.get().compassGui().openModeMenu(p);
         long tick = System.currentTimeMillis();
         p.setMetadata("hb_menu_click", new FixedMetadataValue(HikaBrainPlugin.get(), tick));
-        org.bukkit.Bukkit.getScheduler().runTaskLater(HikaBrainPlugin.get(), () -> p.removeMetadata("hb_menu_click", HikaBrainPlugin.get()), 5L);
+        Bukkit.getScheduler().runTaskLater(HikaBrainPlugin.get(), () -> p.removeMetadata("hb_menu_click", HikaBrainPlugin.get()), 5L);
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
