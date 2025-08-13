@@ -63,14 +63,13 @@ public class HikaBrainPlugin extends JavaPlugin {
         this.theme = new ThemeServiceImpl(this);
         this.fx = new FeedbackServiceImpl(this);
         this.ui = new UiServiceImpl(this, theme, fx);
+        this.gameManager = new GameManager(this);
         this.scoreboard = new ScoreboardServiceV2(this);
         this.tablist = new TablistServiceV2(this);
         this.compassGui = new CompassGuiService(this);
         this.lobbyService = new LobbyService(this);
         this.arenaRegistry = new ArenaRegistry(this);
         this.adminMode = new AdminModeService();
-
-        this.gameManager = new GameManager(this);
         getServer().getPluginManager().registerEvents(new GameListener(gameManager, adminMode), this);
 
         boolean registered = false;
@@ -108,6 +107,7 @@ public class HikaBrainPlugin extends JavaPlugin {
     @Override
     public void onDisable() {
         if (scoreboard != null) scoreboard.clear();
+        if (tablist != null) tablist.clear();
         if (gameManager != null) gameManager.shutdown();
         getLogger().info("HikaBrain disabled.");
     }

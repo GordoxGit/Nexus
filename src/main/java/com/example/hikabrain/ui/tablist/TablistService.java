@@ -10,4 +10,7 @@ public interface TablistService {
 
     /** Lobby profile helpers */
     default void showLobby(Player p) {}
+
+    /** Cleanup on plugin disable */
+    default void clear() {}
 }
