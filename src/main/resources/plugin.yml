@@ -2,15 +2,15 @@ name: HikaBrain
 main: com.example.hikabrain.HikaBrainPlugin
 version: 1.2.11
 api-version: "1.21"
-description: Hikabrain mini-game for Spigot/Paper 1.21 (world-restricted)
+description: Hikabrain minigame for Spigot/Paper 1.21
 
 commands:
   hb:
-    description: HikaBrain main command
+    description: Commande principale HikaBrain
     usage: "/hb help"
     aliases: [hikabrain]
 
 permissions:
   hikabrain.admin:
-    description: Allow admin setup commands (create/set*/save/load/start/stop)
+    description: Accès aux commandes d’administration HikaBrain
     default: op

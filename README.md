@@ -54,6 +54,8 @@ Mondes autorisés : `world_hika` (par défaut) via `allowed-worlds`.
 allowed-worlds:
   - world_hika
 
+world-allowed: "world_hika"
+
 lobby:
   world: world_hika
   x: 0.5
@@ -65,9 +67,17 @@ lobby:
 server:
   display-name: "Heneria"
   domain: "heneria.com"
+
+compass:
+  enabled: true
+  material: RECOVERY_COMPASS
+  give-on-join: true
+  slot: 8
+  open-on-right-click: true
+  cooldown-ms: 200
 ```
 
-Boussole (PDC `hb_compass`) : menus catégories et GUI lobby/arène (scoreboard/tablist, domaine `heneria.com`).
+  Boussole (PDC `nav_compass`) : recovery compass donnée au join, ouvre le menu partout sans TP.
 
 Dossier arènes `plugins/HikaBrain/arenas/*.yml` :
 ```yml
