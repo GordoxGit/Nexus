@@ -33,6 +33,20 @@ public class HBTabCompleter implements TabCompleter {
             }
             return list;
         }
+        if (args.length == 2) {
+            switch (args[0].toLowerCase()) {
+                case "setspawn":
+                    return Arrays.asList("red", "blue");
+                case "setbuildpos":
+                    return Arrays.asList("1", "2");
+                case "join":
+                    return Arrays.asList("red", "blue");
+                case "admin":
+                    return Arrays.asList("on", "off");
+                case "ui":
+                    return Arrays.asList("reload");
+            }
+        }
         return new ArrayList<>();
     }
 }

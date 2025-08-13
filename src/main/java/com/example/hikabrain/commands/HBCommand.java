@@ -27,13 +27,18 @@ public class HBCommand implements CommandExecutor {
     }
 
     private void sendHelp(CommandSender s) {
-        Component header = Component.text("HikaBrain ", NamedTextColor.GOLD)
-                .append(Component.text("— Aide", NamedTextColor.GRAY));
+        Component header = Component.text("HikaBrain (Heneria) ", NamedTextColor.AQUA)
+                .append(Component.text("— Aide des commandes", NamedTextColor.GRAY));
         s.sendMessage(LegacyComponentSerializer.legacySection().serialize(header));
-        line(s, "/hb join [red|blue]", "Rejoindre une équipe", null);
-        line(s, "/hb leave", "Quitter la partie", null);
-        line(s, "/hb create <nom> <teamSize>", "Créer une arène", "hikabrain.admin");
-        line(s, "/hb help", "Afficher cette aide", null);
+        line(s, "/hb join [red|blue]", "Rejoindre une équipe dans l'arène actuelle.", null);
+        line(s, "/hb leave", "Quitter la partie et retourner au lobby.", null);
+        line(s, "/hb admin [on|off]", "Activer le mode admin pour construire librement.", "hikabrain.admin");
+        line(s, "/hb create <nom> <taille_equipe>", "Créer une nouvelle arène.", "hikabrain.admin");
+        line(s, "/hb setspawn <red|blue>", "Définir le point d'apparition d'une équipe.", "hikabrain.admin");
+        line(s, "/hb setlobby", "Définir le point de spawn du lobby.", "hikabrain.admin");
+        line(s, "/hb start / stop", "Démarrer ou arrêter la partie.", "hikabrain.admin");
+        line(s, "/hb ui reload", "Recharger la configuration de l'interface.", "hikabrain.admin");
+        s.sendMessage(ChatColor.GRAY + "Utilisez l'horloge dans votre inventaire pour choisir une arène.");
     }
 
     private void line(CommandSender s, String cmd, String desc, String perm) {

@@ -13,7 +13,7 @@ lobby:
 
 compass:
   enabled: true
-  material: RECOVERY_COMPASS
+  material: CLOCK
   give-on-join: true
   slot: 8
   open-on-right-click: true
