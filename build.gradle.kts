@@ -1,5 +1,6 @@
 plugins {
     java
+    id("com.github.johnrengelman.shadow") version "8.1.1"
 }
 
 group = "com.example"
@@ -13,8 +14,8 @@ repositories {
 
 dependencies {
     compileOnly("org.spigotmc:spigot-api:1.21-R0.1-SNAPSHOT")
-    compileOnly("net.kyori:adventure-api:4.17.0")
-    compileOnly("net.kyori:adventure-text-serializer-legacy:4.17.0")
+    implementation("net.kyori:adventure-api:4.17.0")
+    implementation("net.kyori:adventure-text-serializer-legacy:4.17.0")
     testImplementation("junit:junit:4.13.2")
 }
 
@@ -27,4 +28,8 @@ java {
 tasks.withType<org.gradle.api.tasks.compile.JavaCompile>().configureEach {
     options.encoding = "UTF-8"
     options.release.set(21)
+}
+
+tasks.build {
+    dependsOn(tasks.shadowJar)
 }
