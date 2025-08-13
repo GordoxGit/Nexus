@@ -11,6 +11,7 @@ import org.bukkit.entity.Player;
 import com.example.hikabrain.ui.FeedbackServiceImpl;
 import com.example.hikabrain.ui.ThemeServiceImpl;
 import com.example.hikabrain.ui.UiServiceImpl;
+import com.example.hikabrain.AdminModeService;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -34,6 +35,7 @@ public class HBCommand implements CommandExecutor, TabCompleter {
         s.sendMessage(ChatColor.YELLOW + "/hb leave" + ChatColor.GRAY + " - Quitter la partie");
         s.sendMessage(ChatColor.YELLOW + "/hb ui reload" + ChatColor.GRAY + " - Recharge la configuration UI");
         s.sendMessage(ChatColor.YELLOW + "/hb theme <id>" + ChatColor.GRAY + " - Applique un thème");
+        s.sendMessage(ChatColor.YELLOW + "/hb admin [on|off|toggle]" + ChatColor.GRAY + " - Mode édition arène");
         s.sendMessage(ChatColor.DARK_GRAY + "Admin: create, setspawn, setbuildpos, setpoints, settimer, setlobby, save, load, start, stop");
     }
 
@@ -92,6 +94,21 @@ public class HBCommand implements CommandExecutor, TabCompleter {
                 if (needAdmin(sender)) return true;
                 game.resetBroke();
                 sender.sendMessage(ChatColor.GREEN + "Reset broke lancé.");
+                return true;
+            }
+            case "admin": {
+                if (needAdmin(sender)) return true;
+                if (!(sender instanceof Player)) { sender.sendMessage("In-game only"); return true; }
+                Player p = (Player) sender;
+                String arg = args.length >= 2 ? args[1].toLowerCase() : "toggle";
+                AdminModeService am = HikaBrainPlugin.get().admin();
+                boolean enabled;
+                switch (arg) {
+                    case "on": am.enable(p); enabled = true; break;
+                    case "off": am.disable(p); enabled = false; break;
+                    default: enabled = am.toggle(p); break;
+                }
+                sender.sendMessage(ChatColor.YELLOW + "Admin: " + (enabled ? ChatColor.GREEN + "ON" : ChatColor.RED + "OFF"));
                 return true;
             }
             case "ui": {
@@ -221,7 +238,7 @@ case "join": {
 
     @Override
     public List<String> onTabComplete(CommandSender sender, org.bukkit.command.Command command, String alias, String[] args) {
-        if (args.length == 1) return Arrays.asList("help","list","setbed","join","leave","create","setspawn","setbuildpos","setpoints","settimer","save","load","start","stop","setbroke","snapshotbroke","resetbroke","ui","theme","setlobby");
+        if (args.length == 1) return Arrays.asList("help","list","setbed","join","leave","create","setspawn","setbuildpos","setpoints","settimer","save","load","start","stop","setbroke","snapshotbroke","resetbroke","ui","theme","setlobby","admin");
         if (args.length == 2) {
             switch (args[0].toLowerCase()) {
                 case "setspawn": return Arrays.asList("red","blue");
@@ -231,6 +248,7 @@ case "join": {
                 case "join": return Arrays.asList("red","blue");
                 case "ui": return Arrays.asList("reload");
                 case "theme": return new ArrayList<>(HikaBrainPlugin.get().theme().available());
+                case "admin": return Arrays.asList("on","off","toggle");
             }
         }
         if (args.length == 3 && args[0].equalsIgnoreCase("create")) {

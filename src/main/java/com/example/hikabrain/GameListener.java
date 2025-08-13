@@ -36,6 +36,10 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.persistence.PersistentDataContainer;
 import org.bukkit.persistence.PersistentDataType;
+import org.bukkit.metadata.FixedMetadataValue;
+import org.bukkit.metadata.MetadataValue;
+
+import java.util.List;
 
 public class GameListener implements Listener {
 /* ---- SetBroke tool ---- */
@@ -61,13 +65,16 @@ public class GameListener implements Listener {
 
 
     private final GameManager game;
-    public GameListener(GameManager game) { this.game = game; }
+    private final AdminModeService admin;
+    public GameListener(GameManager game, AdminModeService admin) {
+        this.game = game;
+        this.admin = admin;
+    }
     private boolean notAllowedWorld(Player p) { return !game.isWorldAllowed(p.getWorld()); }
 
     private static final NamespacedKey GUI_KEY = new NamespacedKey(HikaBrainPlugin.get(), "hb_gui");
     private static final NamespacedKey CAT_KEY = new NamespacedKey(HikaBrainPlugin.get(), "hb_cat");
     private static final NamespacedKey ARENA_KEY = new NamespacedKey(HikaBrainPlugin.get(), "hb_arena");
-    private final java.util.Set<java.util.UUID> compassCooldown = java.util.Collections.newSetFromMap(new java.util.concurrent.ConcurrentHashMap<>());
     private boolean isAllowedWorld(World w) {
         return HikaBrainPlugin.get().isWorldAllowed(w);
     }
@@ -130,6 +137,7 @@ public class GameListener implements Listener {
         ItemStack item = hand == EquipmentSlot.OFF_HAND ?
                 e.getPlayer().getInventory().getItemInOffHand() :
                 e.getPlayer().getInventory().getItemInMainHand();
+        if (admin.isEnabled(e.getPlayer()) && !isBedSelector(item)) return;
 
         if (isBedSelector(item)) {
             Player p = e.getPlayer();
@@ -162,6 +170,7 @@ public class GameListener implements Listener {
         } else {
             HikaBrainPlugin.get().scoreboard().hide(p);
             HikaBrainPlugin.get().tablist().remove(p);
+            admin.disable(p);
         }
     }
 
@@ -173,6 +182,7 @@ public class GameListener implements Listener {
         } else {
             HikaBrainPlugin.get().scoreboard().hide(p);
             HikaBrainPlugin.get().tablist().remove(p);
+            admin.disable(p);
         }
     }
 
@@ -203,6 +213,7 @@ public class GameListener implements Listener {
 
     @EventHandler
     public void onPlace(BlockPlaceEvent e) {
+        if (admin.isEnabled(e.getPlayer())) return;
         if (game.arena() == null || !game.arena().isActive()) return;
         if (notAllowedWorld(e.getPlayer())) return;
         if (!game.canBuild(e.getBlock().getLocation())) { e.setCancelled(true); e.getPlayer().sendMessage(ChatColor.RED + "Tu ne peux pas construire ici."); return; }
@@ -232,12 +243,21 @@ public class GameListener implements Listener {
 
     @EventHandler
     public void onBreak(BlockBreakEvent e) {
+        if (admin.isEnabled(e.getPlayer())) return;
         if (isBrokeSelector(e.getPlayer().getInventory().getItemInMainHand())) {
             e.setCancelled(true);
             return;
         }
         if ((Tag.BEDS.isTagged(e.getBlock().getType()) || e.getBlock().getBlockData() instanceof Bed)
                 && !isBedSelector(e.getPlayer().getInventory().getItemInMainHand())) {
+            if (game.arena() == null || !game.arena().isActive()) {
+                Block foot = normalizeToBedFoot(e.getBlock());
+                if (game.arena() != null) {
+                    if (game.arena().bedRed() != null && foot.getLocation().equals(game.arena().bedRed())) { e.setCancelled(true); return; }
+                    if (game.arena().bedBlue() != null && foot.getLocation().equals(game.arena().bedBlue())) { e.setCancelled(true); return; }
+                }
+                return; // allow breaking other beds when not active
+            }
             e.setCancelled(true);
             return;
         }
@@ -254,7 +274,10 @@ public class GameListener implements Listener {
 
     @EventHandler public void onHunger(FoodLevelChangeEvent e) { e.setCancelled(true); }
 
-    @EventHandler public void onQuit(PlayerQuitEvent e) { game.leave(e.getPlayer()); }
+    @EventHandler public void onQuit(PlayerQuitEvent e) {
+        admin.disable(e.getPlayer());
+        game.leave(e.getPlayer());
+    }
 
     @EventHandler
     public void onDeath(PlayerDeathEvent e) {
@@ -275,7 +298,10 @@ public class GameListener implements Listener {
 
     @EventHandler
     public void onCompassDrop(PlayerDropItemEvent e) {
-        if (isLobbyCompass(e.getItemDrop().getItemStack()) && isAllowedWorld(e.getPlayer().getWorld())) {
+        Player p = e.getPlayer();
+        if (admin.isEnabled(p)) return;
+        if (game.arena() != null && game.arena().isActive()) return;
+        if (isLobbyCompass(e.getItemDrop().getItemStack()) && isAllowedWorld(p.getWorld())) {
             e.setCancelled(true);
         }
     }
@@ -285,6 +311,9 @@ public class GameListener implements Listener {
         if (e.getView().getTopInventory().getHolder() instanceof com.example.hikabrain.ui.compass.CompassGuiService.Holder) {
             e.setCancelled(true);
             if (e.getClickedInventory() != e.getView().getTopInventory()) return;
+            if (e.isShiftClick() || e.getAction() == org.bukkit.event.inventory.InventoryAction.HOTBAR_SWAP
+                    || e.getAction() == org.bukkit.event.inventory.InventoryAction.MOVE_TO_OTHER_INVENTORY
+                    || e.getAction() == org.bukkit.event.inventory.InventoryAction.COLLECT_TO_CURSOR) return;
             if (!e.isLeftClick()) return;
             ItemStack it = e.getCurrentItem();
             if (it == null) return;
@@ -312,7 +341,10 @@ public class GameListener implements Listener {
             }
             return;
         }
-        if (!isAllowedWorld(((Player) e.getWhoClicked()).getWorld())) return;
+        Player p = (Player) e.getWhoClicked();
+        if (admin.isEnabled(p)) return;
+        if (!isAllowedWorld(p.getWorld())) return;
+        if (game.arena() != null && game.arena().isActive()) return;
         if (isLobbyCompass(e.getCurrentItem()) || isLobbyCompass(e.getCursor())) e.setCancelled(true);
     }
 
@@ -322,7 +354,10 @@ public class GameListener implements Listener {
             e.setCancelled(true);
             return;
         }
-        if (!isAllowedWorld(((Player) e.getWhoClicked()).getWorld())) return;
+        Player p = (Player) e.getWhoClicked();
+        if (admin.isEnabled(p)) return;
+        if (!isAllowedWorld(p.getWorld())) return;
+        if (game.arena() != null && game.arena().isActive()) return;
         if (isLobbyCompass(e.getOldCursor())) { e.setCancelled(true); return; }
         for (ItemStack it : e.getNewItems().values()) {
             if (isLobbyCompass(it)) { e.setCancelled(true); return; }
@@ -340,22 +375,28 @@ public class GameListener implements Listener {
         e.setUseItemInHand(Event.Result.DENY);
         e.setUseInteractedBlock(Event.Result.DENY);
         HikaBrainPlugin.get().compassGui().openModeMenu(p);
-        java.util.UUID id = p.getUniqueId();
-        compassCooldown.add(id);
-        org.bukkit.Bukkit.getScheduler().runTaskLater(HikaBrainPlugin.get(), () -> compassCooldown.remove(id), 5L);
+        long tick = System.currentTimeMillis();
+        p.setMetadata("hb_compass_click", new FixedMetadataValue(HikaBrainPlugin.get(), tick));
+        org.bukkit.Bukkit.getScheduler().runTaskLater(HikaBrainPlugin.get(), () -> p.removeMetadata("hb_compass_click", HikaBrainPlugin.get()), 5L);
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onCompassTeleport(PlayerTeleportEvent e) {
-        if (!compassCooldown.contains(e.getPlayer().getUniqueId())) return;
-        PlayerTeleportEvent.TeleportCause c = e.getCause();
-        if (c == PlayerTeleportEvent.TeleportCause.UNKNOWN || c == PlayerTeleportEvent.TeleportCause.PLUGIN) {
-            e.setCancelled(true);
+        List<MetadataValue> list = e.getPlayer().getMetadata("hb_compass_click");
+        if (list.isEmpty()) return;
+        long tick = System.currentTimeMillis();
+        long last = list.get(0).asLong();
+        if (tick - last < 250) {
+            PlayerTeleportEvent.TeleportCause c = e.getCause();
+            if (c == PlayerTeleportEvent.TeleportCause.UNKNOWN || c == PlayerTeleportEvent.TeleportCause.PLUGIN) {
+                e.setCancelled(true);
+            }
         }
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onBedEnter(PlayerBedEnterEvent e) {
+        if (admin.isEnabled(e.getPlayer())) return;
         if (game.arena() == null) return;
         if (notAllowedWorld(e.getPlayer())) return;
         if (isBedSelector(e.getPlayer().getInventory().getItemInMainHand()) ||

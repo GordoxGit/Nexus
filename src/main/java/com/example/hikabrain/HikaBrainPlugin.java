@@ -42,6 +42,7 @@ public class HikaBrainPlugin extends JavaPlugin {
     private CompassGuiService compassGui;
     private LobbyService lobbyService;
     private ArenaRegistry arenaRegistry;
+    private AdminModeService adminMode;
     private UiStyle uiStyle;
     private String serverDisplayName;
     private String serverDomain;
@@ -67,9 +68,10 @@ public class HikaBrainPlugin extends JavaPlugin {
         this.compassGui = new CompassGuiService(this);
         this.lobbyService = new LobbyService(this);
         this.arenaRegistry = new ArenaRegistry(this);
+        this.adminMode = new AdminModeService();
 
         this.gameManager = new GameManager(this);
-        getServer().getPluginManager().registerEvents(new GameListener(gameManager), this);
+        getServer().getPluginManager().registerEvents(new GameListener(gameManager, adminMode), this);
 
         boolean registered = false;
         try {
@@ -158,6 +160,7 @@ public class HikaBrainPlugin extends JavaPlugin {
     public CompassGuiService compassGui() { return compassGui; }
     public LobbyService lobbyService() { return lobbyService; }
     public ArenaRegistry arenaRegistry() { return arenaRegistry; }
+    public AdminModeService admin() { return adminMode; }
     public UiStyle style() { return uiStyle; }
     public String serverDisplayName() { return serverDisplayName; }
     public String serverDomain() { return serverDomain; }
