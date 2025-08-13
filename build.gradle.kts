@@ -13,6 +13,7 @@ repositories {
 dependencies {
     compileOnly("org.spigotmc:spigot-api:1.21-R0.1-SNAPSHOT")
     compileOnly("net.kyori:adventure-api:4.17.0")
+    compileOnly("net.kyori:adventure-text-serializer-legacy:4.17.0")
     testImplementation("junit:junit:4.13.2")
 }
 

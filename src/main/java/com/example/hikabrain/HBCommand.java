@@ -7,6 +7,9 @@ import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.command.TabCompleter;
 import org.bukkit.entity.Player;
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.format.NamedTextColor;
+import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 
 import com.example.hikabrain.ui.FeedbackServiceImpl;
 import com.example.hikabrain.ui.ThemeServiceImpl;
@@ -23,20 +26,22 @@ public class HBCommand implements CommandExecutor, TabCompleter {
     public HBCommand(GameManager game) { this.game = game; }
 
     private void sendHelp(CommandSender s) {
-        s.sendMessage(ChatColor.GOLD + "=== HikaBrain ===");
-        s.sendMessage(ChatColor.YELLOW + "/hb help" + ChatColor.GRAY + " - Affiche l'aide");
-        s.sendMessage(ChatColor.YELLOW + "/hb list" + ChatColor.GRAY + " - Liste des arènes sauvegardées");
-        s.sendMessage(ChatColor.YELLOW + "/hb setbed" + ChatColor.GRAY + " - Donne l'outil pour définir les lits");
-        s.sendMessage(ChatColor.YELLOW + "/hb setbroke" + ChatColor.GRAY + " - Donne l'outil pour définir la zone cassable");
-        s.sendMessage(ChatColor.YELLOW + "/hb snapshotbroke" + ChatColor.GRAY + " - Regénère le snapshot du pont");
-        s.sendMessage(ChatColor.YELLOW + "/hb resetbroke" + ChatColor.GRAY + " - Réinitialise manuellement le pont");
-        s.sendMessage(ChatColor.YELLOW + "/hb setlobby" + ChatColor.GRAY + " - Définit la position du lobby");
-        s.sendMessage(ChatColor.YELLOW + "/hb join [red|blue]" + ChatColor.GRAY + " - Rejoindre une équipe");
-        s.sendMessage(ChatColor.YELLOW + "/hb leave" + ChatColor.GRAY + " - Quitter la partie");
-        s.sendMessage(ChatColor.YELLOW + "/hb ui reload" + ChatColor.GRAY + " - Recharge la configuration UI");
-        s.sendMessage(ChatColor.YELLOW + "/hb theme <id>" + ChatColor.GRAY + " - Applique un thème");
-        s.sendMessage(ChatColor.YELLOW + "/hb admin [on|off|toggle]" + ChatColor.GRAY + " - Mode édition arène");
-        s.sendMessage(ChatColor.DARK_GRAY + "Admin: create, setspawn, setbuildpos, setpoints, settimer, setlobby, save, load, start, stop");
+        Component header = Component.text("HikaBrain ", NamedTextColor.GOLD)
+                .append(Component.text("— Aide", NamedTextColor.GRAY));
+        s.sendMessage(LegacyComponentSerializer.legacySection().serialize(header));
+        line(s, "/hb join [red|blue]", "Rejoindre une équipe", null);
+        line(s, "/hb leave", "Quitter la partie", null);
+        line(s, "/hb create <nom> <teamSize>", "Créer une arène", "hikabrain.admin");
+        line(s, "/hb help", "Afficher cette aide", null);
+    }
+
+    private void line(CommandSender s, String cmd, String desc, String perm) {
+        Component c = Component.text(cmd, NamedTextColor.YELLOW)
+                .append(Component.text(" : " + desc, NamedTextColor.GRAY));
+        if (perm != null) {
+            c = c.append(Component.text(" (" + perm + ")", NamedTextColor.DARK_GRAY));
+        }
+        s.sendMessage(LegacyComponentSerializer.legacySection().serialize(c));
     }
 
     private boolean needAdmin(CommandSender s) {
