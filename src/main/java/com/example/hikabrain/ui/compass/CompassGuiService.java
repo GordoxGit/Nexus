@@ -18,6 +18,11 @@ import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.persistence.PersistentDataContainer;
 import org.bukkit.persistence.PersistentDataType;
 
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+
 /** Handles lobby compass GUI with mode categories and arena list. */
 public class CompassGuiService {
     /** Inventory holder marker to detect our menus. */
@@ -27,9 +32,11 @@ public class CompassGuiService {
 
     private final HikaBrainPlugin plugin;
     private final NamespacedKey guiKey;
-    private final NamespacedKey catKey;
-    private final NamespacedKey arenaKey;
-    private final Holder holder = new Holder();
+   private final NamespacedKey catKey;
+   private final NamespacedKey arenaKey;
+   private final Holder holder = new Holder();
+    private final Set<UUID> joiningNow = ConcurrentHashMap.newKeySet();
+    private final Map<UUID, Long> lastGuiClickTick = new ConcurrentHashMap<>();
 
     public CompassGuiService(HikaBrainPlugin plugin) {
         this.plugin = plugin;
@@ -78,24 +85,43 @@ public class CompassGuiService {
 
     /** Attempt to join an arena selected from the GUI. */
     public void attemptJoin(Player p, String arenaName) {
-        ArenaRegistry.State state = plugin.arenaRegistry().state(arenaName);
-        if (state != ArenaRegistry.State.WAITING && state != ArenaRegistry.State.STARTING) {
-            actionBar(p, ChatColor.GRAY + "En cours");
-            return;
-        }
+        long tick = System.currentTimeMillis();
+        UUID id = p.getUniqueId();
+        Long last = lastGuiClickTick.get(id);
+        if (last != null && tick - last < 250) return;
+        lastGuiClickTick.put(id, tick);
+        if (!joiningNow.add(id)) return;
+        actionBar(p, ChatColor.GRAY + "En cours...");
         try {
-            if (plugin.game().arena() == null || !plugin.game().arena().name().equalsIgnoreCase(arenaName)) {
-                plugin.game().loadArena(arenaName);
+            if (plugin.game().arena() != null && plugin.game().teamOf(p) != Team.SPECTATOR) {
+                return; // already in arena
             }
-            Arena arena = plugin.game().arena();
-            int total = arena.players().get(Team.RED).size() + arena.players().get(Team.BLUE).size();
-            if (total >= arena.teamSize() * 2) {
-                actionBar(p, ChatColor.RED + "Arène pleine");
+            ArenaRegistry.State state = plugin.arenaRegistry().state(arenaName);
+            if (state != ArenaRegistry.State.WAITING && state != ArenaRegistry.State.STARTING) {
+                actionBar(p, ChatColor.RED + "Arène indisponible");
                 return;
             }
-            plugin.game().join(p, null);
-        } catch (Exception ex) {
-            actionBar(p, ChatColor.RED + "Erreur arène");
+            try {
+                if (plugin.game().arena() == null || !plugin.game().arena().name().equalsIgnoreCase(arenaName)) {
+                    plugin.game().loadArena(arenaName);
+                }
+                Arena arena = plugin.game().arena();
+                int total = arena.players().get(Team.RED).size() + arena.players().get(Team.BLUE).size();
+                if (arena.isActive() || total >= arena.teamSize() * 2) {
+                    actionBar(p, ChatColor.RED + "Arène indisponible");
+                    return;
+                }
+                plugin.game().join(p, null);
+                if (plugin.game().teamOf(p) != Team.SPECTATOR) {
+                    actionBar(p, ChatColor.GREEN + "Rejoint");
+                } else {
+                    actionBar(p, ChatColor.RED + "Arène indisponible");
+                }
+            } catch (Exception ex) {
+                actionBar(p, ChatColor.RED + "Erreur arène");
+            }
+        } finally {
+            joiningNow.remove(id);
         }
     }
 
