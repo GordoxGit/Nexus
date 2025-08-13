@@ -70,14 +70,14 @@ server:
 
 compass:
   enabled: true
-  material: RECOVERY_COMPASS
+  material: CLOCK
   give-on-join: true
   slot: 8
   open-on-right-click: true
   cooldown-ms: 200
 ```
 
-  Boussole (PDC `nav_compass`) : recovery compass donnée au join, ouvre le menu partout sans TP.
+  Boussole (PDC `nav_compass`) : horloge donnée au join, ouvre le menu partout sans TP.
 
 Dossier arènes `plugins/HikaBrain/arenas/*.yml` :
 ```yml

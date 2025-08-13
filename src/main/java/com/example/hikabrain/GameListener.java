@@ -17,6 +17,7 @@ import org.bukkit.event.block.Action;
 import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.event.block.BlockDamageEvent;
+import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.entity.FoodLevelChangeEvent;
 import org.bukkit.event.player.PlayerBedEnterEvent;
@@ -209,6 +210,20 @@ public class GameListener implements Listener {
         Team t = game.teamOf(p);
         if (t == Team.SPECTATOR) return;
         game.checkScore(p, t, e.getTo());
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onFallDamage(EntityDamageEvent e) {
+        if (!(e.getEntity() instanceof Player)) {
+            return;
+        }
+        if (e.getCause() != EntityDamageEvent.DamageCause.FALL) {
+            return;
+        }
+        Player player = (Player) e.getEntity();
+        if (game.arena() != null && game.arena().isActive() && game.teamOf(player) != Team.SPECTATOR) {
+            e.setCancelled(true);
+        }
     }
 
     @EventHandler

@@ -43,8 +43,8 @@ public class JoinListener implements Listener {
             }
         }
 
-        Material mat = Material.matchMaterial(cfg.getString("compass.material", "RECOVERY_COMPASS"));
-        if (mat == null) mat = Material.RECOVERY_COMPASS;
+        Material mat = Material.matchMaterial(cfg.getString("compass.material", "CLOCK"));
+        if (mat == null) mat = Material.CLOCK;
         ItemStack compass = new ItemStack(mat);
         ItemMeta meta = compass.getItemMeta();
         if (meta != null) {
