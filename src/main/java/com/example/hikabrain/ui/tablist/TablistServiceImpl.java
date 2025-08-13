@@ -18,7 +18,8 @@ public class TablistServiceImpl implements TablistService {
         this.plugin = plugin;
         new BukkitRunnable(){
             @Override public void run(){
-                Arena a = plugin.game().arena();
+                var game = plugin.game();
+                Arena a = (game != null) ? game.arena() : null;
                 if (a != null) update(a);
             }
         }.runTaskTimer(plugin, 20L, 20L);
@@ -27,9 +28,11 @@ public class TablistServiceImpl implements TablistService {
     @Override
     public void update(Arena arena) {
         if (arena == null) return;
-        int time = plugin.game().timeRemaining();
+        var game = plugin.game();
+        if (game == null) return;
+        int time = game.timeRemaining();
         String mmss = String.format("%02d:%02d", Math.max(0, time) / 60, Math.max(0, time) % 60);
-        int teamSize = plugin.game().teamSize();
+        int teamSize = game.teamSize();
         String mode = teamSize + "v" + teamSize;
         String header = ChatColor.AQUA + "" + ChatColor.BOLD + plugin.serverDisplayName().toUpperCase() + "\n" +
                 ChatColor.GRAY + "HikaBrain " + ChatColor.DARK_GRAY + "• " + ChatColor.GRAY + arena.name() + " " +
@@ -71,6 +74,7 @@ public class TablistServiceImpl implements TablistService {
 
     @Override
     public void reload() {
-        update(plugin.game().arena());
+        var game = plugin.game();
+        if (game != null) update(game.arena());
     }
 }

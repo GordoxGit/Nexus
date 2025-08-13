@@ -2,7 +2,6 @@ package com.example.hikabrain;
 
 import org.bukkit.Bukkit;
 import org.bukkit.World;
-import org.bukkit.command.CommandMap;
 import org.bukkit.command.PluginCommand;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.configuration.file.YamlConfiguration;
@@ -22,8 +21,6 @@ import com.example.hikabrain.lobby.LobbyService;
 import com.example.hikabrain.arena.ArenaRegistry;
 import com.example.hikabrain.ui.style.UiStyle;
 
-import java.lang.reflect.Constructor;
-import java.lang.reflect.Method;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
@@ -72,34 +69,19 @@ public class HikaBrainPlugin extends JavaPlugin {
         this.adminMode = new AdminModeService();
         getServer().getPluginManager().registerEvents(new GameListener(gameManager, adminMode), this);
 
-        boolean registered = false;
-        try {
-            if (getCommand("hb") != null) {
-                HBCommand cmd = new HBCommand(gameManager);
-                getCommand("hb").setExecutor(cmd);
-                getCommand("hb").setTabCompleter(cmd);
-                registered = true;
-                getLogger().info("Registered /hb from plugin.yml");
-            }
-        } catch (Exception ignored) {}
+        getLogger().info("plugin.yml api-version: " + getDescription().getAPIVersion());
 
-        if (!registered) {
-            try {
-                Method getCommandMap = Bukkit.getServer().getClass().getMethod("getCommandMap");
-                CommandMap map = (CommandMap) getCommandMap.invoke(Bukkit.getServer());
-                Constructor<PluginCommand> cons = PluginCommand.class.getDeclaredConstructor(String.class, org.bukkit.plugin.Plugin.class);
-                cons.setAccessible(true);
-                PluginCommand pc = cons.newInstance("hb", this);
-                HBCommand cmd = new HBCommand(gameManager);
-                pc.setExecutor(cmd);
-                pc.setTabCompleter(cmd);
-                pc.setDescription("HikaBrain main command");
-                map.register(getDescription().getName(), pc);
-                getLogger().warning("Registered /hb programmatically (plugin.yml commands missing).");
-            } catch (Throwable t) {
-                getLogger().severe("Failed to register /hb command: " + t.getMessage());
-            }
+        PluginCommand hb = getCommand("hb");
+        getLogger().info("getCommand(\"hb\") -> " + hb);
+        if (hb == null) {
+            getLogger().severe("Command /hb missing from plugin.yml; disabling plugin");
+            getServer().getPluginManager().disablePlugin(this);
+            return;
         }
+        HBCommand cmd = new HBCommand(gameManager);
+        hb.setExecutor(cmd);
+        hb.setTabCompleter(cmd);
+        getLogger().info("Registered /hb command");
 
         getLogger().info("HikaBrain enabled. Allowed worlds: " + String.join(", ", allowedWorlds));
     }

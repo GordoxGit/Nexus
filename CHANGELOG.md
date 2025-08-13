@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.2.11
+- Fix: hb command registration
+- Fix: Tablist NPE init
+- Chore: plugin.yml api-version
+
 ## 1.2.8
 - Boussole air/no-TP, GUI verrouillé
 - Join anti-spam/atomique
