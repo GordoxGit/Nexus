@@ -300,6 +300,7 @@ public class GameManager {
     }
 
     public void restock(Player p, Team t) {
+        if (t == Team.SPECTATOR) return;
         PlayerInventory inv = p.getInventory();
         inv.setItemInOffHand(new ItemStack(Material.SANDSTONE, 64));
         ItemStack apples = inv.getItem(2);

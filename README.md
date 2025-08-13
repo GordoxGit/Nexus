@@ -3,7 +3,7 @@
 [![Java 21](https://img.shields.io/badge/Java-21-red?logo=openjdk)](https://openjdk.org/)
 [![Spigot/Paper 1.21](https://img.shields.io/badge/Spigot/Paper-1.21-yellow?logo=spigotmc)](https://www.spigotmc.org/)
 [![Gradle](https://img.shields.io/badge/Gradle-build-blue?logo=gradle)](https://gradle.org/)
-[![Version](https://img.shields.io/badge/Version-1.2.11-informational)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/Version-1.3.0-informational)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/License-MIT-green)](LICENSE)
 
 Site : [heneria.com](https://heneria.com)
@@ -77,7 +77,7 @@ compass:
   cooldown-ms: 200
 ```
 
-  Boussole (PDC `nav_compass`) : horloge donnée au join, ouvre le menu partout sans TP.
+  Horloge (PDC `nav_compass`) : horloge donnée au join, ouvre le menu partout sans TP.
 
 Dossier arènes `plugins/HikaBrain/arenas/*.yml` :
 ```yml
@@ -114,11 +114,11 @@ Permissions :
 - `hikabrain.play` (par défaut)
 
 ## Fonctionnalités clés
-- Multi-arènes 1v1/2v2/3v3/4v4 (boussole → catégories → arènes)
-- Lobby Hika (UI dédiée + boussole au join)
+- Multi-arènes 1v1/2v2/3v3/4v4 (horloge → catégories → arènes)
+- Lobby Hika (UI dédiée + horloge de navigation au join)
 - Scoreboard & Tablist : titres Heneria/HikaBrain, mode NvN, timer, scores, joueurs dans l’arène, ligne adaptative sans espaces vides
 - Lobby : monde, connectés, marque Heneria + heneria.com
-- Boussole « menu only » : ouvre le GUI en air/void, jamais de TP, inventaires verrouillés
+- Horloge « menu only » : ouvre le GUI en air/void, jamais de TP, inventaires verrouillés
 - Pont cassable (zone broke via SetBroke) + reset à la manche
 - Lits non-interactifs en jeu (deny silencieux) + SetBed admin
 - Anti-spam join : assignation atomique, re-check capacité
@@ -139,7 +139,7 @@ Permissions :
 ## Débogage / erreurs courantes
 - Monde manquant (`world_hika`) → logs d’avertissement, certaines fonctions inactives
 - Arène « pleine » fantôme → vérifier assignation atomique (`joiningNow`), re-check capacité
-- Boussole qui TP → vérifier listener `HIGHEST` + anti-TP (metadata)
+- Horloge qui TP → vérifier listener `HIGHEST` + anti-TP (metadata)
 
 ## Roadmap courte
 - **1.2.x** : polish UI (HUD/bossbar), recap fin de manche, spectateur avancé (compass GUI)
