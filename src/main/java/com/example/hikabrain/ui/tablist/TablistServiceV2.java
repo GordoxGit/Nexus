@@ -56,10 +56,12 @@ public class TablistServiceV2 implements TablistService {
     @Override
     public void update(Arena arena) {
         if (arena == null) return;
+        var game = plugin.game();
+        if (game == null) return;
         UiStyle style = plugin.style();
-        int time = plugin.game().timeRemaining();
+        int time = game.timeRemaining();
         String mmss = String.format("%02d:%02d", Math.max(0, time) / 60, Math.max(0, time) % 60);
-        int teamSize = plugin.game().teamSize();
+        int teamSize = game.teamSize();
         String mode = teamSize + "v" + teamSize;
         String header = ChatColor.AQUA + "" + ChatColor.BOLD + style.brandTitle().toUpperCase() + "\n" +
                 ChatColor.GRAY + style.brandSub() + " " + ChatColor.DARK_GRAY + "• " + ChatColor.GRAY + arena.name() + " " +
@@ -102,7 +104,8 @@ public class TablistServiceV2 implements TablistService {
 
     @Override
     public void reload() {
-        update(plugin.game().arena());
+        var game = plugin.game();
+        if (game != null) update(game.arena());
         updateLobby();
     }
 
