@@ -17,11 +17,15 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.persistence.PersistentDataContainer;
 import org.bukkit.persistence.PersistentDataType;
+import org.bukkit.enchantments.Enchantment;
+import org.bukkit.inventory.ItemFlag;
 
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.ArrayList;
+import java.util.List;
 
 /** Handles lobby compass GUI with mode categories and arena list. */
 public class CompassGuiService {
@@ -62,12 +66,41 @@ public class CompassGuiService {
         if (!plugin.isWorldAllowed(p.getWorld())) return;
         Inventory inv = Bukkit.createInventory(holder, 54,
                 ChatColor.AQUA + "Arènes " + ChatColor.GRAY + "(" + ChatColor.WHITE + teamSize + "v" + teamSize + ChatColor.GRAY + ")");
+        ItemStack filler = new ItemStack(Material.BLACK_STAINED_GLASS_PANE);
+        ItemMeta fillerMeta = filler.getItemMeta();
+        if (fillerMeta != null) {
+            fillerMeta.setDisplayName(" ");
+            filler.setItemMeta(fillerMeta);
+        }
+        for (int i = 0; i < inv.getSize(); i++) {
+            inv.setItem(i, filler);
+        }
+
         int slot = 10;
         for (String name : plugin.arenaRegistry().list(teamSize)) {
-            ItemStack it = new ItemStack(Material.MAP);
+            Arena a = plugin.game().arena() != null && plugin.game().arena().name().equalsIgnoreCase(name) ? plugin.game().arena() : null;
+            int currentPlayers = (a != null) ? a.players().get(Team.RED).size() + a.players().get(Team.BLUE).size() : 0;
+            int maxPlayers = teamSize * 2;
+            boolean isActive = (a != null) && a.isActive();
+
+            List<String> lore = new ArrayList<>();
+            lore.add("§7Map: §b" + name);
+            lore.add(" ");
+            lore.add("§7Joueurs: " + (isActive ? "§c" : "§a") + currentPlayers + "§7/§c" + maxPlayers);
+            lore.add("§7État: " + (isActive ? "§cEn cours" : "§aEn attente"));
+            lore.add(" ");
+            lore.add("§e► Cliquez pour rejoindre");
+
+            ItemStack it = new ItemStack(Material.PAPER);
             ItemMeta m = it.getItemMeta();
             if (m != null) {
                 m.setDisplayName(ChatColor.AQUA + name);
+                m.setLore(lore);
+                if (!isActive) {
+                    Enchantment glow = Enchantment.getByName("DURABILITY");
+                    if (glow != null) m.addEnchant(glow, 1, true);
+                    m.addItemFlags(ItemFlag.HIDE_ENCHANTS);
+                }
                 PersistentDataContainer pdc = m.getPersistentDataContainer();
                 pdc.set(guiKey, PersistentDataType.STRING, "list");
                 pdc.set(arenaKey, PersistentDataType.STRING, name);
@@ -75,7 +108,7 @@ public class CompassGuiService {
             }
             inv.setItem(slot, it);
             slot++;
-            if ((slot + 1) % 9 == 0) slot += 2; // skip edges for readability
+            if ((slot + 1) % 9 == 0) slot += 2;
             if (slot >= 44) break;
         }
         inv.setItem(45, backItem());

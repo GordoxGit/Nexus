@@ -7,6 +7,7 @@ import com.example.hikabrain.Team;
 import com.example.hikabrain.ui.model.Presets;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
+import org.bukkit.Sound;
 import org.bukkit.boss.BarColor;
 import org.bukkit.boss.BarStyle;
 import org.bukkit.boss.BossBar;
@@ -131,6 +132,40 @@ public class UiServiceImpl implements UiService {
                 c--;
             }
         }.runTaskTimer(plugin, 0L, 20L);
+    }
+
+    @Override
+    public void broadcastTitle(Arena a, String title, String subtitle, int fadeIn, int stay, int fadeOut) {
+        if (a == null) return;
+        for (UUID u : a.players().getOrDefault(Team.RED, java.util.Collections.emptySet())) {
+            Player p = Bukkit.getPlayer(u);
+            if (p != null) p.sendTitle(title, subtitle, fadeIn, stay, fadeOut);
+        }
+        for (UUID u : a.players().getOrDefault(Team.BLUE, java.util.Collections.emptySet())) {
+            Player p = Bukkit.getPlayer(u);
+            if (p != null) p.sendTitle(title, subtitle, fadeIn, stay, fadeOut);
+        }
+        for (UUID u : a.players().getOrDefault(Team.SPECTATOR, java.util.Collections.emptySet())) {
+            Player p = Bukkit.getPlayer(u);
+            if (p != null) p.sendTitle(title, subtitle, fadeIn, stay, fadeOut);
+        }
+    }
+
+    @Override
+    public void broadcastSound(Arena a, Sound sound, float volume, float pitch) {
+        if (a == null) return;
+        for (UUID u : a.players().getOrDefault(Team.RED, java.util.Collections.emptySet())) {
+            Player p = Bukkit.getPlayer(u);
+            if (p != null) p.playSound(p.getLocation(), sound, volume, pitch);
+        }
+        for (UUID u : a.players().getOrDefault(Team.BLUE, java.util.Collections.emptySet())) {
+            Player p = Bukkit.getPlayer(u);
+            if (p != null) p.playSound(p.getLocation(), sound, volume, pitch);
+        }
+        for (UUID u : a.players().getOrDefault(Team.SPECTATOR, java.util.Collections.emptySet())) {
+            Player p = Bukkit.getPlayer(u);
+            if (p != null) p.playSound(p.getLocation(), sound, volume, pitch);
+        }
     }
 
     @Override

@@ -29,6 +29,7 @@ public class GameManager {
 
     private final BridgeResetService bridgeReset;
     private BukkitRunnable timerTask;
+    private BukkitRunnable startCountdownTask;
     private int timeRemaining; // seconds
     private int freezeMoveTicks = 0; // block movement & scoring during countdown
 
@@ -128,6 +129,12 @@ public class GameManager {
         plugin.scoreboard().show(p, arena);
         plugin.scoreboard().updatePlayers(arena);
         plugin.tablist().update(arena);
+
+        int totalPlayers = arena.players().get(Team.RED).size() + arena.players().get(Team.BLUE).size();
+        int maxPlayers = arena.teamSize() * 2;
+        if (totalPlayers >= maxPlayers) {
+            prepareGameStart(10);
+        }
     }
 
     public void leave(Player p) {
@@ -192,31 +199,27 @@ public class GameManager {
         Bukkit.broadcastMessage(ChatColor.GREEN + "[HB] Partie lancée ! Objectif: " + arena.targetPoints() + " points.");
     }
 
-    private void broadcastTitle(String title, String sub, int fadeIn, int stay, int fadeOut){
-        for (UUID u : arena.players().getOrDefault(Team.RED, java.util.Collections.emptySet())) {
-            Player p = Bukkit.getPlayer(u);
-            if (p != null) p.sendTitle(title, sub, fadeIn, stay, fadeOut);
-        }
-        for (UUID u : arena.players().getOrDefault(Team.BLUE, java.util.Collections.emptySet())) {
-            Player p = Bukkit.getPlayer(u);
-            if (p != null) p.sendTitle(title, sub, fadeIn, stay, fadeOut);
-        }
-        for (UUID u : arena.players().getOrDefault(Team.SPECTATOR, java.util.Collections.emptySet())) {
-            Player p = Bukkit.getPlayer(u);
-            if (p != null) p.sendTitle(title, sub, fadeIn, stay, fadeOut);
-        }
-    }
-
-    private void broadcastSound(Sound s, float vol, float pitch){
-        for (UUID u : arena.players().getOrDefault(Team.RED, java.util.Collections.emptySet())) {
-            Player p = Bukkit.getPlayer(u); if (p != null) p.playSound(p.getLocation(), s, vol, pitch);
-        }
-        for (UUID u : arena.players().getOrDefault(Team.BLUE, java.util.Collections.emptySet())) {
-            Player p = Bukkit.getPlayer(u); if (p != null) p.playSound(p.getLocation(), s, vol, pitch);
-        }
-        for (UUID u : arena.players().getOrDefault(Team.SPECTATOR, java.util.Collections.emptySet())) {
-            Player p = Bukkit.getPlayer(u); if (p != null) p.playSound(p.getLocation(), s, vol, pitch);
-        }
+    public void prepareGameStart(int seconds) {
+        if (arena == null || arena.isActive()) return;
+        if (startCountdownTask != null) return;
+        startCountdownTask = new BukkitRunnable() {
+            int countdown = seconds;
+            @Override public void run() {
+                if (arena == null || arena.isActive()) { cancel(); startCountdownTask = null; return; }
+                if (countdown > 0) {
+                    String title = ChatColor.AQUA + "Démarrage dans " + countdown + "...";
+                    plugin.ui().broadcastTitle(arena, title, "", 0, 25, 5);
+                    plugin.ui().broadcastSound(arena, Sound.BLOCK_NOTE_BLOCK_HAT, 1f, 1f);
+                    countdown--;
+                } else {
+                    plugin.ui().broadcastSound(arena, Sound.ENTITY_PLAYER_LEVELUP, 1f, 1.2f);
+                    start();
+                    cancel();
+                    startCountdownTask = null;
+                }
+            }
+        };
+        startCountdownTask.runTaskTimer(plugin, 0L, 20L);
     }
 
     private void endByTime() {
@@ -232,6 +235,7 @@ public class GameManager {
         if (arena == null || !arena.isActive()) return;
         arena.setActive(false);
         if (timerTask != null) timerTask.cancel();
+        if (startCountdownTask != null) { startCountdownTask.cancel(); startCountdownTask = null; }
         if (announce) endByTime(); else endCleanup();
     }
 
@@ -418,8 +422,8 @@ public class GameManager {
         }
         title = ChatColor.translateAlternateColorCodes('&', title);
         subtitle = ChatColor.translateAlternateColorCodes('&', subtitle);
-        broadcastTitle(title, subtitle, fadeIn, stay, fadeOut);
-        broadcastSound(Sound.BLOCK_NOTE_BLOCK_PLING, 1f, 1.6f);
+        plugin.ui().broadcastTitle(arena, title, subtitle, fadeIn, stay, fadeOut);
+        plugin.ui().broadcastSound(arena, Sound.BLOCK_NOTE_BLOCK_PLING, 1f, 1.6f);
 
         flushPlacedBlocks();
         for (UUID u : arena.players().get(Team.RED)) {
