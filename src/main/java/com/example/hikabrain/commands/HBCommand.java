@@ -1,29 +1,30 @@
-package com.example.hikabrain;
+package com.example.hikabrain.commands;
 
+import com.example.hikabrain.*;
+import com.example.hikabrain.ui.FeedbackServiceImpl;
+import com.example.hikabrain.ui.ThemeServiceImpl;
+import com.example.hikabrain.ui.UiServiceImpl;
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.format.NamedTextColor;
+import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 import org.bukkit.ChatColor;
 import org.bukkit.World;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
-import org.bukkit.command.TabCompleter;
 import org.bukkit.entity.Player;
-import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.format.NamedTextColor;
-import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 
-import com.example.hikabrain.ui.FeedbackServiceImpl;
-import com.example.hikabrain.ui.ThemeServiceImpl;
-import com.example.hikabrain.ui.UiServiceImpl;
-import com.example.hikabrain.AdminModeService;
-
-import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 
-public class HBCommand implements CommandExecutor, TabCompleter {
+public class HBCommand implements CommandExecutor {
 
+    private final HikaBrainPlugin plugin;
     private final GameManager game;
-    public HBCommand(GameManager game) { this.game = game; }
+
+    public HBCommand(HikaBrainPlugin plugin) {
+        this.plugin = plugin;
+        this.game = plugin.game();
+    }
 
     private void sendHelp(CommandSender s) {
         Component header = Component.text("HikaBrain ", NamedTextColor.GOLD)
@@ -62,7 +63,10 @@ public class HBCommand implements CommandExecutor, TabCompleter {
 
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
-        if (args.length == 0 || args[0].equalsIgnoreCase("help")) { sendHelp(sender); return true; }
+        if (args.length == 0 || args[0].equalsIgnoreCase("help")) {
+            sendHelp(sender);
+            return true;
+        }
 
         String sub = args[0].toLowerCase();
         switch (sub) {
@@ -80,7 +84,6 @@ public class HBCommand implements CommandExecutor, TabCompleter {
                 sender.sendMessage(ChatColor.GREEN + "Houe 'SetBed' ajoutée. Clic droit = lit rouge, clic gauche = lit bleu.");
                 return true;
             }
-            
             case "setbroke": {
                 if (needAdmin(sender)) return true;
                 if (!(sender instanceof Player)) { sender.sendMessage("In-game only"); return true; }
@@ -145,10 +148,9 @@ public class HBCommand implements CommandExecutor, TabCompleter {
                 sender.sendMessage(ChatColor.GREEN + "Thème appliqué: " + args[1]);
                 return true;
             }
-case "join": {
+            case "join": {
                 if (!(sender instanceof Player)) { sender.sendMessage("In-game only"); return true; }
                 Player p = (Player) sender;
-                if (!ensureAllowedWorld(p, sender)) return true;
                 Team pref = null;
                 if (args.length >= 2) {
                     if (args[1].equalsIgnoreCase("red")) pref = Team.RED;
@@ -235,30 +237,20 @@ case "join": {
                 catch (java.io.IOException e) { sender.sendMessage(ChatColor.RED + "Erreur: " + e.getMessage()); }
                 return true;
             }
-            case "start": { if (needAdmin(sender)) return true; game.start(); return true; }
-            case "stop":  { if (needAdmin(sender)) return true; game.stop(true); return true; }
-            default: { sendHelp(sender); return true; }
-        }
-    }
-
-    @Override
-    public List<String> onTabComplete(CommandSender sender, org.bukkit.command.Command command, String alias, String[] args) {
-        if (args.length == 1) return Arrays.asList("help","list","setbed","join","leave","create","setspawn","setbuildpos","setpoints","settimer","save","load","start","stop","setbroke","snapshotbroke","resetbroke","ui","theme","setlobby","admin");
-        if (args.length == 2) {
-            switch (args[0].toLowerCase()) {
-                case "setspawn": return Arrays.asList("red","blue");
-                case "setbuildpos": return Arrays.asList("1","2");
-                case "setpoints": return Arrays.asList("5","10");
-                case "settimer": return Arrays.asList("10","15","20");
-                case "join": return Arrays.asList("red","blue");
-                case "ui": return Arrays.asList("reload");
-                case "theme": return new ArrayList<>(HikaBrainPlugin.get().theme().available());
-                case "admin": return Arrays.asList("on","off","toggle");
+            case "start": {
+                if (needAdmin(sender)) return true;
+                game.start();
+                return true;
+            }
+            case "stop": {
+                if (needAdmin(sender)) return true;
+                game.stop(true);
+                return true;
+            }
+            default: {
+                sendHelp(sender);
+                return true;
             }
         }
-        if (args.length == 3 && args[0].equalsIgnoreCase("create")) {
-            return Arrays.asList("1","2","3","4");
-        }
-        return new ArrayList<>();
     }
 }

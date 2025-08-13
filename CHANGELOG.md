@@ -1,9 +1,9 @@
 # Changelog
 
 ## 1.2.11
-- Fix: hb command registration
-- Fix: Tablist NPE init
-- Chore: plugin.yml api-version
+- Fix command registration (/hb)
+- Add recovery compass on join
+- Improve listener registration & logs
 
 ## 1.2.8
 - Boussole air/no-TP, GUI verrouillé

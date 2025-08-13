@@ -1,6 +1,8 @@
 allowed-worlds:
   - world_hika
 
+world-allowed: "world_hika"
+
 lobby:
   world: world_hika
   x: 0.5
@@ -10,6 +12,12 @@ lobby:
   pitch: 0.0
 
 compass:
+  enabled: true
+  material: RECOVERY_COMPASS
+  give-on-join: true
+  slot: 8
+  open-on-right-click: true
+  cooldown-ms: 200
   gui:
     rows: 6
     category_row: 1

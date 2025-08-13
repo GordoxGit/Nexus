@@ -67,21 +67,25 @@ public class HikaBrainPlugin extends JavaPlugin {
         this.lobbyService = new LobbyService(this);
         this.arenaRegistry = new ArenaRegistry(this);
         this.adminMode = new AdminModeService();
-        getServer().getPluginManager().registerEvents(new GameListener(gameManager, adminMode), this);
 
+        getLogger().info("Starting HikaBrain v" + getDescription().getVersion());
         getLogger().info("plugin.yml api-version: " + getDescription().getAPIVersion());
 
-        PluginCommand hb = getCommand("hb");
-        getLogger().info("getCommand(\"hb\") -> " + hb);
-        if (hb == null) {
-            getLogger().severe("Command /hb missing from plugin.yml; disabling plugin");
+        PluginCommand cmd = getCommand("hb");
+        if (cmd == null) {
+            getLogger().severe("Command /hb introuvable (plugin.yml). Désactivation.");
             getServer().getPluginManager().disablePlugin(this);
             return;
         }
-        HBCommand cmd = new HBCommand(gameManager);
-        hb.setExecutor(cmd);
-        hb.setTabCompleter(cmd);
-        getLogger().info("Registered /hb command");
+        cmd.setExecutor(new com.example.hikabrain.commands.HBCommand(this));
+        cmd.setTabCompleter(new com.example.hikabrain.commands.HBTabCompleter());
+        getLogger().info("Command /hb registered OK");
+
+        org.bukkit.plugin.PluginManager pm = getServer().getPluginManager();
+        pm.registerEvents(new GameListener(gameManager, adminMode), this);
+        pm.registerEvents(new com.example.hikabrain.listener.JoinListener(this), this);
+        pm.registerEvents(new com.example.hikabrain.listener.InteractListener(this), this);
+        getLogger().info("Listeners registered OK");
 
         getLogger().info("HikaBrain enabled. Allowed worlds: " + String.join(", ", allowedWorlds));
     }
