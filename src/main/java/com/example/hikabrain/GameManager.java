@@ -133,7 +133,8 @@ public class GameManager {
         int totalPlayers = arena.players().get(Team.RED).size() + arena.players().get(Team.BLUE).size();
         int maxPlayers = arena.teamSize() * 2;
         if (totalPlayers >= maxPlayers) {
-            prepareGameStart(10);
+            int cd = plugin.getConfig().getInt("game.start-countdown-seconds", 5);
+            prepareGameStart(cd);
         }
     }
 
@@ -146,6 +147,14 @@ public class GameManager {
         plugin.tablist().update(arena);
         HikaBrainPlugin.get().lobbyService().apply(p);
         p.sendMessage(ChatColor.GRAY + "Tu as quitté la partie.");
+
+        if (arena.isActive()) {
+            int playersRemaining = arena.players().get(Team.RED).size() + arena.players().get(Team.BLUE).size();
+            if (playersRemaining < 2) {
+                broadcastToArena("Un joueur a quitté, la partie est terminée.");
+                stop(true);
+            }
+        }
     }
 
     public boolean isFrozen() { return freezeMoveTicks > 0; }
@@ -237,6 +246,16 @@ public class GameManager {
         if (timerTask != null) timerTask.cancel();
         if (startCountdownTask != null) { startCountdownTask.cancel(); startCountdownTask = null; }
         if (announce) endByTime(); else endCleanup();
+    }
+
+    private void broadcastToArena(String msg) {
+        if (arena == null) return;
+        for (Team t : Team.values()) {
+            for (UUID u : arena.players().getOrDefault(t, Collections.emptySet())) {
+                Player pl = Bukkit.getPlayer(u);
+                if (pl != null) pl.sendMessage(ChatColor.YELLOW + msg);
+            }
+        }
     }
 
     private void endCleanup() {

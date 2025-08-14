@@ -22,6 +22,9 @@ compass:
     rows: 6
     category_row: 1
 
+game:
+  start-countdown-seconds: 5
+
 debug: false
 
 server:

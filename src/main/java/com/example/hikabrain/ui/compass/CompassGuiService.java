@@ -19,6 +19,8 @@ import org.bukkit.persistence.PersistentDataContainer;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.enchantments.Enchantment;
 import org.bukkit.inventory.ItemFlag;
+import org.bukkit.scheduler.BukkitRunnable;
+import org.bukkit.scheduler.BukkitTask;
 
 import java.util.Map;
 import java.util.Set;
@@ -41,6 +43,7 @@ public class CompassGuiService {
    private final Holder holder = new Holder();
     private final Set<UUID> joiningNow = ConcurrentHashMap.newKeySet();
     private final Map<UUID, Long> lastGuiClickTick = new ConcurrentHashMap<>();
+    private final Map<UUID, BukkitTask> refreshTasks = new ConcurrentHashMap<>();
 
     public CompassGuiService(HikaBrainPlugin plugin) {
         this.plugin = plugin;
@@ -53,10 +56,14 @@ public class CompassGuiService {
     public void openModeMenu(Player p) {
         if (!plugin.isWorldAllowed(p.getWorld())) return;
         Inventory inv = Bukkit.createInventory(holder, 54, ChatColor.AQUA + "Choix du mode");
-        addMode(inv, 10, 1);
-        addMode(inv, 12, 2);
-        addMode(inv, 14, 3);
-        addMode(inv, 16, 4);
+        ItemStack filler = fillerItem();
+        for (int i = 0; i < inv.getSize(); i++) {
+            inv.setItem(i, filler);
+        }
+        addMode(inv, 10, 1, Material.IRON_SWORD);
+        addMode(inv, 12, 2, Material.DIAMOND_SWORD);
+        addMode(inv, 14, 3, Material.NETHERITE_SWORD);
+        addMode(inv, 16, 4, Material.BOW);
         inv.setItem(53, closeItem());
         p.openInventory(inv);
     }
@@ -66,54 +73,27 @@ public class CompassGuiService {
         if (!plugin.isWorldAllowed(p.getWorld())) return;
         Inventory inv = Bukkit.createInventory(holder, 54,
                 ChatColor.AQUA + "Arènes " + ChatColor.GRAY + "(" + ChatColor.WHITE + teamSize + "v" + teamSize + ChatColor.GRAY + ")");
-        ItemStack filler = new ItemStack(Material.BLACK_STAINED_GLASS_PANE);
-        ItemMeta fillerMeta = filler.getItemMeta();
-        if (fillerMeta != null) {
-            fillerMeta.setDisplayName(" ");
-            filler.setItemMeta(fillerMeta);
-        }
+        ItemStack filler = fillerItem();
         for (int i = 0; i < inv.getSize(); i++) {
             inv.setItem(i, filler);
         }
-
-        int slot = 10;
-        for (String name : plugin.arenaRegistry().list(teamSize)) {
-            Arena a = plugin.game().arena() != null && plugin.game().arena().name().equalsIgnoreCase(name) ? plugin.game().arena() : null;
-            int currentPlayers = (a != null) ? a.players().get(Team.RED).size() + a.players().get(Team.BLUE).size() : 0;
-            int maxPlayers = teamSize * 2;
-            boolean isActive = (a != null) && a.isActive();
-
-            List<String> lore = new ArrayList<>();
-            lore.add("§7Map: §b" + name);
-            lore.add(" ");
-            lore.add("§7Joueurs: " + (isActive ? "§c" : "§a") + currentPlayers + "§7/§c" + maxPlayers);
-            lore.add("§7État: " + (isActive ? "§cEn cours" : "§aEn attente"));
-            lore.add(" ");
-            lore.add("§e► Cliquez pour rejoindre");
-
-            ItemStack it = new ItemStack(Material.PAPER);
-            ItemMeta m = it.getItemMeta();
-            if (m != null) {
-                m.setDisplayName(ChatColor.AQUA + name);
-                m.setLore(lore);
-                if (!isActive) {
-                    Enchantment glow = Enchantment.getByName("DURABILITY");
-                    if (glow != null) m.addEnchant(glow, 1, true);
-                    m.addItemFlags(ItemFlag.HIDE_ENCHANTS);
-                }
-                PersistentDataContainer pdc = m.getPersistentDataContainer();
-                pdc.set(guiKey, PersistentDataType.STRING, "list");
-                pdc.set(arenaKey, PersistentDataType.STRING, name);
-                it.setItemMeta(m);
-            }
-            inv.setItem(slot, it);
-            slot++;
-            if ((slot + 1) % 9 == 0) slot += 2;
-            if (slot >= 44) break;
-        }
         inv.setItem(45, backItem());
         inv.setItem(53, closeItem());
+        fillArenaListItems(inv, teamSize, p, filler);
         p.openInventory(inv);
+
+        cancelUpdateTask(p);
+        BukkitTask task = new BukkitRunnable() {
+            @Override public void run() {
+                if (!p.isOnline() || p.getOpenInventory().getTopInventory() != inv) {
+                    cancel();
+                    refreshTasks.remove(p.getUniqueId());
+                    return;
+                }
+                fillArenaListItems(inv, teamSize, p, filler);
+            }
+        }.runTaskTimer(plugin, 20L, 20L);
+        refreshTasks.put(p.getUniqueId(), task);
     }
 
     /** Attempt to join an arena selected from the GUI. */
@@ -158,17 +138,97 @@ public class CompassGuiService {
         }
     }
 
-    private void addMode(Inventory inv, int slot, int teamSize) {
-        ItemStack it = new ItemStack(Material.PAPER);
+    private void addMode(Inventory inv, int slot, int teamSize, Material mat) {
+        ItemStack it = new ItemStack(mat);
         ItemMeta m = it.getItemMeta();
         if (m != null) {
             m.setDisplayName(ChatColor.AQUA + "" + teamSize + "v" + teamSize);
+            Arena a = plugin.game().arena();
+            int count = 0;
+            if (a != null && a.teamSize() == teamSize) {
+                count = a.players().get(Team.RED).size() + a.players().get(Team.BLUE).size();
+            }
+            List<String> lore = new ArrayList<>();
+            lore.add("§a" + count + " joueurs en " + teamSize + "v" + teamSize);
+            m.setLore(lore);
             PersistentDataContainer pdc = m.getPersistentDataContainer();
             pdc.set(guiKey, PersistentDataType.STRING, "mode");
             pdc.set(catKey, PersistentDataType.INTEGER, teamSize);
             it.setItemMeta(m);
         }
         inv.setItem(slot, it);
+    }
+
+    private ItemStack fillerItem() {
+        ItemStack filler = new ItemStack(Material.BLACK_STAINED_GLASS_PANE);
+        ItemMeta m = filler.getItemMeta();
+        if (m != null) {
+            m.setDisplayName(" ");
+            filler.setItemMeta(m);
+        }
+        return filler;
+    }
+
+    private void fillArenaListItems(Inventory inv, int teamSize, Player p, ItemStack filler) {
+        int slot = 10;
+        while (slot < 44) {
+            inv.setItem(slot, filler);
+            slot++;
+            if ((slot + 1) % 9 == 0) slot += 2;
+        }
+        slot = 10;
+        for (String name : plugin.arenaRegistry().list(teamSize)) {
+            Arena a = plugin.game().arena() != null && plugin.game().arena().name().equalsIgnoreCase(name) ? plugin.game().arena() : null;
+            int currentPlayers = (a != null) ? a.players().get(Team.RED).size() + a.players().get(Team.BLUE).size() : 0;
+            int maxPlayers = teamSize * 2;
+            boolean isActive = (a != null) && a.isActive();
+
+            List<String> lore = new ArrayList<>();
+            lore.add("§7Map: §b" + name);
+            lore.add(" ");
+            lore.add("§7Joueurs: " + (isActive ? "§c" : "§a") + currentPlayers + "§7/§c" + maxPlayers);
+            lore.add("§7État: " + (isActive ? "§cEn cours" : "§aEn attente"));
+            lore.add(" ");
+            lore.add("§e► Cliquez pour rejoindre");
+
+            ItemStack it = new ItemStack(Material.PAPER);
+            ItemMeta m = it.getItemMeta();
+            if (m != null) {
+                m.setDisplayName(ChatColor.AQUA + name);
+                m.setLore(lore);
+                if (!isActive) {
+                    Enchantment glow = Enchantment.getByName("DURABILITY");
+                    if (glow != null) m.addEnchant(glow, 1, true);
+                    m.addItemFlags(ItemFlag.HIDE_ENCHANTS);
+                }
+                PersistentDataContainer pdc = m.getPersistentDataContainer();
+                pdc.set(guiKey, PersistentDataType.STRING, "list");
+                pdc.set(arenaKey, PersistentDataType.STRING, name);
+                it.setItemMeta(m);
+            }
+            inv.setItem(slot, it);
+            slot++;
+            if ((slot + 1) % 9 == 0) slot += 2;
+            if (slot >= 44) break;
+        }
+
+        if (plugin.game().arena() != null && plugin.game().teamOf(p) != Team.SPECTATOR && !plugin.game().arena().isActive()) {
+            ItemStack leave = new ItemStack(Material.BARRIER);
+            ItemMeta lm = leave.getItemMeta();
+            if (lm != null) {
+                lm.setDisplayName("§cQuitter la file");
+                lm.getPersistentDataContainer().set(guiKey, PersistentDataType.STRING, "leave");
+                leave.setItemMeta(lm);
+            }
+            inv.setItem(49, leave);
+        } else {
+            inv.setItem(49, filler);
+        }
+    }
+
+    public void cancelUpdateTask(Player p) {
+        BukkitTask task = refreshTasks.remove(p.getUniqueId());
+        if (task != null) task.cancel();
     }
 
     private ItemStack backItem() {

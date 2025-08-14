@@ -32,6 +32,7 @@ import org.bukkit.event.player.PlayerChangedWorldEvent;
 import org.bukkit.event.player.PlayerTeleportEvent;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryDragEvent;
+import org.bukkit.event.inventory.InventoryCloseEvent;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.ItemFlag;
 import org.bukkit.inventory.ItemStack;
@@ -364,6 +365,9 @@ public class GameListener implements Listener {
                 case "close":
                     p.closeInventory();
                     break;
+                case "leave":
+                    HikaBrainPlugin.get().game().leave(p);
+                    break;
             }
             return;
         }
@@ -387,6 +391,13 @@ public class GameListener implements Listener {
         if (isLobbyCompass(e.getOldCursor())) { e.setCancelled(true); return; }
         for (ItemStack it : e.getNewItems().values()) {
             if (isLobbyCompass(it)) { e.setCancelled(true); return; }
+        }
+    }
+
+    @EventHandler
+    public void onInventoryClose(InventoryCloseEvent e) {
+        if (e.getInventory().getHolder() instanceof com.example.hikabrain.ui.compass.CompassGuiService.Holder) {
+            HikaBrainPlugin.get().compassGui().cancelUpdateTask((Player) e.getPlayer());
         }
     }
 
