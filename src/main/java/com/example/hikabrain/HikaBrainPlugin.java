@@ -20,6 +20,7 @@ import com.example.hikabrain.ui.compass.CompassGuiService;
 import com.example.hikabrain.lobby.LobbyService;
 import com.example.hikabrain.arena.ArenaRegistry;
 import com.example.hikabrain.ui.style.UiStyle;
+import com.example.hikabrain.protection.ProtectionService;
 
 import java.util.HashSet;
 import java.util.List;
@@ -41,6 +42,7 @@ public class HikaBrainPlugin extends JavaPlugin {
     private ArenaRegistry arenaRegistry;
     private AdminModeService adminMode;
     private UiStyle uiStyle;
+    private ProtectionService protectionService;
     private String serverDisplayName;
     private String serverDomain;
     private final Set<String> allowedWorlds = new HashSet<>(); // lower-case
@@ -64,9 +66,10 @@ public class HikaBrainPlugin extends JavaPlugin {
         this.scoreboard = new ScoreboardServiceV2(this);
         this.tablist = new TablistServiceV2(this);
         this.compassGui = new CompassGuiService(this);
-        this.lobbyService = new LobbyService(this);
-        this.arenaRegistry = new ArenaRegistry(this);
-        this.adminMode = new AdminModeService();
+       this.lobbyService = new LobbyService(this);
+       this.arenaRegistry = new ArenaRegistry(this);
+       this.adminMode = new AdminModeService();
+        this.protectionService = new ProtectionService(this);
 
         getLogger().info("Starting HikaBrain v" + getDescription().getVersion());
         getLogger().info("plugin.yml api-version: " + getDescription().getAPIVersion());
@@ -82,7 +85,7 @@ public class HikaBrainPlugin extends JavaPlugin {
         getLogger().info("Command /hb registered OK");
 
         org.bukkit.plugin.PluginManager pm = getServer().getPluginManager();
-        pm.registerEvents(new GameListener(gameManager, adminMode), this);
+        pm.registerEvents(new GameListener(gameManager, adminMode, protectionService), this);
         pm.registerEvents(new com.example.hikabrain.listener.JoinListener(this), this);
         pm.registerEvents(new com.example.hikabrain.listener.InteractListener(this), this);
         getLogger().info("Listeners registered OK");
@@ -95,6 +98,7 @@ public class HikaBrainPlugin extends JavaPlugin {
         if (scoreboard != null) scoreboard.clear();
         if (tablist != null) tablist.clear();
         if (gameManager != null) gameManager.shutdown();
+        if (protectionService != null) protectionService.saveRegions();
         getLogger().info("HikaBrain disabled.");
     }
 
@@ -147,6 +151,7 @@ public class HikaBrainPlugin extends JavaPlugin {
     public LobbyService lobbyService() { return lobbyService; }
     public ArenaRegistry arenaRegistry() { return arenaRegistry; }
     public AdminModeService admin() { return adminMode; }
+    public ProtectionService protection() { return protectionService; }
     public UiStyle style() { return uiStyle; }
     public String serverDisplayName() { return serverDisplayName; }
     public String serverDomain() { return serverDomain; }

@@ -3,7 +3,7 @@
 [![Java 21](https://img.shields.io/badge/Java-21-red?logo=openjdk)](https://openjdk.org/)
 [![Spigot/Paper 1.21](https://img.shields.io/badge/Spigot/Paper-1.21-yellow?logo=spigotmc)](https://www.spigotmc.org/)
 [![Gradle](https://img.shields.io/badge/Gradle-build-blue?logo=gradle)](https://gradle.org/)
-[![Version](https://img.shields.io/badge/Version-1.3.2-informational)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/Version-1.4.0-informational)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/License-MIT-green)](LICENSE)
 
 Site : [heneria.com](https://heneria.com)
@@ -102,6 +102,8 @@ broke:
 /hb setbed
 /hb setbroke
 /hb setlobby
+/hb protect
+/hb confirm <nom>
 /hb start
 /hb stop
 /hb join [red|blue]

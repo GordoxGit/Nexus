@@ -16,7 +16,8 @@ public class HBTabCompleter implements TabCompleter {
     private static final List<String> ADMIN_CMDS = Arrays.asList(
             "start", "stop", "create", "setspawn", "setbed", "setbroke",
             "setlobby", "setbuildpos", "setpoints", "settimer", "save",
-            "load", "admin", "ui", "theme", "snapshotbroke", "resetbroke");
+            "load", "admin", "ui", "theme", "snapshotbroke", "resetbroke",
+            "protect", "confirm");
 
     @Override
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {

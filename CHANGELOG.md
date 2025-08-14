@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.4.0 - Protection de zones
+- **Feat:** Outil en jeu pour définir des zones protégées avec `/hb protect` et `/hb confirm`.
+- **Feat:** Chargement et sauvegarde persistants des régions protégées.
+- **Feat:** Empêche les joueurs sans permission de casser ou placer des blocs dans ces zones.
+
 ## 1.3.2 - File d'attente sans TP
 - **Fix:** l'item « Quitter la file » ne peut plus être posé et fonctionne en l'air.
 - **UX:** quitter une file d'attente n'entraîne plus de téléportation au lobby.

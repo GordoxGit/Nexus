@@ -41,6 +41,7 @@ import org.bukkit.persistence.PersistentDataContainer;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.metadata.FixedMetadataValue;
 import org.bukkit.metadata.MetadataValue;
+import com.example.hikabrain.protection.ProtectionService;
 
 import java.util.List;
 
@@ -69,9 +70,11 @@ public class GameListener implements Listener {
 
     private final GameManager game;
     private final AdminModeService admin;
-    public GameListener(GameManager game, AdminModeService admin) {
+    private final ProtectionService protectionService;
+    public GameListener(GameManager game, AdminModeService admin, ProtectionService protectionService) {
         this.game = game;
         this.admin = admin;
+        this.protectionService = protectionService;
     }
     private boolean notAllowedWorld(Player p) { return !game.isWorldAllowed(p.getWorld()); }
 
@@ -126,6 +129,24 @@ public class GameListener implements Listener {
         if (!(foot.getBlockData() instanceof Bed)) return foot;
         Bed data = (Bed) foot.getBlockData();
         return foot.getLocation().add(data.getFacing().getModX(), 0, data.getFacing().getModZ()).getBlock();
+    }
+
+    @EventHandler
+    public void onProtectionToolInteract(PlayerInteractEvent e) {
+        Player player = e.getPlayer();
+        if (!protectionService.isInProtectMode(player)) return;
+        ItemStack tool = player.getInventory().getItemInMainHand();
+        if (tool.getType() != Material.SHEARS) return;
+        e.setCancelled(true);
+        Block clickedBlock = e.getClickedBlock();
+        if (clickedBlock == null) return;
+        if (e.getAction() == Action.LEFT_CLICK_BLOCK) {
+            protectionService.setPos1(player, clickedBlock.getLocation());
+            player.sendMessage("§aPosition 1 définie !");
+        } else if (e.getAction() == Action.RIGHT_CLICK_BLOCK) {
+            protectionService.setPos2(player, clickedBlock.getLocation());
+            player.sendMessage("§aPosition 2 définie !");
+        }
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
@@ -244,6 +265,7 @@ public class GameListener implements Listener {
 
     @EventHandler
     public void onPlace(BlockPlaceEvent e) {
+        if (e.isCancelled()) return;
         if (admin.isEnabled(e.getPlayer())) return;
         if (game.arena() == null || !game.arena().isActive()) return;
         if (notAllowedWorld(e.getPlayer())) return;
@@ -274,6 +296,7 @@ public class GameListener implements Listener {
 
     @EventHandler
     public void onBreak(BlockBreakEvent e) {
+        if (e.isCancelled()) return;
         if (admin.isEnabled(e.getPlayer())) return;
         if (isBrokeSelector(e.getPlayer().getInventory().getItemInMainHand())) {
             e.setCancelled(true);
@@ -298,6 +321,26 @@ public class GameListener implements Listener {
         if (notAllowedWorld(e.getPlayer())) return;
         if (!game.canBuild(e.getBlock().getLocation())) { e.setCancelled(true); return; }
         if (!game.wasPlaced(e.getBlock().getLocation())) e.setCancelled(true);
+    }
+
+    @EventHandler(priority = EventPriority.LOWEST)
+    public void onBlockBreakInProtectedZone(BlockBreakEvent e) {
+        Player player = e.getPlayer();
+        if (player.isOp() || player.hasPermission("hikabrain.admin.bypass")) return;
+        if (protectionService.isProtected(e.getBlock().getLocation())) {
+            e.setCancelled(true);
+            player.sendMessage("§cVous ne pouvez pas modifier cette zone.");
+        }
+    }
+
+    @EventHandler(priority = EventPriority.LOWEST)
+    public void onBlockPlaceInProtectedZone(BlockPlaceEvent e) {
+        Player player = e.getPlayer();
+        if (player.isOp() || player.hasPermission("hikabrain.admin.bypass")) return;
+        if (protectionService.isProtected(e.getBlock().getLocation())) {
+            e.setCancelled(true);
+            player.sendMessage("§cVous ne pouvez pas construire ici.");
+        }
     }
 
     @EventHandler public void onHunger(FoodLevelChangeEvent e) { e.setCancelled(true); }

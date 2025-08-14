@@ -13,8 +13,15 @@ import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
+import org.bukkit.Material;
+import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.meta.ItemMeta;
+
+import com.example.hikabrain.protection.ProtectionService;
+import org.bukkit.Location;
 
 import java.util.List;
+import java.util.Arrays;
 
 public class HBCommand implements CommandExecutor {
 
@@ -36,6 +43,8 @@ public class HBCommand implements CommandExecutor {
         line(s, "/hb create <nom> <taille_equipe>", "Créer une nouvelle arène.", "hikabrain.admin");
         line(s, "/hb setspawn <red|blue>", "Définir le point d'apparition d'une équipe.", "hikabrain.admin");
         line(s, "/hb setlobby", "Définir le point de spawn du lobby.", "hikabrain.admin");
+        line(s, "/hb protect", "Mode sélection de zones protégées.", "hikabrain.admin");
+        line(s, "/hb confirm <nom>", "Enregistrer une zone protégée.", "hikabrain.admin");
         line(s, "/hb start / stop", "Démarrer ou arrêter la partie.", "hikabrain.admin");
         line(s, "/hb ui reload", "Recharger la configuration de l'interface.", "hikabrain.admin");
         s.sendMessage(ChatColor.GRAY + "Utilisez l'horloge dans votre inventaire pour choisir une arène.");
@@ -194,6 +203,52 @@ public class HBCommand implements CommandExecutor {
                 Player p = (Player) sender;
                 HikaBrainPlugin.get().setLobby(p.getLocation());
                 sender.sendMessage(ChatColor.GREEN + "Lobby défini.");
+                return true;
+            }
+            case "protect": {
+                if (needAdmin(sender)) return true;
+                if (!(sender instanceof Player)) { sender.sendMessage("In-game only"); return true; }
+                Player p = (Player) sender;
+                ProtectionService ps = HikaBrainPlugin.get().protection();
+                if (ps.isInProtectMode(p)) {
+                    ps.disableProtectMode(p);
+                    p.getInventory().remove(Material.SHEARS);
+                    sender.sendMessage(ChatColor.YELLOW + "Mode protection désactivé.");
+                } else {
+                    ps.enableProtectMode(p);
+                    ItemStack tool = new ItemStack(Material.SHEARS);
+                    ItemMeta meta = tool.getItemMeta();
+                    if (meta != null) {
+                        meta.setDisplayName("§aOutil de Sélection");
+                        meta.setLore(Arrays.asList("§7Clic gauche = Pos1", "§7Clic droit = Pos2"));
+                        tool.setItemMeta(meta);
+                    }
+                    p.getInventory().addItem(tool);
+                    sender.sendMessage(ChatColor.GREEN + "Mode protection activé. Utilisez la cisaille pour définir la zone.");
+                }
+                return true;
+            }
+            case "confirm": {
+                if (needAdmin(sender)) return true;
+                if (!(sender instanceof Player)) { sender.sendMessage("In-game only"); return true; }
+                if (args.length < 2) { sender.sendMessage(ChatColor.RED + "Usage: /hb confirm <nom>"); return true; }
+                Player p = (Player) sender;
+                ProtectionService ps = HikaBrainPlugin.get().protection();
+                if (!ps.isInProtectMode(p)) {
+                    sender.sendMessage(ChatColor.RED + "Vous n'êtes pas en mode protection.");
+                    return true;
+                }
+                Location a = ps.getPos1(p);
+                Location b = ps.getPos2(p);
+                if (a == null || b == null) {
+                    sender.sendMessage(ChatColor.RED + "Sélection incomplète.");
+                    return true;
+                }
+                ps.addRegion(args[1], new Cuboid(a, b));
+                ps.saveRegions();
+                ps.disableProtectMode(p);
+                p.getInventory().remove(Material.SHEARS);
+                sender.sendMessage(ChatColor.GREEN + "Zone protégée enregistrée: " + args[1]);
                 return true;
             }
             case "setspawn": {
