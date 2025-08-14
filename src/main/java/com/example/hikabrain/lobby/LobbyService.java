@@ -52,11 +52,20 @@ public class LobbyService {
         p.getInventory().setItem(4, it);
     }
 
-    /** Apply full lobby profile: teleport, lobby item, scoreboard and tablist. */
-    public void apply(Player p) {
-        teleport(p);
+    /**
+     * Applique l'inventaire et l'UI du lobby SANS téléporter le joueur.
+     */
+    public void setLobbyMode(Player p) {
         giveLobbyItem(p);
         plugin.scoreboard().showLobby(p);
         plugin.tablist().showLobby(p);
+    }
+
+    /**
+     * Applique le profil complet du lobby, INCLUANT la téléportation.
+     */
+    public void apply(Player p) {
+        teleport(p);
+        setLobbyMode(p);
     }
 }

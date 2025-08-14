@@ -83,7 +83,6 @@ public class GameListener implements Listener {
     }
 
     private static final NamespacedKey COMPASS_KEY = new NamespacedKey(HikaBrainPlugin.get(), "hb_compass");
-    private static final NamespacedKey LEAVE_ITEM_KEY = new NamespacedKey(HikaBrainPlugin.get(), "hb_leave_item");
     private static boolean isLobbyCompass(ItemStack it) {
         if (it == null) return false;
         ItemMeta m = it.getItemMeta();
@@ -412,18 +411,29 @@ public class GameListener implements Listener {
         }
     }
 
-    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
-    public void onLeaveItemClick(PlayerInteractEvent e) {
+    @EventHandler(priority = EventPriority.HIGHEST)
+    public void onLeaveItemInteract(PlayerInteractEvent e) {
+        // S'assurer qu'on gère bien les deux types de clics droits
         Action action = e.getAction();
-        if (action != Action.RIGHT_CLICK_AIR && action != Action.RIGHT_CLICK_BLOCK) return;
+        if (action != Action.RIGHT_CLICK_AIR && action != Action.RIGHT_CLICK_BLOCK) {
+            return;
+        }
+
         if (e.getHand() != EquipmentSlot.HAND) return;
-        ItemStack it = e.getItem();
-        if (it == null) return;
-        ItemMeta meta = it.getItemMeta();
-        if (meta == null) return;
-        Byte b = meta.getPersistentDataContainer().get(LEAVE_ITEM_KEY, PersistentDataType.BYTE);
-        if (b == null || b != (byte)1) return;
+
+        ItemStack item = e.getItem();
+        if (item == null || item.getType() != Material.BARRIER) return;
+
+        // Vérifier si c'est bien notre item spécifique via son tag persistant
+        ItemMeta meta = item.getItemMeta();
+        if (meta == null || !meta.getPersistentDataContainer().has(new NamespacedKey(HikaBrainPlugin.get(), "hb_leave_item"), PersistentDataType.BYTE)) {
+            return;
+        }
+
+        // ÉTAPE CRUCIALE : Annuler l'événement pour empêcher le placement du bloc
         e.setCancelled(true);
+
+        // Exécuter l'action de quitter la file
         game.leave(e.getPlayer());
     }
 

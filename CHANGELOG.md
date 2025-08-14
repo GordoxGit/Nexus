@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.3.2 - File d'attente sans TP
+- **Fix:** l'item « Quitter la file » ne peut plus être posé et fonctionne en l'air.
+- **UX:** quitter une file d'attente n'entraîne plus de téléportation au lobby.
+
 ## 1.3.1 - Queue & stability tweaks
 - **Feat:** Système de file repensé avec barrière de sortie.
 - **Fix:** Annulation du compte à rebours et arrêt de partie si un joueur quitte.
