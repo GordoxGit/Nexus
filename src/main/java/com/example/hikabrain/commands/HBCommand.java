@@ -210,6 +210,10 @@ public class HBCommand implements CommandExecutor {
                 if (!(sender instanceof Player)) { sender.sendMessage("In-game only"); return true; }
                 Player p = (Player) sender;
                 ProtectionService ps = HikaBrainPlugin.get().protection();
+                if (args.length >= 2 && args[1].equalsIgnoreCase("list")) {
+                    HikaBrainPlugin.get().protectionGui().openProtectionListGui(p);
+                    return true;
+                }
                 if (ps.isInProtectMode(p)) {
                     ps.disableProtectMode(p);
                     p.getInventory().remove(Material.SHEARS);

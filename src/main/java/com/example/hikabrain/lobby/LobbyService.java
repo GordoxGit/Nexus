@@ -4,6 +4,7 @@ import com.example.hikabrain.HikaBrainPlugin;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
 import org.bukkit.entity.Player;
+import org.bukkit.GameMode;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.persistence.PersistentDataType;
@@ -56,6 +57,11 @@ public class LobbyService {
      * Applique l'inventaire et l'UI du lobby SANS téléporter le joueur.
      */
     public void setLobbyMode(Player p) {
+        if (p.hasPermission("hikabrain.admin.bypass") || plugin.admin().isEnabled(p)) {
+            p.setGameMode(GameMode.CREATIVE);
+        } else {
+            p.setGameMode(GameMode.ADVENTURE);
+        }
         giveLobbyItem(p);
         plugin.scoreboard().showLobby(p);
         plugin.tablist().showLobby(p);

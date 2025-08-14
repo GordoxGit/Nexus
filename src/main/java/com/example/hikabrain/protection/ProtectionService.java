@@ -77,6 +77,10 @@ public class ProtectionService {
         regions.put(name, cuboid);
     }
 
+    public Map<String, Cuboid> regions() { return regions; }
+
+    public void removeRegion(String name) { regions.remove(name); }
+
     public boolean isInProtectMode(Player player) {
         return protectMode.contains(player.getUniqueId());
     }
