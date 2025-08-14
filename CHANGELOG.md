@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.5.0 - Lobby Adventure & Zone Manager
+- **Feat:** Joueurs en GameMode.ADVENTURE au lobby pour une protection totale.
+- **Feat:** Commande `/hb protect list` avec GUI pour gérer les zones protégées.
+- **Fix:** Réinitialisation correcte de l'état du joueur après une mort au lobby.
+- **Fix:** Tablist stable sans clignotement.
+
 ## 1.4.1 - Protection UX fixes
 - **Fix:** confirmation for "Position 2" is only sent once.
 - **Fix:** block hit animation is cancelled in protected zones.

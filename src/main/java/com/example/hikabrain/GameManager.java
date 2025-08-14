@@ -153,34 +153,38 @@ public class GameManager {
         }
     }
 
-    public void leave(Player p) {
+    public void leave(Player p) { leave(p, false); }
+
+    public void leave(Player p, boolean silent) {
         if (arena == null) return;
 
-        boolean wasInGame = arena.isActive(); // Savoir si le joueur était en pleine partie
+        boolean wasInGame = arena.isActive();
+        boolean inRed = arena.players().get(Team.RED).remove(p.getUniqueId());
+        boolean inBlue = arena.players().get(Team.BLUE).remove(p.getUniqueId());
+        boolean wasParticipant = inRed || inBlue;
 
-        for (Set<UUID> s : arena.players().values()) s.remove(p.getUniqueId());
         plugin.scoreboard().hide(p);
         plugin.tablist().remove(p);
         plugin.scoreboard().updatePlayers(arena);
         plugin.tablist().update(arena);
-        boolean wasCountdown = countdownTask != null && !countdownTask.isCancelled();
-        if (wasCountdown) {
+
+        if (wasParticipant && countdownTask != null && !countdownTask.isCancelled()) {
             countdownTask.cancel();
             countdownTask = null;
             broadcastToArena("§cLe démarrage a été annulé (un joueur a quitté).");
         }
 
-        if (wasInGame) {
-            // Si le joueur quitte une partie active, on le téléporte au lobby.
+        if (wasInGame && wasParticipant) {
             plugin.lobbyService().apply(p);
         } else {
-            // Si le joueur quitte juste une file d'attente, on met juste son inventaire/UI à jour.
             plugin.lobbyService().setLobbyMode(p);
         }
 
-        p.sendMessage(ChatColor.GRAY + "Tu as quitté la partie.");
+        if (!silent && wasParticipant) {
+            p.sendMessage(ChatColor.GRAY + "Tu as quitté la partie.");
+        }
 
-        if (wasInGame) {
+        if (wasInGame && wasParticipant) {
             int playersRemaining = arena.players().get(Team.RED).size() + arena.players().get(Team.BLUE).size();
             if (playersRemaining < 2) {
                 broadcastToArena("§cUn joueur a quitté, la partie est terminée !");
@@ -324,6 +328,7 @@ public class GameManager {
     }
 
     private void giveKit(Player p, Team t) {
+        p.setGameMode(GameMode.SURVIVAL);
         PlayerInventory inv = p.getInventory();
         inv.clear();
 

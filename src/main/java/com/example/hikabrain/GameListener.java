@@ -42,6 +42,7 @@ import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.metadata.FixedMetadataValue;
 import org.bukkit.metadata.MetadataValue;
 import com.example.hikabrain.protection.ProtectionService;
+import com.example.hikabrain.ui.protection.ProtectionGuiService;
 
 import java.util.List;
 
@@ -376,6 +377,8 @@ public class GameListener implements Listener {
                     player.spigot().respawn();
                 }
             });
+        } else {
+            game.leave(player, true);
         }
     }
 
@@ -399,7 +402,19 @@ public class GameListener implements Listener {
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onProtectionGuiClick(InventoryClickEvent e) {
+        if (e.getView().getTopInventory().getHolder() instanceof ProtectionGuiService.Holder) {
+            e.setCancelled(true);
+            HikaBrainPlugin.get().protectionGui().handleClick(e);
+            return;
+        }
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onCompassClick(InventoryClickEvent e) {
+        if (e.getView().getTopInventory().getHolder() instanceof ProtectionGuiService.Holder) {
+            return;
+        }
         if (e.getView().getTopInventory().getHolder() instanceof com.example.hikabrain.ui.compass.CompassGuiService.Holder) {
             e.setCancelled(true);
             if (e.getClickedInventory() != e.getView().getTopInventory()) return;
@@ -445,6 +460,10 @@ public class GameListener implements Listener {
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onCompassDrag(InventoryDragEvent e) {
+        if (e.getView().getTopInventory().getHolder() instanceof ProtectionGuiService.Holder) {
+            e.setCancelled(true);
+            return;
+        }
         if (e.getView().getTopInventory().getHolder() instanceof com.example.hikabrain.ui.compass.CompassGuiService.Holder) {
             e.setCancelled(true);
             return;

@@ -17,6 +17,7 @@ import com.example.hikabrain.ui.scoreboard.ScoreboardServiceV2;
 import com.example.hikabrain.ui.tablist.TablistService;
 import com.example.hikabrain.ui.tablist.TablistServiceV2;
 import com.example.hikabrain.ui.compass.CompassGuiService;
+import com.example.hikabrain.ui.protection.ProtectionGuiService;
 import com.example.hikabrain.lobby.LobbyService;
 import com.example.hikabrain.arena.ArenaRegistry;
 import com.example.hikabrain.ui.style.UiStyle;
@@ -43,6 +44,7 @@ public class HikaBrainPlugin extends JavaPlugin {
     private AdminModeService adminMode;
     private UiStyle uiStyle;
     private ProtectionService protectionService;
+    private ProtectionGuiService protectionGui;
     private String serverDisplayName;
     private String serverDomain;
     private final Set<String> allowedWorlds = new HashSet<>(); // lower-case
@@ -70,6 +72,7 @@ public class HikaBrainPlugin extends JavaPlugin {
        this.arenaRegistry = new ArenaRegistry(this);
        this.adminMode = new AdminModeService();
         this.protectionService = new ProtectionService(this);
+        this.protectionGui = new ProtectionGuiService(this);
 
         getLogger().info("Starting HikaBrain v" + getDescription().getVersion());
         getLogger().info("plugin.yml api-version: " + getDescription().getAPIVersion());
@@ -152,6 +155,7 @@ public class HikaBrainPlugin extends JavaPlugin {
     public ArenaRegistry arenaRegistry() { return arenaRegistry; }
     public AdminModeService admin() { return adminMode; }
     public ProtectionService protection() { return protectionService; }
+    public ProtectionGuiService protectionGui() { return protectionGui; }
     public UiStyle style() { return uiStyle; }
     public String serverDisplayName() { return serverDisplayName; }
     public String serverDomain() { return serverDomain; }
