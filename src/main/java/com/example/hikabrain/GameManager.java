@@ -131,6 +131,19 @@ public class GameManager {
         plugin.scoreboard().updatePlayers(arena);
         plugin.tablist().update(arena);
 
+        for (Player other : Bukkit.getOnlinePlayers()) {
+            if (other.equals(p)) continue;
+            boolean inArena = arena.players().get(Team.RED).contains(other.getUniqueId()) ||
+                              arena.players().get(Team.BLUE).contains(other.getUniqueId());
+            if (inArena) {
+                other.showPlayer(plugin, p);
+                p.showPlayer(plugin, other);
+            } else {
+                p.hidePlayer(plugin, other);
+                other.hidePlayer(plugin, p);
+            }
+        }
+
         p.closeInventory();
         PlayerInventory inv = p.getInventory();
         inv.clear();
@@ -165,6 +178,18 @@ public class GameManager {
         plugin.tablist().remove(p);
         plugin.scoreboard().updatePlayers(arena);
         plugin.tablist().update(arena);
+
+        for (Player other : Bukkit.getOnlinePlayers()) {
+            p.showPlayer(plugin, other);
+            if (other.equals(p)) continue;
+            boolean inArena = arena.players().get(Team.RED).contains(other.getUniqueId()) ||
+                              arena.players().get(Team.BLUE).contains(other.getUniqueId());
+            if (inArena) {
+                other.hidePlayer(plugin, p);
+            } else {
+                other.showPlayer(plugin, p);
+            }
+        }
 
         if (wasParticipant && countdownTask != null && !countdownTask.isCancelled()) {
             countdownTask.cancel();
@@ -254,13 +279,11 @@ public class GameManager {
                     return;
                 }
                 if (countdown > 0) {
-                    String title = ChatColor.AQUA + "" + countdown;
-                    plugin.ui().broadcastTitle(arena, title, "", 0, 25, 5);
+                    plugin.ui().broadcastTitle(arena, "", ChatColor.GREEN + "" + countdown, 0, 25, 5);
                     plugin.ui().broadcastSound(arena, Sound.BLOCK_NOTE_BLOCK_HAT, 1f, 1f);
                     countdown--;
                 } else {
-                    String title = ChatColor.GREEN + "Go!";
-                    plugin.ui().broadcastTitle(arena, title, "", 0, 30, 10);
+                    plugin.ui().broadcastTitle(arena, ChatColor.GREEN + "Go!", "", 0, 30, 10);
                     plugin.ui().broadcastSound(arena, Sound.ENTITY_PLAYER_LEVELUP, 1f, 1.2f);
                     start();
                     this.cancel();
@@ -463,9 +486,9 @@ public class GameManager {
                 Player player = Bukkit.getPlayer(u);
                 if (player == null) continue;
                 if (team == t) {
-                    player.sendTitle(pointTitle, " ", 5, 40, 10);
+                    player.sendTitle("", pointTitle, 5, 40, 10);
                 } else if (team != Team.SPECTATOR) {
-                    player.sendTitle(" ", scoringTeamName + " §a+1", 5, 40, 10);
+                    player.sendTitle("", scoringTeamName + " §a+1", 5, 40, 10);
                 }
             }
         }
