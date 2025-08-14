@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.3.1 - Queue & stability tweaks
+- **Feat:** Système de file repensé avec barrière de sortie.
+- **Fix:** Annulation du compte à rebours et arrêt de partie si un joueur quitte.
+- **UX:** Gel initial assoupli permettant de regarder autour de soi.
+
 ## 1.3.0 - Gameplay & UX Finalization
 - **Feat:** Replaced lobby navigation compass with a clock.
 - **Feat:** Implemented instant respawn in arenas, removing the death screen.
