@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.5.6 - Critical Scope Fix & UX Improvements
+- **Fix:** Les protections de construction et la mort dans le vide ne s'appliquent qu'aux joueurs de l'arène active.
+- **UX:** Compte à rebours « 2, 1 » en sous-titre puis « Go! » en titre.
+- **UX:** Titres de score uniformisés (« +1 POINT » et annonce d'équipe).
+- **Feat:** Messages de mort dédiés et tablist isolé par arène.
+
 ## 1.5.5 - UX Polish & Admin Bed Bypass
 - **Fix:** Les opérateurs peuvent désormais casser ou placer les lits malgré la protection.
 - **UX:** Compte à rebours de départ « 2, 1, Go! » avec titre dédié.

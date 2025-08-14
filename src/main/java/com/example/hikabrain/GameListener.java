@@ -44,6 +44,7 @@ import org.bukkit.metadata.MetadataValue;
 import com.example.hikabrain.protection.ProtectionService;
 
 import java.util.List;
+import java.util.UUID;
 
 public class GameListener implements Listener {
 /* ---- SetBroke tool ---- */
@@ -244,14 +245,14 @@ public class GameListener implements Listener {
         }
 
         if (game.arena() == null || !game.arena().isActive()) return;
+        Team t = game.teamOf(p);
+        if (t == Team.SPECTATOR) return;
         if (notAllowedWorld(p)) return;
         World w = p.getWorld();
         if (e.getTo().getY() < w.getMinHeight() + 1) {
             p.setHealth(0.0);
             return;
         }
-        Team t = game.teamOf(p);
-        if (t == Team.SPECTATOR) return;
         game.checkScore(p, t, e.getTo());
     }
 
@@ -272,8 +273,9 @@ public class GameListener implements Listener {
     @EventHandler
     public void onPlace(BlockPlaceEvent e) {
         if (e.isCancelled()) return;
-        if (admin.isEnabled(e.getPlayer())) return;
         if (game.arena() == null || !game.arena().isActive()) return;
+        if (game.teamOf(e.getPlayer()) == Team.SPECTATOR) return;
+        if (admin.isEnabled(e.getPlayer())) return;
         if (notAllowedWorld(e.getPlayer())) return;
         if (!game.canBuild(e.getBlock().getLocation())) { e.setCancelled(true); e.getPlayer().sendMessage(ChatColor.RED + "Tu ne peux pas construire ici."); return; }
         if (e.getBlock().getType() != Material.SANDSTONE) { e.setCancelled(true); e.getPlayer().sendMessage(ChatColor.RED + "Blocs autorisés: grès seulement."); return; }
@@ -308,23 +310,20 @@ public class GameListener implements Listener {
             e.setCancelled(true);
             return;
         }
+        if (game.arena() == null || !game.arena().isActive()) return;
+        if (game.teamOf(e.getPlayer()) == Team.SPECTATOR) return;
+        if (notAllowedWorld(e.getPlayer())) return;
         Block b = e.getBlock();
         boolean isBed = Tag.BEDS.isTagged(b.getType());
         if (isBed && !isBedSelector(e.getPlayer().getInventory().getItemInMainHand())) {
-            if (game.arena() == null || !game.arena().isActive()) {
-                return; // allow breaking any beds outside active games
-            }
             Block foot = normalizeToBedFoot(b);
             if (game.arena().bedRed() != null && foot.getLocation().equals(game.arena().bedRed())) { e.setCancelled(true); return; }
             if (game.arena().bedBlue() != null && foot.getLocation().equals(game.arena().bedBlue())) { e.setCancelled(true); return; }
         }
-        if (game.arena() != null && game.arena().isActive()
-                && game.inBrokeRegion(e.getBlock().getLocation())) {
+        if (game.inBrokeRegion(e.getBlock().getLocation())) {
             e.setCancelled(false);
             return;
         }
-        if (game.arena() == null || !game.arena().isActive()) return;
-        if (notAllowedWorld(e.getPlayer())) return;
         if (!game.canBuild(e.getBlock().getLocation())) { e.setCancelled(true); return; }
         if (!game.wasPlaced(e.getBlock().getLocation())) e.setCancelled(true);
     }
@@ -372,6 +371,23 @@ public class GameListener implements Listener {
             e.setKeepInventory(true);
             e.getDrops().clear();
             e.setDeathMessage(null);
+
+            Player victim = player;
+            Player killer = victim.getKiller();
+            String deathMessage;
+            if (killer != null) {
+                deathMessage = "§7[HikaBrain] §e" + victim.getName() + " §7a été tué par §e" + killer.getName() + "§7.";
+            } else {
+                deathMessage = "§7[HikaBrain] §e" + victim.getName() + " §7est mort.";
+            }
+            for (Team team : Team.values()) {
+                for (UUID uuid : game.arena().players().get(team)) {
+                    Player p = Bukkit.getPlayer(uuid);
+                    if (p != null) {
+                        p.sendMessage(deathMessage);
+                    }
+                }
+            }
 
             // Planifier le respawn pour le prochain tick serveur pour éviter tout conflit.
             Bukkit.getScheduler().runTask(HikaBrainPlugin.get(), () -> {
