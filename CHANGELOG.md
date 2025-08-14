@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.5.1 - Critical Hotfix
+- **Fix:** Players are no longer permanently frozen after a game is manually stopped with `/hb stop`. The game state is now correctly reset.
+
 ## 1.5.0 - Lobby Adventure & Zone Manager
 - **Feat:** Joueurs en GameMode.ADVENTURE au lobby pour une protection totale.
 - **Feat:** Commande `/hb protect list` avec GUI pour gérer les zones protégées.

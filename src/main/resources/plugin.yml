@@ -1,6 +1,6 @@
 name: HikaBrain
 main: com.example.hikabrain.HikaBrainPlugin
-version: 1.5.0
+version: 1.5.1
 api-version: "1.21"
 description: Hikabrain minigame for Spigot/Paper 1.21
 

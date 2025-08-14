@@ -298,6 +298,7 @@ public class GameManager {
     }
 
     private void endCleanup() {
+        setFrozen(false); // ensure players can move after game ends
         flushPlacedBlocks();
         if (arena != null) {
             for (Team t : Team.values()) {
