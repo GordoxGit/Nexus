@@ -44,6 +44,7 @@ public class HBCommand implements CommandExecutor {
         line(s, "/hb setspawn <red|blue>", "Définir le point d'apparition d'une équipe.", "hikabrain.admin");
         line(s, "/hb setlobby", "Définir le point de spawn du lobby.", "hikabrain.admin");
         line(s, "/hb protect", "Mode sélection de zones protégées.", "hikabrain.admin");
+        line(s, "/hb list", "Gérer les zones protégées.", "hikabrain.admin");
         line(s, "/hb confirm <nom>", "Enregistrer une zone protégée.", "hikabrain.admin");
         line(s, "/hb start / stop", "Démarrer ou arrêter la partie.", "hikabrain.admin");
         line(s, "/hb ui reload", "Recharger la configuration de l'interface.", "hikabrain.admin");
@@ -119,9 +120,9 @@ public class HBCommand implements CommandExecutor {
                 return true;
             }
             case "list": {
-                List<String> list = game.listArenas();
-                if (list.isEmpty()) sender.sendMessage(ChatColor.GRAY + "Aucune arène sauvegardée.");
-                else sender.sendMessage(ChatColor.YELLOW + "Arènes: " + String.join(", ", list));
+                if (needAdmin(sender)) return true;
+                if (!(sender instanceof Player)) { sender.sendMessage("In-game only"); return true; }
+                HikaBrainPlugin.get().protection().openListMenu((Player) sender);
                 return true;
             }
             case "setbed": {

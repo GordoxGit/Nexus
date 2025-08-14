@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.5.3 - Protection GUI on /hb list
+- **Feat:** Implemented Protection Zone Management GUI on `/hb list`.
+
 ## 1.5.2 - Protection List Menu
 - **Feat:** Implémentation de `/hb protect list` avec menu de gestion des zones.
 - **Fix:** Résolution du conflit entre `/hb list` et `/hb protect list`.

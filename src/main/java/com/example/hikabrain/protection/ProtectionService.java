@@ -99,30 +99,41 @@ public class ProtectionService {
 
     /** Open GUI listing protected regions for management. */
     public void openListMenu(Player player) {
-        Inventory inv = Bukkit.createInventory(holder, 54, ChatColor.AQUA + "Zones protégées");
+        loadRegions();
+        Inventory inv = Bukkit.createInventory(holder, 54, ChatColor.DARK_GRAY + "Gestion des Zones Protégées");
+
+        ItemStack filler = new ItemStack(Material.BLACK_STAINED_GLASS_PANE);
+        ItemMeta fm = filler.getItemMeta();
+        if (fm != null) {
+            fm.setDisplayName(" ");
+            filler.setItemMeta(fm);
+        }
+        for (int i = 0; i < inv.getSize(); i++) {
+            inv.setItem(i, filler);
+        }
+
         int slot = 10;
         for (Map.Entry<String, Cuboid> en : regions.entrySet()) {
             if (slot >= 54) break;
             String name = en.getKey();
             Cuboid c = en.getValue();
 
-            ItemStack zone = new ItemStack(Material.BEACON);
-            ItemMeta zm = zone.getItemMeta();
-            if (zm != null) {
-                zm.setDisplayName(ChatColor.AQUA + name);
-                zm.setLore(Arrays.asList(
+            ItemStack info = new ItemStack(Material.BEACON);
+            ItemMeta im = info.getItemMeta();
+            if (im != null) {
+                im.setDisplayName(ChatColor.AQUA + name);
+                im.setLore(Arrays.asList(
                         ChatColor.GRAY + "(" + c.x1() + "," + c.y1() + "," + c.z1() + ")",
                         ChatColor.GRAY + "(" + c.x2() + "," + c.y2() + "," + c.z2() + ")"
                 ));
-                zm.getPersistentDataContainer().set(actionKey, PersistentDataType.STRING, "noop");
-                zm.getPersistentDataContainer().set(nameKey, PersistentDataType.STRING, name);
-                zone.setItemMeta(zm);
+                info.setItemMeta(im);
             }
 
             ItemStack edit = new ItemStack(Material.ANVIL);
             ItemMeta em = edit.getItemMeta();
             if (em != null) {
                 em.setDisplayName(ChatColor.YELLOW + "Modifier");
+                em.setLore(Arrays.asList(ChatColor.GRAY + "Redéfinir cette zone."));
                 em.getPersistentDataContainer().set(actionKey, PersistentDataType.STRING, "edit");
                 em.getPersistentDataContainer().set(nameKey, PersistentDataType.STRING, name);
                 edit.setItemMeta(em);
@@ -132,12 +143,13 @@ public class ProtectionService {
             ItemMeta dm = del.getItemMeta();
             if (dm != null) {
                 dm.setDisplayName(ChatColor.RED + "Supprimer");
+                dm.setLore(Arrays.asList(ChatColor.GRAY + "Supprimer cette zone."));
                 dm.getPersistentDataContainer().set(actionKey, PersistentDataType.STRING, "delete");
                 dm.getPersistentDataContainer().set(nameKey, PersistentDataType.STRING, name);
                 del.setItemMeta(dm);
             }
 
-            inv.setItem(slot, zone);
+            inv.setItem(slot, info);
             inv.setItem(slot + 1, edit);
             inv.setItem(slot + 2, del);
             slot += 9;
