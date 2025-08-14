@@ -42,9 +42,9 @@ import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.metadata.FixedMetadataValue;
 import org.bukkit.metadata.MetadataValue;
 import com.example.hikabrain.protection.ProtectionService;
-import com.example.hikabrain.ui.protection.ProtectionGuiService;
 
 import java.util.List;
+import java.util.Arrays;
 
 public class GameListener implements Listener {
 /* ---- SetBroke tool ---- */
@@ -82,6 +82,8 @@ public class GameListener implements Listener {
     private static final NamespacedKey GUI_KEY = new NamespacedKey(HikaBrainPlugin.get(), "hb_gui");
     private static final NamespacedKey CAT_KEY = new NamespacedKey(HikaBrainPlugin.get(), "hb_cat");
     private static final NamespacedKey ARENA_KEY = new NamespacedKey(HikaBrainPlugin.get(), "hb_arena");
+    private static final NamespacedKey P_ACTION_KEY = new NamespacedKey(HikaBrainPlugin.get(), "hb_paction");
+    private static final NamespacedKey P_NAME_KEY = new NamespacedKey(HikaBrainPlugin.get(), "hb_pname");
     private boolean isAllowedWorld(World w) {
         return HikaBrainPlugin.get().isWorldAllowed(w);
     }
@@ -403,16 +405,46 @@ public class GameListener implements Listener {
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onProtectionGuiClick(InventoryClickEvent e) {
-        if (e.getView().getTopInventory().getHolder() instanceof ProtectionGuiService.Holder) {
-            e.setCancelled(true);
-            HikaBrainPlugin.get().protectionGui().handleClick(e);
+        if (!(e.getView().getTopInventory().getHolder() instanceof ProtectionService.MenuHolder)) {
             return;
+        }
+        e.setCancelled(true);
+        if (e.getClickedInventory() != e.getView().getTopInventory()) return;
+        if (!e.isLeftClick()) return;
+        ItemStack it = e.getCurrentItem();
+        if (it == null) return;
+        ItemMeta m = it.getItemMeta();
+        if (m == null) return;
+        String action = m.getPersistentDataContainer().get(P_ACTION_KEY, PersistentDataType.STRING);
+        String name = m.getPersistentDataContainer().get(P_NAME_KEY, PersistentDataType.STRING);
+        if (action == null || name == null) return;
+        Player p = (Player) e.getWhoClicked();
+        switch (action) {
+            case "edit" -> {
+                protectionService.enableProtectMode(p);
+                ItemStack tool = new ItemStack(Material.SHEARS);
+                ItemMeta meta = tool.getItemMeta();
+                if (meta != null) {
+                    meta.setDisplayName("§aOutil de Sélection");
+                    meta.setLore(Arrays.asList("§7Clic gauche = Pos1", "§7Clic droit = Pos2"));
+                    tool.setItemMeta(meta);
+                }
+                p.getInventory().addItem(tool);
+                p.sendMessage(ChatColor.GREEN + "Sélectionnez la nouvelle zone puis /hb confirm " + name);
+                p.closeInventory();
+            }
+            case "delete" -> {
+                protectionService.removeRegion(name);
+                protectionService.saveRegions();
+                p.sendMessage(ChatColor.RED + "Zone supprimée: " + name);
+                protectionService.openListMenu(p);
+            }
         }
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onCompassClick(InventoryClickEvent e) {
-        if (e.getView().getTopInventory().getHolder() instanceof ProtectionGuiService.Holder) {
+        if (e.getView().getTopInventory().getHolder() instanceof ProtectionService.MenuHolder) {
             return;
         }
         if (e.getView().getTopInventory().getHolder() instanceof com.example.hikabrain.ui.compass.CompassGuiService.Holder) {
@@ -460,7 +492,7 @@ public class GameListener implements Listener {
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onCompassDrag(InventoryDragEvent e) {
-        if (e.getView().getTopInventory().getHolder() instanceof ProtectionGuiService.Holder) {
+        if (e.getView().getTopInventory().getHolder() instanceof ProtectionService.MenuHolder) {
             e.setCancelled(true);
             return;
         }

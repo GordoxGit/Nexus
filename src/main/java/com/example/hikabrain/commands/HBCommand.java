@@ -77,13 +77,47 @@ public class HBCommand implements CommandExecutor {
 
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
-        if (args.length == 0 || args[0].equalsIgnoreCase("help")) {
+        if (args.length == 0) {
             sendHelp(sender);
             return true;
         }
 
-        String sub = args[0].toLowerCase();
-        switch (sub) {
+        String baseCommand = args[0].toLowerCase();
+
+        // Gestion des sous-commandes prioritaires
+        if (baseCommand.equals("protect")) {
+            if (needAdmin(sender)) return true;
+            if (!(sender instanceof Player)) { sender.sendMessage("In-game only"); return true; }
+            Player p = (Player) sender;
+            ProtectionService ps = HikaBrainPlugin.get().protection();
+            if (args.length > 1 && args[1].equalsIgnoreCase("list")) {
+                ps.openListMenu(p);
+                return true;
+            }
+            if (ps.isInProtectMode(p)) {
+                ps.disableProtectMode(p);
+                p.getInventory().remove(Material.SHEARS);
+                sender.sendMessage(ChatColor.YELLOW + "Mode protection désactivé.");
+            } else {
+                ps.enableProtectMode(p);
+                ItemStack tool = new ItemStack(Material.SHEARS);
+                ItemMeta meta = tool.getItemMeta();
+                if (meta != null) {
+                    meta.setDisplayName("§aOutil de Sélection");
+                    meta.setLore(Arrays.asList("§7Clic gauche = Pos1", "§7Clic droit = Pos2"));
+                    tool.setItemMeta(meta);
+                }
+                p.getInventory().addItem(tool);
+                sender.sendMessage(ChatColor.GREEN + "Mode protection activé. Utilisez la cisaille pour définir la zone.");
+            }
+            return true;
+        }
+
+        switch (baseCommand) {
+            case "help": {
+                sendHelp(sender);
+                return true;
+            }
             case "list": {
                 List<String> list = game.listArenas();
                 if (list.isEmpty()) sender.sendMessage(ChatColor.GRAY + "Aucune arène sauvegardée.");
@@ -203,33 +237,6 @@ public class HBCommand implements CommandExecutor {
                 Player p = (Player) sender;
                 HikaBrainPlugin.get().setLobby(p.getLocation());
                 sender.sendMessage(ChatColor.GREEN + "Lobby défini.");
-                return true;
-            }
-            case "protect": {
-                if (needAdmin(sender)) return true;
-                if (!(sender instanceof Player)) { sender.sendMessage("In-game only"); return true; }
-                Player p = (Player) sender;
-                ProtectionService ps = HikaBrainPlugin.get().protection();
-                if (args.length >= 2 && args[1].equalsIgnoreCase("list")) {
-                    HikaBrainPlugin.get().protectionGui().openProtectionListGui(p);
-                    return true;
-                }
-                if (ps.isInProtectMode(p)) {
-                    ps.disableProtectMode(p);
-                    p.getInventory().remove(Material.SHEARS);
-                    sender.sendMessage(ChatColor.YELLOW + "Mode protection désactivé.");
-                } else {
-                    ps.enableProtectMode(p);
-                    ItemStack tool = new ItemStack(Material.SHEARS);
-                    ItemMeta meta = tool.getItemMeta();
-                    if (meta != null) {
-                        meta.setDisplayName("§aOutil de Sélection");
-                        meta.setLore(Arrays.asList("§7Clic gauche = Pos1", "§7Clic droit = Pos2"));
-                        tool.setItemMeta(meta);
-                    }
-                    p.getInventory().addItem(tool);
-                    sender.sendMessage(ChatColor.GREEN + "Mode protection activé. Utilisez la cisaille pour définir la zone.");
-                }
                 return true;
             }
             case "confirm": {

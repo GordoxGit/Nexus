@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.5.2 - Protection List Menu
+- **Feat:** Implémentation de `/hb protect list` avec menu de gestion des zones.
+- **Fix:** Résolution du conflit entre `/hb list` et `/hb protect list`.
+
 ## 1.5.1 - Critical Hotfix
 - **Fix:** Players are no longer permanently frozen after a game is manually stopped with `/hb stop`. The game state is now correctly reset.
 
