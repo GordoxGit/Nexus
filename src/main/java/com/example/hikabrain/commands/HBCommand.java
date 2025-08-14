@@ -166,7 +166,12 @@ public class HBCommand implements CommandExecutor {
             }
             case "leave": {
                 if (!(sender instanceof Player)) { sender.sendMessage("In-game only"); return true; }
-                game.leave((Player) sender);
+                Player p = (Player) sender;
+                if (game.arena() == null || game.teamOf(p) == Team.SPECTATOR) {
+                    sender.sendMessage(ChatColor.RED + "Tu n'es pas en file.");
+                    return true;
+                }
+                game.leave(p);
                 return true;
             }
             case "create": {
