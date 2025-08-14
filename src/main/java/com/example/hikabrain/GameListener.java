@@ -166,6 +166,7 @@ public class GameListener implements Listener {
         ItemStack item = hand == EquipmentSlot.OFF_HAND ?
                 e.getPlayer().getInventory().getItemInOffHand() :
                 e.getPlayer().getInventory().getItemInMainHand();
+        if (e.getPlayer().isOp()) return;
         if (admin.isEnabled(e.getPlayer()) && !isBedSelector(item)) return;
 
         if (isBedSelector(item)) {
@@ -302,7 +303,7 @@ public class GameListener implements Listener {
     @EventHandler
     public void onBreak(BlockBreakEvent e) {
         if (e.isCancelled()) return;
-        if (admin.isEnabled(e.getPlayer())) return;
+        if (e.getPlayer().isOp() || admin.isEnabled(e.getPlayer())) return;
         if (isBrokeSelector(e.getPlayer().getInventory().getItemInMainHand())) {
             e.setCancelled(true);
             return;

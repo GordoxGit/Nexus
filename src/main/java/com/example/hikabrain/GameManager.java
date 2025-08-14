@@ -13,7 +13,6 @@ import org.bukkit.inventory.meta.LeatherArmorMeta;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.scheduler.BukkitTask;
 import org.bukkit.NamespacedKey;
-import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.persistence.PersistentDataType;
 
 import com.example.hikabrain.ui.FeedbackService;
@@ -36,7 +35,6 @@ public class GameManager {
     private int timeRemaining; // seconds
     private int freezeMoveTicks = 0; // block movement & scoring during countdown
 
-    private boolean scoredConfigWarned = false;
 
     private Location build1, build2;
 
@@ -248,7 +246,7 @@ public class GameManager {
         if (arena == null || arena.isActive()) return;
         if (countdownTask != null) return;
         countdownTask = new BukkitRunnable() {
-            int countdown = seconds;
+            int countdown = seconds - 1;
             @Override public void run() {
                 if (arena == null || arena.isActive()) {
                     this.cancel();
@@ -256,11 +254,13 @@ public class GameManager {
                     return;
                 }
                 if (countdown > 0) {
-                    String title = ChatColor.AQUA + "Démarrage dans " + countdown + "...";
+                    String title = ChatColor.AQUA + "" + countdown;
                     plugin.ui().broadcastTitle(arena, title, "", 0, 25, 5);
                     plugin.ui().broadcastSound(arena, Sound.BLOCK_NOTE_BLOCK_HAT, 1f, 1f);
                     countdown--;
                 } else {
+                    String title = ChatColor.GREEN + "Go!";
+                    plugin.ui().broadcastTitle(arena, title, "", 0, 30, 10);
                     plugin.ui().broadcastSound(arena, Sound.ENTITY_PLAYER_LEVELUP, 1f, 1.2f);
                     start();
                     this.cancel();
@@ -454,35 +454,24 @@ public class GameManager {
         plugin.tablist().update(arena);
         plugin.fx().playTeamPreset(t, Presets.SCORE_BED);
 
-        String teamName = (t==Team.RED?"Rouge":"Bleue");
-        String msg = (t==Team.RED?ChatColor.RED:ChatColor.BLUE) + "L'équipe " + teamName + " a marqué !";
-        Bukkit.broadcastMessage(msg);
+        String scoringTeamName = (t == Team.RED ? "§cRouge" : "§9Bleu");
+        String scoringTeamColor = (t == Team.RED ? "§c" : "§9");
+        String pointTitle = "§a+1 POINT";
 
-        ConfigurationSection sec = plugin.getConfig().getConfigurationSection("scored");
-        if (sec == null && !scoredConfigWarned) {
-            plugin.getLogger().info("Missing 'scored' section in config.yml, using defaults.");
-            scoredConfigWarned = true;
-        }
-        String title = null;
-        if (sec != null) title = sec.getString(t==Team.RED?"title":"title-blue");
-        if (title == null) title = t==Team.RED?"&cÉquipe ROUGE &7marque le point!":"&9Équipe BLEUE &7marque le point!";
-        String subtitle = null;
-        if (sec != null) subtitle = sec.getString("subtitle");
-        if (subtitle == null) subtitle = "&7Score: {red} - {blue}";
-        subtitle = subtitle.replace("{red}", String.valueOf(arena.redScore()))
-                           .replace("{blue}", String.valueOf(arena.blueScore()));
-        int fadeIn = 10, stay = 80, fadeOut = 10;
-        if (sec != null) {
-            ConfigurationSection times = sec.getConfigurationSection("timings");
-            if (times != null) {
-                fadeIn = times.getInt("fadeIn", 10);
-                stay = times.getInt("stay", 80);
-                fadeOut = times.getInt("fadeOut", 10);
+        for (Team team : Team.values()) {
+            for (UUID u : arena.players().getOrDefault(team, java.util.Collections.emptySet())) {
+                Player player = Bukkit.getPlayer(u);
+                if (player == null) continue;
+                if (team == t) {
+                    player.sendTitle(pointTitle, " ", 5, 40, 10);
+                } else if (team != Team.SPECTATOR) {
+                    player.sendTitle(" ", scoringTeamName + " §a+1", 5, 40, 10);
+                }
             }
         }
-        title = ChatColor.translateAlternateColorCodes('&', title);
-        subtitle = ChatColor.translateAlternateColorCodes('&', subtitle);
-        plugin.ui().broadcastTitle(arena, title, subtitle, fadeIn, stay, fadeOut);
+
+        String chatMessage = scoringTeamColor + "■ " + scoringTeamName + " a marqué !";
+        broadcastToArena(chatMessage);
         plugin.ui().broadcastSound(arena, Sound.BLOCK_NOTE_BLOCK_PLING, 1f, 1.6f);
 
         flushPlacedBlocks();
@@ -495,7 +484,7 @@ public class GameManager {
             if (p != null) { tp(p, arena.spawnBlue()); giveKit(p, Team.BLUE); }
         }
         setFrozen(true);
-        int delay = fadeIn + stay;
+        int delay = 45;
         bridgeReset.reset(() -> {
             Bukkit.getScheduler().runTaskLater(plugin, () -> {
                 setFrozen(false);

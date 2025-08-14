@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.5.5 - UX Polish & Admin Bed Bypass
+- **Fix:** Les opérateurs peuvent désormais casser ou placer les lits malgré la protection.
+- **UX:** Compte à rebours de départ « 2, 1, Go! » avec titre dédié.
+- **UX:** Titres de score retravaillés : « +1 POINT » pour l’équipe qui marque, annonce colorée pour l’adverse.
+
 ## 1.5.4 - Protection Tool Polish
 - **Fix:** Prevented duplication of the selection tool when editing regions.
 - **Polish:** `/hb protect list` requires being in protection mode.
