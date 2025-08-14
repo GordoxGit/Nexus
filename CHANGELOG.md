@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.5.4 - Protection Tool Polish
+- **Fix:** Prevented duplication of the selection tool when editing regions.
+- **Polish:** `/hb protect list` requires being in protection mode.
+
 ## 1.5.3 - Protection GUI on /hb list
 - **Feat:** Implemented Protection Zone Management GUI on `/hb list`.
 
