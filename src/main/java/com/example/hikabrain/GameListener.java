@@ -430,7 +430,7 @@ public class GameListener implements Listener {
                     tool.setItemMeta(meta);
                 }
                 p.getInventory().addItem(tool);
-                p.sendMessage(ChatColor.GREEN + "Sélectionnez la nouvelle zone puis /hb confirm " + name);
+                p.sendMessage(ChatColor.GREEN + "Mode protection pour la zone '" + name + "'. Sélectionnez la nouvelle zone puis /hb confirm " + name);
                 p.closeInventory();
             }
             case "delete" -> {
