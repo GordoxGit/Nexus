@@ -13,15 +13,9 @@ import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
-import org.bukkit.Material;
-import org.bukkit.inventory.ItemStack;
-import org.bukkit.inventory.meta.ItemMeta;
-
 import com.example.hikabrain.protection.ProtectionService;
 import org.bukkit.Location;
-
 import java.util.List;
-import java.util.Arrays;
 
 public class HBCommand implements CommandExecutor {
 
@@ -44,7 +38,7 @@ public class HBCommand implements CommandExecutor {
         line(s, "/hb setspawn <red|blue>", "Définir le point d'apparition d'une équipe.", "hikabrain.admin");
         line(s, "/hb setlobby", "Définir le point de spawn du lobby.", "hikabrain.admin");
         line(s, "/hb protect", "Mode sélection de zones protégées.", "hikabrain.admin");
-        line(s, "/hb list", "Gérer les zones protégées.", "hikabrain.admin");
+        line(s, "/hb list", "Gérer les zones protégées (mode protection).", "hikabrain.admin");
         line(s, "/hb confirm <nom>", "Enregistrer une zone protégée.", "hikabrain.admin");
         line(s, "/hb start / stop", "Démarrer ou arrêter la partie.", "hikabrain.admin");
         line(s, "/hb ui reload", "Recharger la configuration de l'interface.", "hikabrain.admin");
@@ -92,23 +86,20 @@ public class HBCommand implements CommandExecutor {
             Player p = (Player) sender;
             ProtectionService ps = HikaBrainPlugin.get().protection();
             if (args.length > 1 && args[1].equalsIgnoreCase("list")) {
+                if (!ps.isInProtectMode(p)) {
+                    sender.sendMessage("§cVous devez d'abord être en mode protection. Faites /hb protect.");
+                    return true;
+                }
                 ps.openListMenu(p);
                 return true;
             }
             if (ps.isInProtectMode(p)) {
                 ps.disableProtectMode(p);
-                p.getInventory().remove(Material.SHEARS);
+                ps.removeSelectionTool(p);
                 sender.sendMessage(ChatColor.YELLOW + "Mode protection désactivé.");
             } else {
                 ps.enableProtectMode(p);
-                ItemStack tool = new ItemStack(Material.SHEARS);
-                ItemMeta meta = tool.getItemMeta();
-                if (meta != null) {
-                    meta.setDisplayName("§aOutil de Sélection");
-                    meta.setLore(Arrays.asList("§7Clic gauche = Pos1", "§7Clic droit = Pos2"));
-                    tool.setItemMeta(meta);
-                }
-                p.getInventory().addItem(tool);
+                ps.giveSelectionTool(p);
                 sender.sendMessage(ChatColor.GREEN + "Mode protection activé. Utilisez la cisaille pour définir la zone.");
             }
             return true;
@@ -122,7 +113,13 @@ public class HBCommand implements CommandExecutor {
             case "list": {
                 if (needAdmin(sender)) return true;
                 if (!(sender instanceof Player)) { sender.sendMessage("In-game only"); return true; }
-                HikaBrainPlugin.get().protection().openListMenu((Player) sender);
+                Player p = (Player) sender;
+                ProtectionService ps = HikaBrainPlugin.get().protection();
+                if (!ps.isInProtectMode(p)) {
+                    sender.sendMessage("§cVous devez d'abord être en mode protection. Faites /hb protect.");
+                    return true;
+                }
+                ps.openListMenu(p);
                 return true;
             }
             case "setbed": {
@@ -259,7 +256,7 @@ public class HBCommand implements CommandExecutor {
                 ps.addRegion(args[1], new Cuboid(a, b));
                 ps.saveRegions();
                 ps.disableProtectMode(p);
-                p.getInventory().remove(Material.SHEARS);
+                ps.removeSelectionTool(p);
                 sender.sendMessage(ChatColor.GREEN + "Zone protégée enregistrée: " + args[1]);
                 return true;
             }

@@ -36,6 +36,7 @@ public class ProtectionService {
     private final File file;
     private final NamespacedKey actionKey;
     private final NamespacedKey nameKey;
+    private final NamespacedKey toolKey;
     public static class MenuHolder implements InventoryHolder { @Override public Inventory getInventory() { return null; } }
     private final MenuHolder holder = new MenuHolder();
 
@@ -44,6 +45,7 @@ public class ProtectionService {
         this.file = new File(plugin.getDataFolder(), "protection.yml");
         this.actionKey = new NamespacedKey(plugin, "hb_paction");
         this.nameKey = new NamespacedKey(plugin, "hb_pname");
+        this.toolKey = new NamespacedKey(plugin, "hb_protection_tool");
         loadRegions();
     }
 
@@ -186,5 +188,31 @@ public class ProtectionService {
 
     public Location getPos2(Player player) {
         return pos2.get(player.getUniqueId());
+    }
+
+    /** Remove any existing HikaBrain selection tool from the player's inventory. */
+    public void removeSelectionTool(Player player) {
+        for (ItemStack item : player.getInventory().getContents()) {
+            if (item == null || item.getType() != Material.SHEARS) continue;
+            ItemMeta meta = item.getItemMeta();
+            if (meta != null && meta.getPersistentDataContainer().has(toolKey, PersistentDataType.BYTE)) {
+                player.getInventory().remove(item);
+            }
+        }
+    }
+
+    /** Give the selection tool, ensuring there is only one instance. */
+    public void giveSelectionTool(Player player) {
+        removeSelectionTool(player);
+
+        ItemStack tool = new ItemStack(Material.SHEARS);
+        ItemMeta meta = tool.getItemMeta();
+        if (meta != null) {
+            meta.setDisplayName("§aOutil de Sélection");
+            meta.setLore(Arrays.asList("§7Clic gauche = Pos1", "§7Clic droit = Pos2"));
+            meta.getPersistentDataContainer().set(toolKey, PersistentDataType.BYTE, (byte) 1);
+            tool.setItemMeta(meta);
+        }
+        player.getInventory().addItem(tool);
     }
 }

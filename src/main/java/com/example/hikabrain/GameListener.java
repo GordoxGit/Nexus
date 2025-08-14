@@ -44,7 +44,6 @@ import org.bukkit.metadata.MetadataValue;
 import com.example.hikabrain.protection.ProtectionService;
 
 import java.util.List;
-import java.util.Arrays;
 
 public class GameListener implements Listener {
 /* ---- SetBroke tool ---- */
@@ -422,14 +421,7 @@ public class GameListener implements Listener {
         switch (action) {
             case "edit" -> {
                 protectionService.enableProtectMode(p);
-                ItemStack tool = new ItemStack(Material.SHEARS);
-                ItemMeta meta = tool.getItemMeta();
-                if (meta != null) {
-                    meta.setDisplayName("§aOutil de Sélection");
-                    meta.setLore(Arrays.asList("§7Clic gauche = Pos1", "§7Clic droit = Pos2"));
-                    tool.setItemMeta(meta);
-                }
-                p.getInventory().addItem(tool);
+                protectionService.giveSelectionTool(p);
                 p.sendMessage(ChatColor.GREEN + "Mode protection pour la zone '" + name + "'. Sélectionnez la nouvelle zone puis /hb confirm " + name);
                 p.closeInventory();
             }
