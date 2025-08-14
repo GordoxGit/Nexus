@@ -3,11 +3,21 @@ package com.example.hikabrain.protection;
 import com.example.hikabrain.Cuboid;
 import com.example.hikabrain.HikaBrainPlugin;
 import org.bukkit.Bukkit;
+import org.bukkit.ChatColor;
 import org.bukkit.Location;
+import org.bukkit.Material;
+import org.bukkit.NamespacedKey;
 import org.bukkit.World;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.Player;
+import org.bukkit.inventory.Inventory;
+import org.bukkit.inventory.InventoryHolder;
+import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.meta.ItemMeta;
+import org.bukkit.persistence.PersistentDataType;
+
+import java.util.Arrays;
 
 import java.io.File;
 import java.io.IOException;
@@ -24,10 +34,16 @@ public class ProtectionService {
     private final Map<UUID, Location> pos1 = new HashMap<>();
     private final Map<UUID, Location> pos2 = new HashMap<>();
     private final File file;
+    private final NamespacedKey actionKey;
+    private final NamespacedKey nameKey;
+    public static class MenuHolder implements InventoryHolder { @Override public Inventory getInventory() { return null; } }
+    private final MenuHolder holder = new MenuHolder();
 
     public ProtectionService(HikaBrainPlugin plugin) {
         this.plugin = plugin;
         this.file = new File(plugin.getDataFolder(), "protection.yml");
+        this.actionKey = new NamespacedKey(plugin, "hb_paction");
+        this.nameKey = new NamespacedKey(plugin, "hb_pname");
         loadRegions();
     }
 
@@ -80,6 +96,54 @@ public class ProtectionService {
     public Map<String, Cuboid> regions() { return regions; }
 
     public void removeRegion(String name) { regions.remove(name); }
+
+    /** Open GUI listing protected regions for management. */
+    public void openListMenu(Player player) {
+        Inventory inv = Bukkit.createInventory(holder, 54, ChatColor.AQUA + "Zones protégées");
+        int slot = 10;
+        for (Map.Entry<String, Cuboid> en : regions.entrySet()) {
+            if (slot >= 54) break;
+            String name = en.getKey();
+            Cuboid c = en.getValue();
+
+            ItemStack zone = new ItemStack(Material.BEACON);
+            ItemMeta zm = zone.getItemMeta();
+            if (zm != null) {
+                zm.setDisplayName(ChatColor.AQUA + name);
+                zm.setLore(Arrays.asList(
+                        ChatColor.GRAY + "(" + c.x1() + "," + c.y1() + "," + c.z1() + ")",
+                        ChatColor.GRAY + "(" + c.x2() + "," + c.y2() + "," + c.z2() + ")"
+                ));
+                zm.getPersistentDataContainer().set(actionKey, PersistentDataType.STRING, "noop");
+                zm.getPersistentDataContainer().set(nameKey, PersistentDataType.STRING, name);
+                zone.setItemMeta(zm);
+            }
+
+            ItemStack edit = new ItemStack(Material.ANVIL);
+            ItemMeta em = edit.getItemMeta();
+            if (em != null) {
+                em.setDisplayName(ChatColor.YELLOW + "Modifier");
+                em.getPersistentDataContainer().set(actionKey, PersistentDataType.STRING, "edit");
+                em.getPersistentDataContainer().set(nameKey, PersistentDataType.STRING, name);
+                edit.setItemMeta(em);
+            }
+
+            ItemStack del = new ItemStack(Material.BARRIER);
+            ItemMeta dm = del.getItemMeta();
+            if (dm != null) {
+                dm.setDisplayName(ChatColor.RED + "Supprimer");
+                dm.getPersistentDataContainer().set(actionKey, PersistentDataType.STRING, "delete");
+                dm.getPersistentDataContainer().set(nameKey, PersistentDataType.STRING, name);
+                del.setItemMeta(dm);
+            }
+
+            inv.setItem(slot, zone);
+            inv.setItem(slot + 1, edit);
+            inv.setItem(slot + 2, del);
+            slot += 9;
+        }
+        player.openInventory(inv);
+    }
 
     public boolean isInProtectMode(Player player) {
         return protectMode.contains(player.getUniqueId());
