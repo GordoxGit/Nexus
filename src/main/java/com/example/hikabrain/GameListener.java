@@ -83,6 +83,7 @@ public class GameListener implements Listener {
     }
 
     private static final NamespacedKey COMPASS_KEY = new NamespacedKey(HikaBrainPlugin.get(), "hb_compass");
+    private static final NamespacedKey LEAVE_ITEM_KEY = new NamespacedKey(HikaBrainPlugin.get(), "hb_leave_item");
     private static boolean isLobbyCompass(ItemStack it) {
         if (it == null) return false;
         ItemMeta m = it.getItemMeta();
@@ -204,12 +205,22 @@ public class GameListener implements Listener {
 
     @EventHandler
     public void onMove(PlayerMoveEvent e) {
-        if (e.getTo() == null || game.arena() == null || !game.arena().isActive()) return;
-        if (notAllowedWorld(e.getPlayer())) return;
-        if (game.isFrozen()) { e.setTo(e.getFrom()); return; }
+        if (e.getTo() == null) return;
         Player p = e.getPlayer();
+
+        if (game.isFrozen()) {
+            Location from = e.getFrom();
+            Location to = e.getTo();
+            if (from.getX() != to.getX() || from.getY() != to.getY() || from.getZ() != to.getZ()) {
+                p.teleport(from);
+            }
+            return;
+        }
+
+        if (game.arena() == null || !game.arena().isActive()) return;
+        if (notAllowedWorld(p)) return;
         World w = p.getWorld();
-        if (e.getTo().getY() < w.getMinHeight()+1) {
+        if (e.getTo().getY() < w.getMinHeight() + 1) {
             p.setHealth(0.0);
             return;
         }
@@ -399,6 +410,21 @@ public class GameListener implements Listener {
         if (e.getInventory().getHolder() instanceof com.example.hikabrain.ui.compass.CompassGuiService.Holder) {
             HikaBrainPlugin.get().compassGui().cancelUpdateTask((Player) e.getPlayer());
         }
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onLeaveItemClick(PlayerInteractEvent e) {
+        Action action = e.getAction();
+        if (action != Action.RIGHT_CLICK_AIR && action != Action.RIGHT_CLICK_BLOCK) return;
+        if (e.getHand() != EquipmentSlot.HAND) return;
+        ItemStack it = e.getItem();
+        if (it == null) return;
+        ItemMeta meta = it.getItemMeta();
+        if (meta == null) return;
+        Byte b = meta.getPersistentDataContainer().get(LEAVE_ITEM_KEY, PersistentDataType.BYTE);
+        if (b == null || b != (byte)1) return;
+        e.setCancelled(true);
+        game.leave(e.getPlayer());
     }
 
     @EventHandler(priority = EventPriority.HIGHEST)

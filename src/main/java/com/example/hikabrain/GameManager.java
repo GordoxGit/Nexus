@@ -8,10 +8,13 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.player.PlayerTeleportEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.PlayerInventory;
+import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.inventory.meta.LeatherArmorMeta;
 import org.bukkit.scheduler.BukkitRunnable;
+import org.bukkit.scheduler.BukkitTask;
 import org.bukkit.NamespacedKey;
 import org.bukkit.configuration.ConfigurationSection;
+import org.bukkit.persistence.PersistentDataType;
 
 import com.example.hikabrain.ui.FeedbackService;
 import com.example.hikabrain.ui.ThemeService;
@@ -29,7 +32,7 @@ public class GameManager {
 
     private final BridgeResetService bridgeReset;
     private BukkitRunnable timerTask;
-    private BukkitRunnable startCountdownTask;
+    private BukkitTask countdownTask;
     private int timeRemaining; // seconds
     private int freezeMoveTicks = 0; // block movement & scoring during countdown
 
@@ -130,6 +133,18 @@ public class GameManager {
         plugin.scoreboard().updatePlayers(arena);
         plugin.tablist().update(arena);
 
+        p.closeInventory();
+        PlayerInventory inv = p.getInventory();
+        inv.clear();
+        ItemStack leave = new ItemStack(Material.BARRIER);
+        ItemMeta meta = leave.getItemMeta();
+        if (meta != null) {
+            meta.setDisplayName("§cQuitter la file (Clic Droit)");
+            meta.getPersistentDataContainer().set(new NamespacedKey(plugin, "hb_leave_item"), PersistentDataType.BYTE, (byte)1);
+            leave.setItemMeta(meta);
+        }
+        inv.setItem(4, leave);
+
         int totalPlayers = arena.players().get(Team.RED).size() + arena.players().get(Team.BLUE).size();
         int maxPlayers = arena.teamSize() * 2;
         if (totalPlayers >= maxPlayers) {
@@ -145,13 +160,20 @@ public class GameManager {
         plugin.tablist().remove(p);
         plugin.scoreboard().updatePlayers(arena);
         plugin.tablist().update(arena);
+        boolean wasCountdown = countdownTask != null && !countdownTask.isCancelled();
+        if (wasCountdown) {
+            countdownTask.cancel();
+            countdownTask = null;
+            broadcastToArena("§cLe démarrage a été annulé (un joueur a quitté).");
+        }
+
         HikaBrainPlugin.get().lobbyService().apply(p);
         p.sendMessage(ChatColor.GRAY + "Tu as quitté la partie.");
 
         if (arena.isActive()) {
             int playersRemaining = arena.players().get(Team.RED).size() + arena.players().get(Team.BLUE).size();
             if (playersRemaining < 2) {
-                broadcastToArena("Un joueur a quitté, la partie est terminée.");
+                broadcastToArena("§cUn joueur a quitté, la partie est terminée !");
                 stop(true);
             }
         }
@@ -210,11 +232,15 @@ public class GameManager {
 
     public void prepareGameStart(int seconds) {
         if (arena == null || arena.isActive()) return;
-        if (startCountdownTask != null) return;
-        startCountdownTask = new BukkitRunnable() {
+        if (countdownTask != null) return;
+        countdownTask = new BukkitRunnable() {
             int countdown = seconds;
             @Override public void run() {
-                if (arena == null || arena.isActive()) { cancel(); startCountdownTask = null; return; }
+                if (arena == null || arena.isActive()) {
+                    this.cancel();
+                    countdownTask = null;
+                    return;
+                }
                 if (countdown > 0) {
                     String title = ChatColor.AQUA + "Démarrage dans " + countdown + "...";
                     plugin.ui().broadcastTitle(arena, title, "", 0, 25, 5);
@@ -223,12 +249,11 @@ public class GameManager {
                 } else {
                     plugin.ui().broadcastSound(arena, Sound.ENTITY_PLAYER_LEVELUP, 1f, 1.2f);
                     start();
-                    cancel();
-                    startCountdownTask = null;
+                    this.cancel();
+                    countdownTask = null;
                 }
             }
-        };
-        startCountdownTask.runTaskTimer(plugin, 0L, 20L);
+        }.runTaskTimer(plugin, 0L, 20L);
     }
 
     private void endByTime() {
@@ -244,7 +269,7 @@ public class GameManager {
         if (arena == null || !arena.isActive()) return;
         arena.setActive(false);
         if (timerTask != null) timerTask.cancel();
-        if (startCountdownTask != null) { startCountdownTask.cancel(); startCountdownTask = null; }
+        if (countdownTask != null) { countdownTask.cancel(); countdownTask = null; }
         if (announce) endByTime(); else endCleanup();
     }
 
