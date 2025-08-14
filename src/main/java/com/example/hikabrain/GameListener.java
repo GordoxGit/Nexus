@@ -133,6 +133,9 @@ public class GameListener implements Listener {
 
     @EventHandler
     public void onProtectionToolInteract(PlayerInteractEvent e) {
+        if (e.getHand() != EquipmentSlot.HAND) {
+            return;
+        }
         Player player = e.getPlayer();
         if (!protectionService.isInProtectMode(player)) return;
         ItemStack tool = player.getInventory().getItemInMainHand();
@@ -340,6 +343,15 @@ public class GameListener implements Listener {
         if (protectionService.isProtected(e.getBlock().getLocation())) {
             e.setCancelled(true);
             player.sendMessage("§cVous ne pouvez pas construire ici.");
+        }
+    }
+
+    @EventHandler(priority = EventPriority.LOWEST)
+    public void onBlockDamageInProtectedZone(BlockDamageEvent e) {
+        Player player = e.getPlayer();
+        if (player.isOp() || player.hasPermission("hikabrain.admin.bypass")) return;
+        if (protectionService.isProtected(e.getBlock().getLocation())) {
+            e.setCancelled(true);
         }
     }
 

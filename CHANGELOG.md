@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.4.1 - Protection UX fixes
+- **Fix:** confirmation for "Position 2" is only sent once.
+- **Fix:** block hit animation is cancelled in protected zones.
+
 ## 1.4.0 - Protection de zones
 - **Feat:** Outil en jeu pour définir des zones protégées avec `/hb protect` et `/hb confirm`.
 - **Feat:** Chargement et sauvegarde persistants des régions protégées.
