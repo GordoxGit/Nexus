@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.5.7
+- **Fix:** Reworked the `/hb setbed` tool to prevent the vanilla sleep mechanic and provide clear admin feedback.
+
 ## 1.5.6 - Critical Scope Fix & UX Improvements
 - **Fix:** Les protections de construction et la mort dans le vide ne s'appliquent qu'aux joueurs de l'arène active.
 - **UX:** Compte à rebours « 2, 1 » en sous-titre puis « Go! » en titre.

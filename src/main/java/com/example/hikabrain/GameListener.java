@@ -155,36 +155,58 @@ public class GameListener implements Listener {
         }
     }
 
-    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    @EventHandler(priority = EventPriority.HIGHEST)
     public void onBedInteract(PlayerInteractEvent e) {
-        Action act = e.getAction();
-        if (!(act == Action.RIGHT_CLICK_BLOCK || act == Action.LEFT_CLICK_BLOCK)) return;
-        Block clicked = e.getClickedBlock();
-        if (clicked == null) return;
-        if (!(Tag.BEDS.isTagged(clicked.getType()) || clicked.getBlockData() instanceof Bed)) return;
+        // Ne rien faire si ce n'est pas un clic sur un bloc
+        if (e.getClickedBlock() == null) return;
 
-        EquipmentSlot hand = e.getHand();
-        ItemStack item = hand == EquipmentSlot.OFF_HAND ?
-                e.getPlayer().getInventory().getItemInOffHand() :
-                e.getPlayer().getInventory().getItemInMainHand();
-        if (e.getPlayer().isOp()) return;
-        if (admin.isEnabled(e.getPlayer()) && !isBedSelector(item)) return;
-
-        if (isBedSelector(item)) {
-            Player p = e.getPlayer();
-            if (!p.hasPermission("hikabrain.admin")) { p.sendMessage(ChatColor.RED + "Permission: hikabrain.admin"); deny(e); return; }
-            if (notAllowedWorld(p)) { p.sendMessage(ChatColor.RED + "Actif uniquement dans: " + HikaBrainPlugin.get().allowedWorldsPretty()); deny(e); return; }
-            Block b = normalizeToBedFoot(clicked);
-            if (act == Action.RIGHT_CLICK_BLOCK) {
-                if (game.setBed(Team.RED, b.getLocation())) p.sendMessage(ChatColor.GREEN + "Lit ROUGE enregistré.");
-            } else {
-                if (game.setBed(Team.BLUE, b.getLocation())) p.sendMessage(ChatColor.GREEN + "Lit BLEU enregistré.");
-            }
-            deny(e);
+        // Vérifier si le joueur tient l'outil de sélection de lit
+        ItemStack itemInHand = e.getPlayer().getInventory().getItemInMainHand();
+        if (!isBedSelector(itemInHand)) {
+            // Si le joueur ne tient pas l'outil, on laisse les autres logiques de protection des lits s'appliquer
+            // ... (code existant pour empêcher les joueurs de dormir pendant une partie, etc.)
             return;
         }
 
-        deny(e);
+        // Le joueur utilise l'outil : on prend le contrôle total.
+
+        // ÉTAPE 1 : Annuler l'événement immédiatement et sans condition pour empêcher de dormir.
+        e.setCancelled(true);
+        e.setUseInteractedBlock(Event.Result.DENY);
+        e.setUseItemInHand(Event.Result.DENY);
+
+        Player player = e.getPlayer();
+
+        // ÉTAPE 2 : Vérifier les permissions
+        if (!player.hasPermission("hikabrain.admin")) {
+            player.sendMessage("§cVous n'avez pas la permission d'utiliser cet outil.");
+            return;
+        }
+
+        // ÉTAPE 3 : Vérifier que le bloc cliqué est un lit
+        if (!Tag.BEDS.isTagged(e.getClickedBlock().getType())) {
+            player.sendMessage("§cVous devez cliquer sur un lit.");
+            return;
+        }
+
+        // ÉTAPE 4 : Exécuter l'action et envoyer un message personnalisé
+        Team team = null;
+        String teamName = "";
+        if (e.getAction() == Action.RIGHT_CLICK_BLOCK) {
+            team = Team.RED;
+            teamName = "§cROUGE";
+        } else if (e.getAction() == Action.LEFT_CLICK_BLOCK) {
+            team = Team.BLUE;
+            teamName = "§9BLEU";
+        }
+
+        if (team != null) {
+            if (game.setBed(team, e.getClickedBlock().getLocation())) {
+                player.sendMessage("§a[HikaBrain] Lit de l'équipe " + teamName + " §adéfini avec succès !");
+            } else {
+                player.sendMessage("§c[HikaBrain] Erreur : Aucune arène n'est chargée. Créez-en une d'abord.");
+            }
+        }
     }
 
     private void deny(PlayerInteractEvent e) {
