@@ -1,0 +1,47 @@
+# Nom du workflow qui apparaîtra dans l'onglet "Actions" de GitHub
+name: HikaBrain CI - Build & Test
+
+# Déclencheurs : la pipeline s'exécutera sur chaque push vers la branche principale
+# ou sur chaque Pull Request ciblant la branche principale.
+on:
+  push:
+    branches: [ "main", "master" ] # Adaptez si votre branche principale a un autre nom
+  pull_request:
+    branches: [ "main", "master" ]
+
+jobs:
+  # Un seul "job" (tâche) qui s'appelle "build"
+  build:
+    # Utiliser la dernière version d'Ubuntu comme environnement d'exécution
+    runs-on: ubuntu-latest
+
+    steps:
+      # Étape 1 : Récupérer le code du dépôt
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      # Étape 2 : Configurer l'environnement Java avec la version JDK 21
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin' # Une distribution populaire de Java
+
+      # Étape 3 : Rendre le script Gradle exécutable
+      # C'est une bonne pratique pour assurer la compatibilité entre les systèmes
+      - name: Grant execute permission for gradlew
+        run: chmod +x ./gradlew
+
+      # Étape 4 : Construire le projet avec Gradle
+      # La commande "build" exécute la compilation, les tests et le shadowJar
+      - name: Build with Gradle
+        run: ./gradlew build
+
+      # Étape 5 : Téléverser l'artefact (le .jar du plugin)
+      # Le fichier sera disponible en téléchargement sur la page du workflow
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: HikaBrain-Plugin-JAR
+          # Le chemin vers le JAR généré par shadowJar
+          path: build/libs/HikaBrain-*.jar
