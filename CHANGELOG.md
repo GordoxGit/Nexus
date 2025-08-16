@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.5.8 - Critical Build Fix
+- **Fix:** Permanently resolved the `NoClassDefFoundError` startup crash by correctly bundling the Kyori Adventure library into the plugin JAR.
+
 ## 1.5.7
 - **Fix:** Reworked the `/hb setbed` tool to prevent the vanilla sleep mechanic and provide clear admin feedback.
 
