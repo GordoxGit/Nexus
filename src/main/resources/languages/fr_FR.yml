@@ -1,0 +1,6 @@
+no-permission: "&cVous n'avez pas la permission d'exécuter cette commande."
+config-reloaded: "&aConfiguration et messages rechargés."
+plugin-version: "&aHenebrain version %version%"
+command-help-header: "&eCommandes disponibles :"
+command-help-format: "&6/%command%&7: %description%"
+unknown-subcommand: "&cSous-commande inconnue."

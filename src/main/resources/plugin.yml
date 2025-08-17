@@ -1,16 +1,9 @@
-name: HikaBrain
-main: com.example.hikabrain.HikaBrainPlugin
-version: 1.5.7
-api-version: "1.21"
-description: Hikabrain minigame for Spigot/Paper 1.21
-
+name: Henebrain
+main: fr.gordox.henebrain.Henebrain
+version: 0.1.0
+api-version: '1.21'
 commands:
-  hb:
-    description: Commande principale HikaBrain
-    usage: "/hb help"
-    aliases: [hikabrain]
-
-permissions:
-  hikabrain.admin:
-    description: Accès aux commandes d’administration HikaBrain
-    default: op
+  henebrain:
+    description: Commande principale du plugin Henebrain
+    usage: /<command>
+    aliases: [hb]
