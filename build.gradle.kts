@@ -1,32 +1,33 @@
 plugins {
-    java
+    id("java")
     id("com.github.johnrengelman.shadow") version "8.1.1"
 }
 
-group = "com.example"
-version = "1.5.7"
+group = "fr.gordox"
+version = "0.0.1-SNAPSHOT"
 
 repositories {
     mavenCentral()
-    maven("https://repo.papermc.io/repository/maven-public/")
     maven("https://hub.spigotmc.org/nexus/content/repositories/snapshots/")
+    maven("https://oss.sonatype.org/content/repositories/snapshots")
 }
 
 dependencies {
+    // Spigot API for Minecraft 1.21
     compileOnly("org.spigotmc:spigot-api:1.21-R0.1-SNAPSHOT")
-    implementation("net.kyori:adventure-api:4.17.0")
-    implementation("net.kyori:adventure-text-serializer-legacy:4.17.0")
-    testImplementation("junit:junit:4.13.2")
 }
 
 java {
-    toolchain {
-        languageVersion.set(JavaLanguageVersion.of(21))
+    toolchain.languageVersion.set(JavaLanguageVersion.of(21))
+}
+
+tasks {
+    shadowJar {
+        archiveBaseName.set(rootProject.name)
+        archiveClassifier.set("")
+        relocate("org.bstats", "fr.gordox.henebrain.libs.bstats")
+    }
+    build {
+        dependsOn(shadowJar)
     }
 }
-
-tasks.withType<org.gradle.api.tasks.compile.JavaCompile>().configureEach {
-    options.encoding = "UTF-8"
-    options.release.set(21)
-}
-
