@@ -1,1 +1,1 @@
-rootProject.name = "HikaBrain"
+rootProject.name = "Henebrain"
