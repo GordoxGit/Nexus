@@ -30,3 +30,16 @@ tasks.withType<org.gradle.api.tasks.compile.JavaCompile>().configureEach {
     options.release.set(21)
 }
 
+tasks {
+    shadowJar {
+        archiveBaseName.set(rootProject.name)
+        archiveClassifier.set("")
+
+        mergeServiceFiles()
+        exclude("META-INF/*.SF", "META-INF/*.DSA", "META-INF/*.RSA")
+    }
+    build {
+        dependsOn(shadowJar)
+    }
+}
+

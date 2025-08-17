@@ -1,0 +1,29 @@
+name: Java CI with Gradle
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Set up JDK 21
+      uses: actions/setup-java@v4
+      with:
+        java-version: '21'
+        distribution: 'temurin'
+
+    - name: Build with Gradle
+      # Exécute la tâche "clean" pour assurer un build propre, puis "build"
+      # Utilise "gradle" car le wrapper n'est pas inclus dans le projet
+      run: gradle clean build
+
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: Henebrain-Plugin
+        path: build/libs/*.jar
