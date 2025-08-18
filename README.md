@@ -22,3 +22,9 @@ Toutes les commandes suivantes nécessitent la permission `henebrain.admin` et s
 | `/hb admin setpoint <nom_arène>` | Définit la position actuelle du joueur comme point à marquer. |
 | `/hb admin addmode <nom_arène> <mode>` | Ajoute un mode de jeu supporté à l'arène. |
 | `/hb admin removemode <nom_arène> <mode>` | Retire un mode de jeu supporté de l'arène. |
+
+## Commandes Joueur
+
+| Commande | Description | Permission |
+| --- | --- | --- |
+| `/hb join <nom_arène>` | Rejoint la file d'attente de l'arène indiquée. | `henebrain.join` |
