@@ -1,0 +1,6 @@
+database:
+  host: '51.75.125.229'
+  port: 3306
+  database: 'henebrain'
+  username: 'root'
+  password: 'your_password'
