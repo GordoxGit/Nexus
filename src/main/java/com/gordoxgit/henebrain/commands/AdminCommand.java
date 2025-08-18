@@ -141,6 +141,24 @@ public class AdminCommand implements CommandExecutor, TabCompleter {
                 pointArena.setPoint(pointPlayer.getLocation());
                 sender.sendMessage("Point défini pour l'arène " + pointArena.getName() + ".");
                 break;
+            case "setscore":
+                if (args.length < 3) {
+                    sender.sendMessage("Usage: /" + label + " admin setscore <nom_arène> <nombre>");
+                    return;
+                }
+                Arena scoreArena = arenaManager.getArena(args[1]);
+                if (scoreArena == null) {
+                    sender.sendMessage("Cette arène n'existe pas.");
+                    return;
+                }
+                try {
+                    int value = Integer.parseInt(args[2]);
+                    scoreArena.setPointsToWin(value);
+                    sender.sendMessage("Score à atteindre défini à " + value + " pour l'arène " + scoreArena.getName() + ".");
+                } catch (NumberFormatException ex) {
+                    sender.sendMessage("Le nombre fourni est invalide.");
+                }
+                break;
             case "addmode":
                 if (args.length < 3) {
                     sender.sendMessage("Usage: /" + label + " admin addmode <nom_arène> <mode>");
@@ -204,14 +222,14 @@ public class AdminCommand implements CommandExecutor, TabCompleter {
         }
 
         if (args.length == 2) {
-            List<String> subs = Arrays.asList("create", "delete", "setlobby", "setspawn", "setpoint", "addmode", "removemode");
+            List<String> subs = Arrays.asList("create", "delete", "setlobby", "setspawn", "setpoint", "setscore", "addmode", "removemode");
             StringUtil.copyPartialMatches(args[1], subs, completions);
             return completions;
         }
 
         if (args.length == 3) {
             String sub = args[1].toLowerCase();
-            if (Arrays.asList("delete", "setlobby", "setspawn", "setpoint", "addmode", "removemode").contains(sub)) {
+            if (Arrays.asList("delete", "setlobby", "setspawn", "setpoint", "setscore", "addmode", "removemode").contains(sub)) {
                 List<String> arenaNames = arenaManager.getAllArenas().stream().map(Arena::getName).collect(Collectors.toList());
                 StringUtil.copyPartialMatches(args[2], arenaNames, completions);
             }

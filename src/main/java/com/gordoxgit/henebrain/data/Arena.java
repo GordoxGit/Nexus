@@ -14,6 +14,7 @@ public class Arena {
     private Location point;
     private List<GameModeType> supportedModes;
     private List<Location> barrierLocations;
+    private int pointsToWin = 10;
 
     public Arena(String name, Location lobby, Map<String, Location> teamSpawns, Location point,
                  List<GameModeType> supportedModes, List<Location> barrierLocations) {
@@ -71,6 +72,14 @@ public class Arena {
 
     public void setBarrierLocations(List<Location> barrierLocations) {
         this.barrierLocations = barrierLocations;
+    }
+
+    public int getPointsToWin() {
+        return pointsToWin;
+    }
+
+    public void setPointsToWin(int pointsToWin) {
+        this.pointsToWin = pointsToWin;
     }
 }
 

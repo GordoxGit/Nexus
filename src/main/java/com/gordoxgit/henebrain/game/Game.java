@@ -89,6 +89,10 @@ public class Game {
         this.placedBlocks = placedBlocks;
     }
 
+    public Arena getArena() {
+        return Henebrain.getInstance().getArenaManager().getArena(arenaName);
+    }
+
     /**
      * Starts a 10 second countdown before the game actually begins.
      */
@@ -125,9 +129,11 @@ public class Game {
         Arena arena = Henebrain.getInstance().getArenaManager().getArena(arenaName);
 
         teamManager.balanceTeams(this);
-        setState(GameState.PLAYING);
+        scores = new HashMap<>();
+        placedBlocks = new ArrayList<>();
 
         for (Team team : teams) {
+            scores.put(team, 0);
             Location spawn = arena.getTeamSpawns().get(team.getTeamName());
             for (UUID uuid : team.getMembers()) {
                 Player p = Bukkit.getPlayer(uuid);
@@ -138,6 +144,76 @@ public class Game {
                     loadoutManager.applyLoadout(p);
                 }
             }
+        }
+        setState(GameState.PLAYING);
+    }
+
+    public void onPointScored(Player scorer) {
+        Team scoringTeam = null;
+        for (Team team : teams) {
+            if (team.getMembers().contains(scorer.getUniqueId())) {
+                scoringTeam = team;
+                break;
+            }
+        }
+        if (scoringTeam == null) {
+            return;
+        }
+
+        scores.put(scoringTeam, scores.getOrDefault(scoringTeam, 0) + 1);
+        int score = scores.get(scoringTeam);
+        for (Player p : players.values()) {
+            p.sendMessage("Point pour l'équipe " + scoringTeam.getTeamName() + " ! Score: " + score);
+        }
+
+        Arena arena = getArena();
+        if (arena != null && score >= arena.getPointsToWin()) {
+            end(scoringTeam);
+        } else {
+            endRound();
+        }
+    }
+
+    public void endRound() {
+        setState(GameState.ROUND_ENDED);
+        new BukkitRunnable() {
+            @Override
+            public void run() {
+                startNextRound();
+            }
+        }.runTaskLater(Henebrain.getInstance(), 20L * 5);
+    }
+
+    private void startNextRound() {
+        Arena arena = getArena();
+        LoadoutManager loadoutManager = Henebrain.getInstance().getLoadoutManager();
+
+        if (placedBlocks != null) {
+            for (BlockState state : placedBlocks) {
+                state.update(true, false);
+            }
+            placedBlocks.clear();
+        }
+
+        for (Team team : teams) {
+            Location spawn = arena != null ? arena.getTeamSpawns().get(team.getTeamName()) : null;
+            for (UUID uuid : team.getMembers()) {
+                Player p = Bukkit.getPlayer(uuid);
+                if (p != null) {
+                    if (spawn != null) {
+                        p.teleport(spawn);
+                    }
+                    p.getInventory().clear();
+                    loadoutManager.applyLoadout(p);
+                }
+            }
+        }
+
+        if (mode == GameModeType.STRATEGY) {
+            setState(GameState.SHOP_PHASE);
+            // TODO: démarrer le timer de la boutique
+        } else {
+            setState(GameState.PLAYING);
         }
     }
 

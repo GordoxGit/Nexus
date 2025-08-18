@@ -77,6 +77,7 @@ public class ArenaManager {
             }
 
             Arena arena = new Arena(key, lobby, spawns, point, modes, barriers);
+            arena.setPointsToWin(config.getInt(path + "pointsToWin", 10));
             arenas.put(key, arena);
         }
     }
@@ -98,6 +99,7 @@ public class ArenaManager {
                 config.set(path + "spawns." + entry.getKey(), entry.getValue());
             }
             config.set(path + "point", arena.getPoint());
+            config.set(path + "pointsToWin", arena.getPointsToWin());
 
             List<String> modeNames = new ArrayList<>();
             for (GameModeType mode : arena.getSupportedModes()) {

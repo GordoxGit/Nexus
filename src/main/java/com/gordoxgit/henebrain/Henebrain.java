@@ -5,6 +5,7 @@ import org.bukkit.plugin.java.JavaPlugin;
 import com.gordoxgit.henebrain.commands.AdminCommand;
 import com.gordoxgit.henebrain.commands.JoinCommand;
 import com.gordoxgit.henebrain.listeners.PlayerConnectionListener;
+import com.gordoxgit.henebrain.listeners.PointListener;
 import com.gordoxgit.henebrain.managers.ArenaManager;
 import com.gordoxgit.henebrain.managers.ConfigManager;
 import com.gordoxgit.henebrain.managers.GameManager;
@@ -39,6 +40,7 @@ public class Henebrain extends JavaPlugin {
         getCommand("hb").setTabCompleter(joinCommand);
 
         getServer().getPluginManager().registerEvents(new PlayerConnectionListener(this), this);
+        getServer().getPluginManager().registerEvents(new PointListener(this), this);
     }
 
     @Override
