@@ -2,6 +2,7 @@ package com.gordoxgit.henebrain;
 
 import org.bukkit.plugin.java.JavaPlugin;
 
+import com.gordoxgit.henebrain.commands.AdminCommand;
 import com.gordoxgit.henebrain.managers.ArenaManager;
 import com.gordoxgit.henebrain.managers.ConfigManager;
 import com.gordoxgit.henebrain.managers.GameManager;
@@ -27,6 +28,17 @@ public class Henebrain extends JavaPlugin {
         this.teamManager = new TeamManager(this);
         this.loadoutManager = new LoadoutManager(this);
         this.gameManager = new GameManager(this);
+
+        this.arenaManager.loadArenas();
+
+        AdminCommand adminCommand = new AdminCommand(this);
+        getCommand("hb").setExecutor(adminCommand);
+        getCommand("hb").setTabCompleter(adminCommand);
+    }
+
+    @Override
+    public void onDisable() {
+        this.arenaManager.saveArenas();
     }
 
     public static Henebrain getInstance() {
