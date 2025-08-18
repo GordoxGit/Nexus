@@ -1,6 +1,8 @@
 package com.gordoxgit.henebrain.game;
 
 public enum GameModeType {
-    CLASSIC
+    CLASSIC,
+    STRATEGY,
+    DUEL
 }
 

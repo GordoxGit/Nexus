@@ -20,6 +20,7 @@ Toutes les commandes suivantes nécessitent la permission `henebrain.admin` et s
 | `/hb admin setlobby <nom_arène>` | Définit la position actuelle du joueur comme lobby de l'arène. |
 | `/hb admin setspawn <nom_arène> <nom_équipe>` | Définit le spawn de l'équipe donnée à la position du joueur. |
 | `/hb admin setpoint <nom_arène>` | Définit la position actuelle du joueur comme point à marquer. |
+| `/hb admin setscore <nom_arène> <nombre>` | Définit le nombre de points nécessaires pour gagner dans l'arène. |
 | `/hb admin addmode <nom_arène> <mode>` | Ajoute un mode de jeu supporté à l'arène. |
 | `/hb admin removemode <nom_arène> <mode>` | Retire un mode de jeu supporté de l'arène. |
 
