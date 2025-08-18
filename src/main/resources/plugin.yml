@@ -3,3 +3,7 @@ main: com.gordoxgit.henebrain.Henebrain
 version: ${project.version}
 api-version: '1.21'
 author: GordoxGit
+commands:
+  hb:
+    description: Commande principale Henebrain
+    usage: /hb
