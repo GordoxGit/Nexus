@@ -1,0 +1,27 @@
+-- Initial schema
+CREATE TABLE IF NOT EXISTS players (
+    uuid BINARY(16) NOT NULL PRIMARY KEY,
+    elo INT NOT NULL DEFAULT 1000,
+    wins INT NOT NULL DEFAULT 0,
+    losses INT NOT NULL DEFAULT 0,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_players_elo (elo)
+);
+
+CREATE TABLE IF NOT EXISTS arenas (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(100) NOT NULL UNIQUE,
+    max_players SMALLINT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS matches (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    arena_id INT NOT NULL,
+    started_at TIMESTAMP NOT NULL,
+    ended_at TIMESTAMP NULL,
+    winner_uuid BINARY(16) NULL,
+    INDEX idx_matches_arena_id (arena_id),
+    CONSTRAINT fk_matches_arena FOREIGN KEY (arena_id) REFERENCES arenas(id) ON DELETE RESTRICT
+);

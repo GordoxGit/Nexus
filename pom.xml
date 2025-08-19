@@ -58,6 +58,18 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     </dependency>
 
     <dependency>
+        <groupId>com.zaxxer</groupId>
+        <artifactId>HikariCP</artifactId>
+        <version>5.0.1</version>
+    </dependency>
+
+    <dependency>
+        <groupId>org.flywaydb</groupId>
+        <artifactId>flyway-core</artifactId>
+        <version>10.10.0</version>
+    </dependency>
+
+    <dependency>
         <groupId>dev.triumphteam</groupId>
         <artifactId>triumph-gui</artifactId>
         <version>3.1.8</version>
@@ -76,6 +88,25 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
                 <target>${maven.compiler.target}</target>
             </configuration>
         </plugin>
+        <!-- Shade plugin can be configured if dependencies should be bundled -->
+        <!--
+        <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-shade-plugin</artifactId>
+            <version>3.5.0</version>
+            <executions>
+                <execution>
+                    <phase>package</phase>
+                    <goals>
+                        <goal>shade</goal>
+                    </goals>
+                    <configuration>
+                        <createDependencyReducedPom>false</createDependencyReducedPom>
+                    </configuration>
+                </execution>
+            </executions>
+        </plugin>
+        -->
     </plugins>
 </build>
 </project>
