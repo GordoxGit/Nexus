@@ -70,6 +70,12 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     </dependency>
 
     <dependency>
+        <groupId>net.kyori</groupId>
+        <artifactId>adventure-platform-bukkit</artifactId>
+        <version>4.3.3</version>
+    </dependency>
+
+    <dependency>
         <groupId>dev.triumphteam</groupId>
         <artifactId>triumph-gui</artifactId>
         <version>3.1.8</version>
@@ -88,25 +94,34 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
                 <target>${maven.compiler.target}</target>
             </configuration>
         </plugin>
-        <!-- Shade plugin can be configured if dependencies should be bundled -->
-        <!--
         <plugin>
             <groupId>org.apache.maven.plugins</groupId>
             <artifactId>maven-shade-plugin</artifactId>
-            <version>3.5.0</version>
+            <version>3.5.2</version>
             <executions>
                 <execution>
+                    <id>shade</id>
                     <phase>package</phase>
                     <goals>
                         <goal>shade</goal>
                     </goals>
                     <configuration>
                         <createDependencyReducedPom>false</createDependencyReducedPom>
+                        <minimizeJar>false</minimizeJar>
+                        <artifactSet>
+                            <includes>
+                                <include>com.zaxxer:HikariCP</include>
+                                <include>org.flywaydb:flyway-core</include>
+                                <include>com.mysql:mysql-connector-j</include>
+                            </includes>
+                        </artifactSet>
+                        <transformers>
+                            <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
+                        </transformers>
                     </configuration>
                 </execution>
             </executions>
         </plugin>
-        -->
     </plugins>
 </build>
 </project>
