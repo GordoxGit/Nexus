@@ -7,6 +7,8 @@ import org.bukkit.ChatColor;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
+import org.flywaydb.core.api.MigrationInfoService;
+import org.flywaydb.core.api.MigrationInfo;
 
 import java.sql.Connection;
 
@@ -60,9 +62,16 @@ public class DbCommand implements CommandExecutor {
                         + " idle=" + mx.getIdleConnections());
             }
 
-            var info = flywayManager.info();
-            var current = info.current() != null ? info.current().getVersion() : "none";
-            sender.sendMessage(ChatColor.GRAY + "Flyway version=" + current + " pending=" + info.pending().size());
+            String prefix = "[Henebrain-DB] ";
+            MigrationInfoService info = flywayManager.info();
+            MigrationInfo current = info.current();
+
+            String currentVersion = (current != null && current.getVersion() != null)
+                    ? current.getVersion().toString() : "none";
+            int pendingCount = info.pending() != null ? info.pending().length : 0;
+
+            sender.sendMessage(prefix + "Flyway current version: " + currentVersion);
+            sender.sendMessage(prefix + "Flyway pending migrations: " + pendingCount);
         } catch (Exception e) {
             sender.sendMessage(ChatColor.RED + "Database check failed: " + e.getMessage());
         }
