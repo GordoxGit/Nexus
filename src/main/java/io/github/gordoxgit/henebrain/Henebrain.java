@@ -1,9 +1,14 @@
 package io.github.gordoxgit.henebrain;
 
+import io.github.gordoxgit.henebrain.commands.ArenaCommand;
 import io.github.gordoxgit.henebrain.commands.DbCommand;
+import io.github.gordoxgit.henebrain.commands.HbCommand;
+import io.github.gordoxgit.henebrain.arena.ArenaManager;
 import io.github.gordoxgit.henebrain.database.FlywayManager;
 import io.github.gordoxgit.henebrain.database.HikariDataSourceProvider;
 import io.github.gordoxgit.henebrain.repository.JdbcPlayerRepository;
+import io.github.gordoxgit.henebrain.repository.JdbcArenaRepository;
+import io.github.gordoxgit.henebrain.repository.ArenaRepository;
 import io.github.gordoxgit.henebrain.repository.PlayerRepository;
 import org.bukkit.plugin.java.JavaPlugin;
 
@@ -15,6 +20,8 @@ public final class Henebrain extends JavaPlugin {
     private HikariDataSourceProvider dataSourceProvider;
     private FlywayManager flywayManager;
     private PlayerRepository playerRepository;
+    private ArenaRepository arenaRepository;
+    private ArenaManager arenaManager;
 
     @Override
     public void onEnable() {
@@ -30,8 +37,13 @@ public final class Henebrain extends JavaPlugin {
         }
 
         playerRepository = new JdbcPlayerRepository(this, dataSourceProvider);
+        arenaRepository = new JdbcArenaRepository(this, dataSourceProvider);
+        arenaManager = new ArenaManager(arenaRepository);
+        arenaManager.loadArenas();
 
-        getCommand("hb").setExecutor(new DbCommand(dataSourceProvider, flywayManager));
+        DbCommand dbCommand = new DbCommand(dataSourceProvider, flywayManager);
+        ArenaCommand arenaCommand = new ArenaCommand(arenaRepository, arenaManager);
+        getCommand("hb").setExecutor(new HbCommand(dbCommand, arenaCommand));
         getLogger().info("Henebrain a démarré avec succès !");
     }
 
