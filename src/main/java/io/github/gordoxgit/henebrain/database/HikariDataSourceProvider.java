@@ -32,12 +32,20 @@ public class HikariDataSourceProvider {
         }
 
         HikariConfig config = new HikariConfig();
-        String host = dbConfig.getString("host");
-        int port = dbConfig.getInt("port");
-        String database = dbConfig.getString("database");
-        String jdbcUrl = "jdbc:mysql://" + host + ":" + port + "/" + database
-                + "?useSSL=false&serverTimezone=UTC&rewriteBatchedStatements=true";
-        config.setJdbcUrl(jdbcUrl);
+        if (dbConfig.contains("jdbcUrl")) {
+            config.setJdbcUrl(dbConfig.getString("jdbcUrl"));
+            plugin.getLogger().info("Configuration de la base de données via jdbcUrl.");
+            if (dbConfig.contains("driverClassName")) {
+                config.setDriverClassName(dbConfig.getString("driverClassName"));
+            }
+        } else {
+            plugin.getLogger().warning("jdbcUrl non trouvé dans config.yml, utilisation des anciens paramètres host/port.");
+            String host = dbConfig.getString("host", "localhost");
+            int port = dbConfig.getInt("port", 3306);
+            String database = dbConfig.getString("database");
+            String jdbcUrl = "jdbc:mysql://" + host + ":" + port + "/" + database;
+            config.setJdbcUrl(jdbcUrl);
+        }
         config.setUsername(dbConfig.getString("username"));
         config.setPassword(dbConfig.getString("password"));
 
