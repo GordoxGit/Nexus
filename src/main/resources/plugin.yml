@@ -7,9 +7,11 @@ description: Un plugin de mode de jeu Hikabrain moderne et compétitif.
 commands:
   hb:
     description: Commandes administratives Henebrain
-    usage: /hb db <doctor|migrate>
-    permission: henebrain.admin.db
+    usage: /hb <db|arena> ...
 permissions:
   henebrain.admin.db:
     description: Permet d'utiliser les commandes de gestion de la base de données
+    default: op
+  henebrain.admin.arena:
+    description: Permet d'utiliser les commandes de gestion des arènes
     default: op
