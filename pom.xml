@@ -33,6 +33,10 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
         <id>sonatype-oss-snapshots</id>
         <url>https://oss.sonatype.org/content/repositories/snapshots</url>
     </repository>
+    <repository>
+        <id>sonatype-oss-s01-snapshots</id>
+        <url>https://s01.oss.sonatype.org/content/repositories/snapshots/</url>
+    </repository>
 </repositories>
 
 <dependencies>
