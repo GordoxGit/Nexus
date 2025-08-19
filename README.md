@@ -27,3 +27,7 @@ Dépendances Clés : PlaceholderAPI, triumph-gui
 État Actuel
 Phase 1 - Initialisation du Projet
 La structure de base du projet est en cours de création. Le pom.xml est configuré, et la documentation initiale (README, ROADMAP) est établie.
+
+## Déploiement
+
+Le JAR du plugin est auto-contenu et inclut toutes les bibliothèques nécessaires (HikariCP, Flyway, driver MySQL). Aucun ajout de dépendances externes dans le dossier `plugins` du serveur n'est requis.
