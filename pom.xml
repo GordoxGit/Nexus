@@ -85,6 +85,22 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
         <version>3.1.8</version>
         <scope>compile</scope>
     </dependency>
+
+    <dependency>
+        <groupId>com.fasterxml.jackson.core</groupId>
+        <artifactId>jackson-databind</artifactId>
+        <version>2.17.1</version>
+    </dependency>
+    <dependency>
+        <groupId>com.fasterxml.jackson.core</groupId>
+        <artifactId>jackson-core</artifactId>
+        <version>2.17.1</version>
+    </dependency>
+    <dependency>
+        <groupId>com.fasterxml.jackson.core</groupId>
+        <artifactId>jackson-annotations</artifactId>
+        <version>2.17.1</version>
+    </dependency>
 </dependencies>
 
 <build>
@@ -117,8 +133,29 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
                                 <include>com.zaxxer:HikariCP</include>
                                 <include>org.flywaydb:flyway-core</include>
                                 <include>com.mysql:mysql-connector-j</include>
+                                <include>com.fasterxml.jackson.core:jackson-databind</include>
+                                <include>com.fasterxml.jackson.core:jackson-core</include>
+                                <include>com.fasterxml.jackson.core:jackson-annotations</include>
                             </includes>
                         </artifactSet>
+                        <relocations>
+                            <relocation>
+                                <pattern>com.zaxxer.hikari</pattern>
+                                <shadedPattern>io.github.gordoxgit.libs.hikari</shadedPattern>
+                            </relocation>
+                            <relocation>
+                                <pattern>org.flywaydb</pattern>
+                                <shadedPattern>io.github.gordoxgit.libs.flyway</shadedPattern>
+                            </relocation>
+                            <relocation>
+                                <pattern>com.mysql.cj</pattern>
+                                <shadedPattern>io.github.gordoxgit.libs.mysql</shadedPattern>
+                            </relocation>
+                            <relocation>
+                                <pattern>com.fasterxml.jackson</pattern>
+                                <shadedPattern>io.github.gordoxgit.libs.jackson</shadedPattern>
+                            </relocation>
+                        </relocations>
                         <transformers>
                             <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
                         </transformers>
