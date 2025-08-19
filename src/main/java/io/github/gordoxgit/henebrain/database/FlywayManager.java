@@ -4,7 +4,7 @@ import org.bukkit.plugin.java.JavaPlugin;
 import org.flywaydb.core.Flyway;
 import org.flywaydb.core.api.FlywayException;
 import org.flywaydb.core.api.output.MigrateResult;
-import org.flywaydb.core.api.output.InfoResult;
+import org.flywaydb.core.api.MigrationInfoService;
 
 import javax.sql.DataSource;
 
@@ -28,7 +28,8 @@ public class FlywayManager {
     public MigrateResult migrate() {
         try {
             MigrateResult result = flyway.migrate();
-            plugin.getLogger().info("Flyway migrated " + result.migrationsExecuted + " migrations.");
+            plugin.getLogger().info("Flyway a appliqué " + result.migrationsExecuted
+                    + " migration(s). Version actuelle: " + result.targetSchemaVersion);
             return result;
         } catch (FlywayException e) {
             plugin.getLogger().severe("Flyway migration failed: " + e.getMessage());
@@ -36,7 +37,7 @@ public class FlywayManager {
         }
     }
 
-    public InfoResult info() {
+    public MigrationInfoService info() {
         return flyway.info();
     }
 }
