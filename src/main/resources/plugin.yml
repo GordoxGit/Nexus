@@ -1,0 +1,7 @@
+name: Nexus
+version: ${project.version}
+main: fr.heneria.nexus.Nexus
+api-version: '1.21'
+author: Projet Heneria
+description: Plugin principal pour le mode de jeu Nexus sur le serveur Heneria.
+softdepend: [PlaceholderAPI]
