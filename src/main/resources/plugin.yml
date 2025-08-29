@@ -5,3 +5,7 @@ api-version: '1.21'
 author: Projet Heneria
 description: Plugin principal pour le mode de jeu Nexus sur le serveur Heneria.
 softdepend: [PlaceholderAPI]
+commands:
+  nx:
+    description: Commandes administratives de Nexus
+    usage: /nx arena <subcommand>
