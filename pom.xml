@@ -25,17 +25,15 @@
             <id>papermc</id>
             <url>https://repo.papermc.io/repository/maven-public/</url>
         </repository>
+        
         <repository>
             <id>placeholderapi</id>
             <url>https://repo.extendedclip.com/content/repositories/placeholderapi/</url>
         </repository>
+        
         <repository>
-            <id>sonatype</id>
-            <url>https://oss.sonatype.org/content/groups/public/</url>
-        </repository>
-        <repository>
-            <id>jitpack.io</id>
-            <url>https://jitpack.io</url>
+            <id>maven-central</id>
+            <url>https://repo1.maven.org/maven2/</url>
         </repository>
     </repositories>
 
@@ -73,11 +71,12 @@
         </dependency>
 
         <dependency>
-            <groupId>dev.triumphteam.gui</groupId>
+            <groupId>dev.triumphteam</groupId>
             <artifactId>triumph-gui</artifactId>
-            <version>3.1.8</version>
+            <version>3.1.12</version>
             <scope>compile</scope>
         </dependency>
+        
         <dependency>
             <groupId>me.clip</groupId>
             <artifactId>placeholderapi</artifactId>
