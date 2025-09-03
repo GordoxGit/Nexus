@@ -25,13 +25,13 @@ public final class Nexus extends JavaPlugin {
                 .load()
                 .migrate();
 
-        // 3. Initialiser le Repository
+        // 3. Initialiser le repository des arènes
         ArenaRepository arenaRepository = new JdbcArenaRepository(this.dataSourceProvider.getDataSource());
 
-        // 4. Initialiser le Manager
+        // 4. CORRECTION : initialiser le manager et l'assigner au champ de la classe
         this.arenaManager = new ArenaManager(arenaRepository);
 
-        // 5. Charger les arènes existantes
+        // 5. Charger les arènes existantes (this.arenaManager n'est plus null)
         this.arenaManager.loadArenas();
         getLogger().info(this.arenaManager.getAllArenas().size() + " arène(s) chargée(s).");
 
