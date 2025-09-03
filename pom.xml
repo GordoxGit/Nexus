@@ -115,6 +115,18 @@
                             <pattern>dev.triumphteam.gui</pattern>
                             <shadedPattern>fr.heneria.nexus.libs.gui</shadedPattern>
                         </relocation>
+                        <relocation>
+                            <pattern>org.mariadb.jdbc</pattern>
+                            <shadedPattern>fr.heneria.nexus.libs.mariadb</shadedPattern>
+                        </relocation>
+                        <relocation>
+                            <pattern>com.zaxxer.hikari</pattern>
+                            <shadedPattern>fr.heneria.nexus.libs.hikari</shadedPattern>
+                        </relocation>
+                        <relocation>
+                            <pattern>org.flywaydb</pattern>
+                            <shadedPattern>fr.heneria.nexus.libs.flywaydb</shadedPattern>
+                        </relocation>
                     </relocations>
                 </configuration>
             </plugin>
