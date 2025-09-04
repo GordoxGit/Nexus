@@ -18,7 +18,7 @@ public class HikariDataSourceProvider {
     public HikariDataSourceProvider() {
         if (instance != null) {
             throw new IllegalStateException("HikariDataSourceProvider already initialized");
-        }
+            }
         instance = this;
     }
 
@@ -37,7 +37,7 @@ public class HikariDataSourceProvider {
         FileConfiguration config = plugin.getConfig();
 
         HikariConfig hikariConfig = new HikariConfig();
-        
+
         // Configuration de base de données depuis config.yml
         String host = config.getString("database.host", "localhost");
         int port = config.getInt("database.port", 3306);
@@ -51,8 +51,9 @@ public class HikariDataSourceProvider {
         hikariConfig.setUsername(username);
         hikariConfig.setPassword(password);
 
-        // IMPORTANT : Spécifier explicitement le driver relocalisé
-        hikariConfig.setDriverClassName("fr.heneria.nexus.libs.mariadb.jdbc.Driver");
+        // IMPORTANT : Laisser HikariCP détecter automatiquement le driver MariaDB
+        // Ne pas spécifier explicitement le driver - HikariCP le détectera depuis l'URL JDBC
+        // hikariConfig.setDriverClassName("org.mariadb.jdbc.Driver"); // Pas nécessaire
 
         // Configuration du pool HikariCP
         hikariConfig.setMaximumPoolSize(config.getInt("database.hikari.maximum-pool-size", 10));
