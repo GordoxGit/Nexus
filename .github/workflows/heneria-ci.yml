@@ -222,8 +222,9 @@ jobs:
           "plugin.yml"
           "fr/heneria/nexus/Nexus.class"
           "org/mariadb/jdbc/Driver.class"
-          "com/zaxxer/hikari/HikariDataSource.class"
-          "org/flywaydb/core/Flyway.class"
+          "fr/heneria/nexus/libs/hikari/HikariDataSource.class"
+          "fr/heneria/nexus/libs/flywaydb/core/Flyway.class"
+          "fr/heneria/nexus/libs/gui/BaseGui.class"
         )
 
         for file in "${critical_files[@]}"; do
@@ -237,11 +238,11 @@ jobs:
         done
 
         echo ""
-        echo "📈 Analyse des dépendances incluses:"
+        echo "📈 Analyse des dépendances relocalisées:"
         echo "  MariaDB classes: $(jar tf "$JAR_FILE" | grep -c "org/mariadb/")"
-        echo "  HikariCP classes: $(jar tf "$JAR_FILE" | grep -c "com/zaxxer/hikari/")"
-        echo "  Flyway classes: $(jar tf "$JAR_FILE" | grep -c "org/flywaydb/")"
-
+        echo "  HikariCP classes (relocalisées): $(jar tf "$JAR_FILE" | grep -c "fr/heneria/nexus/libs/hikari/")"
+        echo "  Flyway classes (relocalisées): $(jar tf "$JAR_FILE" | grep -c "fr/heneria/nexus/libs/flywaydb/")"
+        echo "  Triumph GUI classes (relocalisées): $(jar tf "$JAR_FILE" | grep -c "fr/heneria/nexus/libs/gui/")"
         echo ""
         echo "🔧 Classes relocalisées:"
         jar tf "$JAR_FILE" | grep -E "fr/heneria/nexus/libs/" | head -5 | sed 's/^/  /' || echo "  ℹ️ Aucune relocalisation détectée"
