@@ -150,10 +150,6 @@
                                     <pattern>com.zaxxer.hikari</pattern>
                                     <shadedPattern>fr.heneria.nexus.libs.hikari</shadedPattern>
                                 </relocation>
-                                <relocation>
-                                    <pattern>org.flywaydb</pattern>
-                                    <shadedPattern>fr.heneria.nexus.libs.flywaydb</shadedPattern>
-                                </relocation>
                             </relocations>
                             <filters>
                                 <!-- Filtre global pour exclure les métadonnées inutiles -->
@@ -243,7 +239,7 @@
                                 <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
                                     <manifestEntries>
                                         <Debug-Relocations>true</Debug-Relocations>
-                                        <Shaded-Dependencies>hikari,flyway,triumph-gui</Shaded-Dependencies>
+                                        <Shaded-Dependencies>hikari,triumph-gui</Shaded-Dependencies>
                                     </manifestEntries>
                                 </transformer>
                             </transformers>
