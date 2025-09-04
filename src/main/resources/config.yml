@@ -11,6 +11,15 @@ database:
   username: "nexus_user"
   password: "your_password_here"
   
+  # Options de compatibilité
+  compatibility:
+    # Si true, utilise MySQL au lieu de MariaDB en cas d'échec
+    mysql-fallback: true
+    # Si true, désactive Flyway et crée les tables manuellement
+    disable-flyway: false
+    # Version de MariaDB/MySQL (pour compatibilité)
+    server-version: "10.11"
+  
   # Paramètres de connexion HikariCP
   hikari:
     maximum-pool-size: 10      # Nombre maximum de connexions
@@ -49,3 +58,5 @@ debug:
   enabled: false
   log-sql-queries: false
   performance-monitoring: true
+  # Si true, affiche les stacktraces complètes
+  verbose-errors: true

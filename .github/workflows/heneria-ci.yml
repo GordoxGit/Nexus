@@ -357,12 +357,12 @@ jobs:
         fi
 
         echo "🔧 Configuration de l'environnement de test..."
-        cat > simplelogger.properties <<'EOF'
-org.slf4j.simpleLogger.defaultLogLevel=error
-org.slf4j.simpleLogger.showDateTime=false
-org.slf4j.simpleLogger.showThreadName=false
-org.slf4j.simpleLogger.showLogName=false
-EOF
+          cat > simplelogger.properties <<'EOF'
+          org.slf4j.simpleLogger.defaultLogLevel=error
+          org.slf4j.simpleLogger.showDateTime=false
+          org.slf4j.simpleLogger.showThreadName=false
+          org.slf4j.simpleLogger.showLogName=false
+          EOF
 
         if ! timeout 60s java -Dorg.slf4j.simpleLogger.defaultLogLevel=error \
              -Dorg.slf4j.simpleLogger.showDateTime=false \
