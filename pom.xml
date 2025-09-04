@@ -60,13 +60,13 @@
         <dependency>
             <groupId>org.flywaydb</groupId>
             <artifactId>flyway-core</artifactId>
-            <version>10.21.0</version>
+            <version>10.18.0</version>
             <scope>compile</scope>
         </dependency>
         <dependency>
             <groupId>org.flywaydb</groupId>
             <artifactId>flyway-mysql</artifactId>
-            <version>10.21.0</version>
+            <version>10.18.0</version>
             <scope>compile</scope>
         </dependency>
         <dependency>
@@ -129,18 +129,6 @@
                         </goals>
                         <configuration>
                             <createDependencyReducedPom>false</createDependencyReducedPom>
-                            <finalName>${project.artifactId}-${project.version}</finalName>
-                            <transformers>
-                                <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
-                                    <manifestEntries>
-                                        <Implementation-Title>${project.artifactId}</Implementation-Title>
-                                        <Implementation-Version>${project.version}</Implementation-Version>
-                                        <Build-Time>${maven.build.timestamp}</Build-Time>
-                                    </manifestEntries>
-                                </transformer>
-                            </transformers>
-                            <minimizeJar>false</minimizeJar>
-                            <createSourcesJar>false</createSourcesJar>
                             <relocations>
                                 <relocation>
                                     <pattern>dev.triumphteam.gui</pattern>
@@ -152,61 +140,13 @@
                                 </relocation>
                             </relocations>
                             <filters>
-                                <!-- Filtre global pour exclure les métadonnées inutiles -->
                                 <filter>
                                     <artifact>*:*</artifact>
                                     <excludes>
                                         <exclude>META-INF/*.SF</exclude>
                                         <exclude>META-INF/*.DSA</exclude>
                                         <exclude>META-INF/*.RSA</exclude>
-                                        <exclude>META-INF/maven/**</exclude>
-                                        <exclude>META-INF/DEPENDENCIES</exclude>
-                                        <exclude>META-INF/LICENSE*</exclude>
-                                        <exclude>META-INF/NOTICE*</exclude>
-                                        <exclude>**/*.kotlin_metadata</exclude>
-                                        <exclude>**/*.kotlin_module</exclude>
-                                        <exclude>**/*.kotlin_builtins</exclude>
                                     </excludes>
-                                </filter>
-
-                        <!-- MariaDB - inclusion explicite -->
-                                <filter>
-                                    <artifact>org.mariadb.jdbc:mariadb-java-client</artifact>
-                                    <includes>
-                                        <include>org/mariadb/**</include>
-                                    </includes>
-                                </filter>
-
-                        <!-- HikariCP -->
-                                <filter>
-                                    <artifact>com.zaxxer:HikariCP</artifact>
-                                    <includes>
-                                        <include>com/zaxxer/hikari/**</include>
-                                    </includes>
-                                </filter>
-
-                        <!-- Flyway Core -->
-                                <filter>
-                                    <artifact>org.flywaydb:flyway-core</artifact>
-                                    <includes>
-                                        <include>org/flywaydb/**</include>
-                                    </includes>
-                                </filter>
-
-                        <!-- Flyway MySQL -->
-                                <filter>
-                                    <artifact>org.flywaydb:flyway-mysql</artifact>
-                                    <includes>
-                                        <include>org/flywaydb/**</include>
-                                    </includes>
-                                </filter>
-
-                        <!-- Triumph GUI -->
-                                <filter>
-                                    <artifact>dev.triumphteam:triumph-gui</artifact>
-                                    <includes>
-                                        <include>dev/triumphteam/gui/**</include>
-                                    </includes>
                                 </filter>
                             </filters>
                         </configuration>
