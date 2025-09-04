@@ -23,6 +23,7 @@ Nexus est une réinvention complète du mode de jeu Hikabrain, conçue pour offr
 - [⚙️ Installation](#️-installation)
 - [🔧 Configuration](#-configuration)
 - [🏗️ Développement](#️-développement)
+- [🐛 Debug Build Issues](#-debug-build-issues)
 - [🤝 Contribution](#-contribution)
 - [📊 Métriques](#-métriques)
 
@@ -256,6 +257,23 @@ Utiliser le script inclus :
 
 # Avec upload automatique (nécessite sshpass)
 VPS_HOST=your.server.ip ./deploy.sh prod
+```
+
+## 🐛 Debug Build Issues
+
+### Investiguer le contenu du JAR
+```bash
+# Lister toutes les classes relocalisées
+jar tf target/Nexus-*.jar | grep "fr/heneria/nexus/libs/" | sort
+
+# Vérifier une dépendance spécifique
+jar tf target/Nexus-*.jar | grep -i triumph
+
+# Build avec profil debug
+mvn clean package -P debug-jar
+
+# Test de chargement des classes
+java -cp target/Nexus-*.jar -verbose:class YourTestClass
 ```
 
 ## 🤝 Contribution
