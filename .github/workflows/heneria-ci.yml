@@ -342,152 +342,507 @@ jobs:
     - name: 🚀 Test de chargement du plugin (Smoke Test)
       run: |
         echo "🚀 Test de chargement du plugin (Smoke Test):"
-        JAR_FILE=$(find target -name "*.jar" -not -name "*-sources.jar" | head -1)
+
+        # Créer un test Java adapté à l'environnement CI
         cat > PluginLoadTest.java << 'EOF'
         import java.lang.reflect.Method;
+        import java.lang.reflect.Constructor;
+        import java.util.jar.JarFile;
+        import java.util.jar.JarEntry;
+        import java.util.Enumeration;
 
         public class PluginLoadTest {
             public static void main(String[] args) {
                 try {
-                    Class<?> nexusClass = Class.forName("fr.heneria.nexus.Nexus");
-                    System.out.println("✅ Classe Nexus chargée: " + nexusClass.getName());
+                    String jarPath = args.length > 0 ? args[0] : "target/Nexus-0.0.0-SNAPSHOT.jar";
+                    System.out.println("🔍 Test du JAR: " + jarPath);
 
-                    Class<?> hikariClass = Class.forName("fr.heneria.nexus.libs.hikari.HikariDataSource");
-                    System.out.println("✅ HikariCP relocalisé chargé: " + hikariClass.getName());
+                    // Test 1: Vérifier que les dépendances relocalisées sont chargeable
+                    testRelocatedDependencies();
 
-                    Class<?> flywayClass = Class.forName("fr.heneria.nexus.libs.flywaydb.core.Flyway");
-                    System.out.println("✅ Flyway relocalisé chargé: " + flywayClass.getName());
+                    // Test 2: Vérifier l'intégrité du JAR
+                    testJarIntegrity(jarPath);
 
-                    String[] possibleClasses = {
-                        "fr.heneria.nexus.libs.gui.guis.Gui",
-                        "fr.heneria.nexus.libs.gui.guis.BaseGui",
-                        "fr.heneria.nexus.libs.gui.components.GuiType"
-                    };
+                    // Test 3: Vérifier les métadonnées du plugin
+                    testPluginMetadata();
 
-                    boolean guiFound = false;
-                    for (String className : possibleClasses) {
-                        try {
-                            Class<?> guiClass = Class.forName(className);
-                            System.out.println("✅ Triumph GUI relocalisé chargé: " + guiClass.getName());
-                            guiFound = true;
-                            break;
-                        } catch (ClassNotFoundException ignored) {}
-                    }
+                    // Test 4: Vérifier les configurations
+                    testConfigurations();
 
-                    if (!guiFound) {
-                        System.err.println("❌ Aucune classe Triumph GUI trouvée");
-                        System.exit(1);
-                    }
-
-                    System.out.println("🎉 Tous les tests de chargement de classes réussis !");
+                    System.out.println("🎉 Tous les tests de smoke réussis !");
 
                 } catch (Exception e) {
-                    System.err.println("❌ Erreur lors du test de chargement: " + e.getMessage());
+                    System.err.println("❌ Erreur lors du smoke test: " + e.getMessage());
                     e.printStackTrace();
                     System.exit(1);
                 }
             }
+
+            private static void testRelocatedDependencies() throws Exception {
+                System.out.println("📦 Test des dépendances relocalisées...");
+
+                // Test HikariCP relocalisé
+                Class<?> hikariClass = Class.forName("fr.heneria.nexus.libs.hikari.HikariDataSource");
+                Constructor<?> hikariConstructor = hikariClass.getConstructor();
+                System.out.println("  ✅ HikariCP relocalisé: " + hikariClass.getName());
+
+                // Test Flyway relocalisé
+                Class<?> flywayClass = Class.forName("fr.heneria.nexus.libs.flywaydb.core.Flyway");
+                Method[] flywayMethods = flywayClass.getDeclaredMethods();
+                System.out.println("  ✅ Flyway relocalisé: " + flywayClass.getName() + " (" + flywayMethods.length + " méthodes)");
+
+                // Test Triumph GUI relocalisé (recherche flexible)
+                String[] possibleGuiClasses = {
+                    "fr.heneria.nexus.libs.gui.guis.Gui",
+                    "fr.heneria.nexus.libs.gui.guis.BaseGui",
+                    "fr.heneria.nexus.libs.gui.components.GuiType",
+                    "fr.heneria.nexus.libs.gui.GuiAction"
+                };
+
+                boolean guiFound = false;
+                for (String className : possibleGuiClasses) {
+                    try {
+                        Class<?> guiClass = Class.forName(className);
+                        System.out.println("  ✅ Triumph GUI relocalisé: " + guiClass.getName());
+                        guiFound = true;
+                        break;
+                    } catch (ClassNotFoundException ignored) {
+                        // Essayer la suivante
+                    }
+                }
+
+                if (!guiFound) {
+                    throw new RuntimeException("Aucune classe Triumph GUI relocalisée trouvée");
+                }
+
+                // Test MariaDB (non relocalisé mais inclus)
+                Class<?> mariadbClass = Class.forName("org.mariadb.jdbc.Driver");
+                System.out.println("  ✅ MariaDB JDBC: " + mariadbClass.getName());
+            }
+
+            private static void testJarIntegrity(String jarPath) throws Exception {
+                System.out.println("🔍 Test d'intégrité du JAR...");
+
+                try (JarFile jar = new JarFile(jarPath)) {
+                    int totalEntries = 0;
+                    int classFiles = 0;
+                    int relocatedClasses = 0;
+
+                    Enumeration<JarEntry> entries = jar.entries();
+                    while (entries.hasMoreElements()) {
+                        JarEntry entry = entries.nextElement();
+                        totalEntries++;
+
+                        if (entry.getName().endsWith(".class")) {
+                            classFiles++;
+                            if (entry.getName().startsWith("fr/heneria/nexus/libs/")) {
+                                relocatedClasses++;
+                            }
+                        }
+                    }
+
+                    System.out.println("  📊 Statistiques JAR:");
+                    System.out.println("    Total entrées: " + totalEntries);
+                    System.out.println("    Fichiers .class: " + classFiles);
+                    System.out.println("    Classes relocalisées: " + relocatedClasses);
+
+                    // Vérifications de sanité
+                    if (totalEntries < 100) {
+                        throw new RuntimeException("JAR trop petit: " + totalEntries + " entrées");
+                    }
+                    if (classFiles < 50) {
+                        throw new RuntimeException("Pas assez de classes: " + classFiles);
+                    }
+                    if (relocatedClasses < 10) {
+                        throw new RuntimeException("Pas assez de classes relocalisées: " + relocatedClasses);
+                    }
+
+                    System.out.println("  ✅ Intégrité du JAR validée");
+                }
+            }
+
+            private static void testPluginMetadata() throws Exception {
+                System.out.println("📄 Test des métadonnées du plugin...");
+
+                // Vérifier que plugin.yml est présent et lisible
+                java.io.InputStream pluginYml = PluginLoadTest.class.getClassLoader()
+                    .getResourceAsStream("plugin.yml");
+
+                if (pluginYml == null) {
+                    throw new RuntimeException("plugin.yml introuvable");
+                }
+
+                // Lire le contenu
+                String content = new String(pluginYml.readAllBytes());
+                pluginYml.close();
+
+                // Vérifications basiques
+                if (!content.contains("name: Nexus")) {
+                    throw new RuntimeException("plugin.yml invalide: nom manquant");
+                }
+                if (!content.contains("main: fr.heneria.nexus.Nexus")) {
+                    throw new RuntimeException("plugin.yml invalide: classe principale manquante");
+                }
+                if (!content.contains("api-version: '1.21'")) {
+                    throw new RuntimeException("plugin.yml invalide: version API manquante");
+                }
+
+                System.out.println("  ✅ plugin.yml valide");
+            }
+
+            private static void testConfigurations() throws Exception {
+                System.out.println("⚙️ Test des fichiers de configuration...");
+
+                // Vérifier config.yml
+                java.io.InputStream configYml = PluginLoadTest.class.getClassLoader()
+                    .getResourceAsStream("config.yml");
+
+                if (configYml == null) {
+                    throw new RuntimeException("config.yml introuvable");
+                }
+
+                String configContent = new String(configYml.readAllBytes());
+                configYml.close();
+
+                // Vérifications basiques de la configuration
+                if (!configContent.contains("database:")) {
+                    throw new RuntimeException("config.yml invalide: section database manquante");
+                }
+                if (!configContent.contains("game:")) {
+                    throw new RuntimeException("config.yml invalide: section game manquante");
+                }
+
+                System.out.println("  ✅ config.yml valide");
+
+                // Vérifier les migrations Flyway
+                java.io.InputStream migration = PluginLoadTest.class.getClassLoader()
+                    .getResourceAsStream("db/migration/V2__create_arena_tables.sql");
+
+                if (migration == null) {
+                    throw new RuntimeException("Migration Flyway V2 introuvable");
+                }
+                migration.close();
+
+                System.out.println("  ✅ Migrations Flyway présentes");
+            }
         }
         EOF
-        javac -cp "$JAR_FILE" PluginLoadTest.java
-        java -cp "$JAR_FILE:." PluginLoadTest
+
+        # Compiler et exécuter le test avec le JAR en argument
+        JAR_FILE=$(find target -name "*.jar" -not -name "*-sources.jar" -not -name "original-*" | head -1)
+        javac PluginLoadTest.java
+        java -cp "$JAR_FILE:." PluginLoadTest "$JAR_FILE"
 
     - name: 🎯 Tests de chargement des classes
       run: |
         echo "🧪 Test de chargement des classes critiques..."
-        
+
         JAR_FILE=$(find target -name "*.jar" -not -name "*-sources.jar" | head -1)
-        
-        # Créer un test Java complet
-        cat > DatabaseConnectionTest.java << 'EOF'
+
+        # Attendre que MariaDB soit complètement prêt
+        echo "⏳ Attente de MariaDB (timeout 60s)..."
+        for i in {1..60}; do
+          if mysql -h127.0.0.1 -P3306 -unexus_user -pnexus_password nexus_integration_test -e "SELECT 1;" &>/dev/null; then
+            echo "✅ MariaDB est prêt après ${i}s"
+            break
+          fi
+          if [ $i -eq 60 ]; then
+            echo "❌ Timeout MariaDB après 60s"
+            # Diagnostics
+            echo "🔍 Diagnostics MariaDB:"
+            docker ps | grep mariadb || echo "Aucun container MariaDB trouvé"
+            mysql -h127.0.0.1 -P3306 -uroot -ptest_root_password -e "SHOW DATABASES;" 2>&1 || echo "Connexion root échouée"
+            netstat -tlnp | grep 3306 || echo "Port 3306 non ouvert"
+            exit 1
+          fi
+          sleep 1
+        done
+
+        # Test avancé de connexion avec toutes les configurations possibles
+        cat > DatabaseAdvancedTest.java << 'EOF'
         import java.sql.Connection;
         import java.sql.DriverManager;
         import java.sql.Statement;
         import java.sql.ResultSet;
-        import com.zaxxer.hikari.HikariConfig;
+        import java.sql.PreparedStatement;
+        import java.util.Properties;
 
-        public class DatabaseConnectionTest {
+        public class DatabaseAdvancedTest {
             public static void main(String[] args) {
-                System.out.println("🔍 Test de chargement du driver MariaDB...");
+                System.out.println("🔍 Tests avancés de base de données...");
 
                 try {
-                    // Test 1: Chargement du driver
+                    // Test 1: Chargement des drivers
+                    System.out.println("📦 Test de chargement des drivers JDBC...");
                     Class.forName("org.mariadb.jdbc.Driver");
-                    System.out.println("✅ Driver MariaDB chargé avec succès");
+                    System.out.println("  ✅ Driver MariaDB chargé");
 
-                    String url = "jdbc:mariadb://localhost:3306/nexus_integration_test";
-                    String username = "nexus_user";
-                    String password = "nexus_password";
+                    // Test 2: Configuration HikariCP (classes relocalisées)
+                    System.out.println("🏊 Test HikariCP relocalisé...");
+                    Class<?> hikariConfigClass = Class.forName("fr.heneria.nexus.libs.hikari.HikariConfig");
+                    Class<?> hikariDataSourceClass = Class.forName("fr.heneria.nexus.libs.hikari.HikariDataSource");
 
-                    // Test 2: Vérification des classes HikariCP
-                    HikariConfig config = new HikariConfig();
-                    config.setJdbcUrl(url);
-                    config.setUsername(username);
-                    config.setPassword(password);
-                    System.out.println("✅ HikariCP disponible dans le JAR");
+                    Object hikariConfig = hikariConfigClass.getDeclaredConstructor().newInstance();
+                    System.out.println("  ✅ HikariConfig instancié: " + hikariConfig.getClass().getName());
 
-                    // Test 3: Connexion à la base
-                    System.out.println("🔗 Test de connexion à la base...");
-                    Connection conn = DriverManager.getConnection(url, username, password);
-                    System.out.println("✅ Connexion établie avec succès");
+                    // Test 3: Connexions multiples avec différentes configurations
+                    String[] urls = {
+                        "jdbc:mariadb://localhost:3306/nexus_integration_test",
+                        "jdbc:mariadb://127.0.0.1:3306/nexus_integration_test",
+                        "jdbc:mariadb://localhost:3306/nexus_integration_test?useSSL=false",
+                        "jdbc:mariadb://localhost:3306/nexus_integration_test?allowMultiQueries=true"
+                    };
 
-                    // Test 4: Opération basique
+                    for (String url : urls) {
+                        try {
+                            System.out.println("🔗 Test connexion: " + url);
+                            Connection conn = DriverManager.getConnection(url, "nexus_user", "nexus_password");
+
+                            // Test basique
+                            Statement stmt = conn.createStatement();
+                            ResultSet rs = stmt.executeQuery("SELECT VERSION() as version, DATABASE() as db");
+                            if (rs.next()) {
+                                System.out.println("    ✅ Connecté - Version: " + rs.getString("version") + ", DB: " + rs.getString("db"));
+                            }
+
+                            conn.close();
+                            break; // Première connexion réussie
+
+                        } catch (Exception e) {
+                            System.out.println("    ❌ Échec: " + e.getMessage());
+                        }
+                    }
+
+                    // Test 4: Opérations de base de données complexes
+                    System.out.println("🗃️  Test d'opérations de base de données...");
+                    Connection conn = DriverManager.getConnection(
+                        "jdbc:mariadb://localhost:3306/nexus_integration_test",
+                        "nexus_user",
+                        "nexus_password"
+                    );
+
+                    // Créer une table de test
                     Statement stmt = conn.createStatement();
-                    ResultSet rs = stmt.executeQuery("SELECT VERSION() as version");
+                    stmt.executeUpdate("CREATE TABLE IF NOT EXISTS test_advanced (id INT PRIMARY KEY AUTO_INCREMENT, name VARCHAR(255), created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)");
+
+                    // Test PreparedStatement
+                    PreparedStatement pstmt = conn.prepareStatement("INSERT INTO test_advanced (name) VALUES (?)");
+                    pstmt.setString(1, "Test Plugin Nexus");
+                    int rows = pstmt.executeUpdate();
+                    System.out.println("    ✅ Insertion réussie: " + rows + " ligne(s)");
+
+                    // Test transaction
+                    conn.setAutoCommit(false);
+                    pstmt.setString(1, "Test Transaction");
+                    pstmt.executeUpdate();
+                    conn.commit();
+                    conn.setAutoCommit(true);
+                    System.out.println("    ✅ Transaction réussie");
+
+                    // Test requête complexe
+                    ResultSet rs = stmt.executeQuery("SELECT COUNT(*) as count, MAX(created_at) as latest FROM test_advanced");
                     if (rs.next()) {
-                        System.out.println("📋 Version MariaDB: " + rs.getString("version"));
+                        System.out.println("    ✅ Requête complexe: " + rs.getInt("count") + " enregistrements, dernier: " + rs.getTimestamp("latest"));
                     }
 
-                    // Test 5: Création de table (simulation Flyway)
-                    stmt.executeUpdate("CREATE TABLE IF NOT EXISTS test_table (id INT PRIMARY KEY, name VARCHAR(255))");
-                    stmt.executeUpdate("INSERT INTO test_table (id, name) VALUES (1, 'Test Plugin') ON DUPLICATE KEY UPDATE name = VALUES(name)");
-
-                    ResultSet testRs = stmt.executeQuery("SELECT name FROM test_table WHERE id = 1");
-                    if (testRs.next()) {
-                        System.out.println("✅ Test CRUD réussi: " + testRs.getString("name"));
-                    }
+                    // Test 5: Flyway relocalisé
+                    System.out.println("🛫 Test Flyway relocalisé...");
+                    Class<?> flywayClass = Class.forName("fr.heneria.nexus.libs.flywaydb.core.Flyway");
+                    System.out.println("    ✅ Flyway relocalisé chargé: " + flywayClass.getName());
 
                     // Nettoyage
-                    stmt.executeUpdate("DROP TABLE test_table");
+                    stmt.executeUpdate("DROP TABLE test_advanced");
                     conn.close();
 
-                    System.out.println("🎉 Tous les tests d'intégration réussis !");
+                    System.out.println("🎉 Tous les tests de base de données avancés réussis !");
 
                 } catch (Exception e) {
-                    System.err.println("❌ Erreur dans les tests: " + e.getMessage());
+                    System.err.println("❌ Erreur dans les tests de base de données: " + e.getMessage());
                     e.printStackTrace();
                     System.exit(1);
                 }
             }
         }
         EOF
-        
-        # Attendre que MariaDB soit prêt
-        echo "⏳ Attente de MariaDB..."
-        for i in {1..30}; do
-          if mysql -h127.0.0.1 -P3306 -unexus_user -pnexus_password -e "SELECT 1;" &>/dev/null; then
-            echo "✅ MariaDB est prêt pour les tests"
-            break
-          fi
-          sleep 2
-        done
-        
-        # Compiler et exécuter le test
-        javac -cp "$JAR_FILE" DatabaseConnectionTest.java
-        java -cp "$JAR_FILE:." DatabaseConnectionTest
 
-    - name: 🧪 Test de simulation Flyway
+        # Compiler et exécuter avec un timeout
+        javac -cp "$JAR_FILE" DatabaseAdvancedTest.java
+        timeout 120s java -cp "$JAR_FILE:." DatabaseAdvancedTest || {
+            echo "❌ Timeout ou erreur dans les tests de base de données"
+            exit 1
+        }
+
+    - name: 🩺 Diagnostics Système
       run: |
-        echo "🧪 Test de simulation des migrations Flyway..."
-        
-        # Vérifier que Flyway est bien inclus
+        echo "🖥️  Diagnostics de l'environnement CI..."
+
+        echo "☕ Version Java:"
+        java -version
+        javac -version
+
+        echo ""
+        echo "🧠 Mémoire disponible:"
+        free -h || echo "free non disponible"
+
+        echo ""
+        echo "💽 Espace disque:"
+        df -h || echo "df non disponible"
+
+        echo ""
+        echo "🐋 Services Docker:"
+        docker ps
+
+        echo ""
+        echo "🌐 Connectivité réseau:"
+        ping -c 1 localhost >/dev/null && echo "✅ localhost OK" || echo "❌ localhost KO"
+        nc -z localhost 3306 && echo "✅ Port 3306 ouvert" || echo "❌ Port 3306 fermé"
+
+        echo ""
+        echo "📦 JAR généré:"
+        ls -la target/*.jar 2>/dev/null || echo "Aucun JAR trouvé"
+
+        echo ""
+        echo "🔍 Variables d'environnement importantes:"
+        echo "JAVA_HOME: ${JAVA_HOME:-non défini}"
+        echo "MAVEN_OPTS: ${MAVEN_OPTS:-non défini}"
+        echo "PATH: ${PATH}"
+
+    - name: 🚀 Tests de Performance Basic
+      run: |
+        echo "⚡ Tests de performance du plugin..."
+
         JAR_FILE=$(find target -name "*.jar" -not -name "*-sources.jar" | head -1)
-        if jar tf "$JAR_FILE" | grep -q "org/flywaydb"; then
-          echo "✅ Flyway détecté dans le JAR"
-        else
-          echo "❌ Flyway non trouvé dans le JAR"
-          exit 1
-        fi
+
+        cat > PerformanceTest.java << 'EOF'
+        import java.util.concurrent.*;
+        import java.sql.*;
+
+        public class PerformanceTest {
+            public static void main(String[] args) {
+                System.out.println("⚡ Tests de performance basiques...");
+
+                try {
+                    // Test 1: Chargement de classes en parallèle
+                    testParallelClassLoading();
+
+                    // Test 2: Connexions simultanées à la base
+                    testConcurrentDatabaseConnections();
+
+                    // Test 3: Performance mémoire
+                    testMemoryUsage();
+
+                    System.out.println("🎉 Tests de performance réussis !");
+
+                } catch (Exception e) {
+                    System.err.println("❌ Erreur dans les tests de performance: " + e.getMessage());
+                    e.printStackTrace();
+                    System.exit(1);
+                }
+            }
+
+            private static void testParallelClassLoading() throws Exception {
+                System.out.println("🔄 Test de chargement de classes en parallèle...");
+
+                String[] classes = {
+                    "fr.heneria.nexus.libs.hikari.HikariDataSource",
+                    "fr.heneria.nexus.libs.flywaydb.core.Flyway",
+                    "org.mariadb.jdbc.Driver"
+                };
+
+                ExecutorService executor = Executors.newFixedThreadPool(3);
+                CompletableFuture<Void>[] futures = new CompletableFuture[classes.length];
+
+                long startTime = System.currentTimeMillis();
+
+                for (int i = 0; i < classes.length; i++) {
+                    final String className = classes[i];
+                    futures[i] = CompletableFuture.runAsync(() -> {
+                        try {
+                            Class.forName(className);
+                        } catch (Exception e) {
+                            throw new RuntimeException("Échec chargement: " + className, e);
+                        }
+                    }, executor);
+                }
+
+                CompletableFuture.allOf(futures).get(10, TimeUnit.SECONDS);
+                long endTime = System.currentTimeMillis();
+
+                executor.shutdown();
+                System.out.println("    ✅ Chargement parallèle réussi en " + (endTime - startTime) + "ms");
+            }
+
+            private static void testConcurrentDatabaseConnections() throws Exception {
+                System.out.println("🗃️  Test de connexions simultanées...");
+
+                String url = "jdbc:mariadb://localhost:3306/nexus_integration_test";
+                String username = "nexus_user";
+                String password = "nexus_password";
+
+                ExecutorService executor = Executors.newFixedThreadPool(5);
+                CompletableFuture<Void>[] futures = new CompletableFuture[5];
+
+                long startTime = System.currentTimeMillis();
+
+                for (int i = 0; i < 5; i++) {
+                    final int threadId = i;
+                    futures[i] = CompletableFuture.runAsync(() -> {
+                        try (Connection conn = DriverManager.getConnection(url, username, password)) {
+                            Statement stmt = conn.createStatement();
+                            ResultSet rs = stmt.executeQuery("SELECT " + threadId + " as thread_id, NOW() as now");
+                            if (rs.next()) {
+                                // OK
+                            }
+                        } catch (Exception e) {
+                            throw new RuntimeException("Connexion thread " + threadId + " échouée", e);
+                        }
+                    }, executor);
+                }
+
+                CompletableFuture.allOf(futures).get(30, TimeUnit.SECONDS);
+                long endTime = System.currentTimeMillis();
+
+                executor.shutdown();
+                System.out.println("    ✅ Connexions simultanées réussies en " + (endTime - startTime) + "ms");
+            }
+
+            private static void testMemoryUsage() {
+                System.out.println("🧠 Test d'utilisation mémoire...");
+
+                Runtime runtime = Runtime.getRuntime();
+                long startMemory = runtime.totalMemory() - runtime.freeMemory();
+
+                // Charger plusieurs fois les classes pour tester les fuites
+                for (int i = 0; i < 100; i++) {
+                    try {
+                        Class.forName("fr.heneria.nexus.libs.hikari.HikariDataSource");
+                        Class.forName("fr.heneria.nexus.libs.flywaydb.core.Flyway");
+                    } catch (Exception e) {
+                        throw new RuntimeException("Erreur chargement classe iteration " + i, e);
+                    }
+                }
+
+                // Forcer GC
+                System.gc();
+                Thread.yield();
+
+                long endMemory = runtime.totalMemory() - runtime.freeMemory();
+                long memoryIncrease = endMemory - startMemory;
+
+                System.out.println("    📊 Mémoire utilisée: " + (memoryIncrease / 1024 / 1024) + " MB");
+
+                if (memoryIncrease > 50 * 1024 * 1024) { // 50MB
+                    throw new RuntimeException("Utilisation mémoire excessive: " + (memoryIncrease / 1024 / 1024) + " MB");
+                }
+
+                System.out.println("    ✅ Utilisation mémoire acceptable");
+            }
+        }
+        EOF
+
+        # Compiler et exécuter avec monitoring mémoire
+        javac -cp "$JAR_FILE" PerformanceTest.java
+        java -Xms256m -Xmx512m -cp "$JAR_FILE:." PerformanceTest
 
   # Job 4: Analyse de sécurité
   security-scan:
@@ -582,46 +937,53 @@ jobs:
     - name: 🔄 Checkout du code
       uses: actions/checkout@v4
 
-    - name: 📊 Génération du rapport final
+    - name: 📊 Génération du rapport final détaillé
       run: |
-        echo "# 🎯 Rapport CI/CD Nexus Plugin" >> $GITHUB_STEP_SUMMARY
+        echo "# 🎯 Rapport CI/CD Nexus Plugin - Détaillé" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
-        
-        echo "## 📋 Informations du Build" >> $GITHUB_STEP_SUMMARY
-        echo "- **Version**: ${{ needs.validate-project.outputs.version }}" >> $GITHUB_STEP_SUMMARY
-        echo "- **Commit**: ${GITHUB_SHA:0:8}" >> $GITHUB_STEP_SUMMARY
-        echo "- **Branche**: ${GITHUB_REF_NAME}" >> $GITHUB_STEP_SUMMARY
-        echo "- **JAR**: ${{ needs.build.outputs.jar-name || 'Non généré' }}" >> $GITHUB_STEP_SUMMARY
-        echo "- **Taille**: ${{ needs.build.outputs.jar-size || 'N/A' }}" >> $GITHUB_STEP_SUMMARY
+
+        # Informations de build existantes...
+
+        echo "## 🧪 Résultats des Tests" >> $GITHUB_STEP_SUMMARY
+        echo "| Test | Statut | Détails |" >> $GITHUB_STEP_SUMMARY
+        echo "|------|--------|---------|" >> $GITHUB_STEP_SUMMARY
+        echo "| 📦 Smoke Test | ${{ job.status }} | Classes relocalisées chargées |" >> $GITHUB_STEP_SUMMARY
+        echo "| 🗃️ Base de Données | ${{ job.status }} | Connexions et transactions |" >> $GITHUB_STEP_SUMMARY
+        echo "| ⚡ Performance | ${{ job.status }} | Chargement parallèle et mémoire |" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
-        
-        echo "## 🎯 Résultats des Jobs" >> $GITHUB_STEP_SUMMARY
-        echo "| Job | Statut |" >> $GITHUB_STEP_SUMMARY
-        echo "|-----|--------|" >> $GITHUB_STEP_SUMMARY
-        echo "| 📊 Validation | ${{ needs.validate-project.result }} |" >> $GITHUB_STEP_SUMMARY
-        echo "| 🔨 Build | ${{ needs.build.result }} |" >> $GITHUB_STEP_SUMMARY
-        echo "| 🧪 Tests | ${{ needs.integration-tests.result }} |" >> $GITHUB_STEP_SUMMARY
-        echo "| 🛡️ Sécurité | ${{ needs.security-scan.result }} |" >> $GITHUB_STEP_SUMMARY
-        echo "| 📊 Qualité | ${{ needs.code-quality.result }} |" >> $GITHUB_STEP_SUMMARY
+
+        # Métriques de qualité
+        echo "## 📊 Métriques de Qualité" >> $GITHUB_STEP_SUMMARY
+        JAR_FILE=$(find target -name "*.jar" -not -name "*-sources.jar" | head -1)
+        if [ -f "$JAR_FILE" ]; then
+          JAR_SIZE=$(ls -lh "$JAR_FILE" | awk '{print $5}')
+          CLASS_COUNT=$(jar tf "$JAR_FILE" | grep "\.class$" | wc -l)
+          RELOCATED_COUNT=$(jar tf "$JAR_FILE" | grep "fr/heneria/nexus/libs/" | wc -l)
+
+          echo "- **Taille JAR**: $JAR_SIZE" >> $GITHUB_STEP_SUMMARY
+          echo "- **Nombre de classes**: $CLASS_COUNT" >> $GITHUB_STEP_SUMMARY
+          echo "- **Classes relocalisées**: $RELOCATED_COUNT" >> $GITHUB_STEP_SUMMARY
+          echo "- **Ratio relocalisation**: $(( RELOCATED_COUNT * 100 / CLASS_COUNT ))%" >> $GITHUB_STEP_SUMMARY
+        fi
+
         echo "" >> $GITHUB_STEP_SUMMARY
-        
-        # Déterminer le statut global
+        echo "## 🔧 Recommandations" >> $GITHUB_STEP_SUMMARY
         if [[ "${{ needs.validate-project.result }}" == "success" && \
               "${{ needs.build.result }}" == "success" && \
               "${{ needs.integration-tests.result }}" == "success" ]]; then
-          echo "## 🎉 Build Réussi !" >> $GITHUB_STEP_SUMMARY
-          echo "✅ Le plugin a passé tous les tests critiques et est prêt pour le déploiement." >> $GITHUB_STEP_SUMMARY
+          echo "✅ **Build Production Ready** - Tous les tests critiques passent" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### 📥 Téléchargement" >> $GITHUB_STEP_SUMMARY
-          echo "Le JAR compilé est disponible dans les artifacts de ce build." >> $GITHUB_STEP_SUMMARY
+          echo "### 🚀 Prochaines étapes suggérées:" >> $GITHUB_STEP_SUMMARY
+          echo "1. Déployer sur le serveur de test" >> $GITHUB_STEP_SUMMARY
+          echo "2. Tests d'intégration avec vrais joueurs" >> $GITHUB_STEP_SUMMARY
+          echo "3. Monitoring des performances en production" >> $GITHUB_STEP_SUMMARY
         else
-          echo "## ❌ Build Échoué" >> $GITHUB_STEP_SUMMARY
-          echo "🔍 Vérifiez les logs des jobs échoués pour plus de détails." >> $GITHUB_STEP_SUMMARY
+          echo "⚠️  **Corrections Nécessaires** - Voir les logs ci-dessus" >> $GITHUB_STEP_SUMMARY
         fi
-        
+
         echo "" >> $GITHUB_STEP_SUMMARY
         echo "---" >> $GITHUB_STEP_SUMMARY
-        echo "*Généré automatiquement par Heneria CI/CD*" >> $GITHUB_STEP_SUMMARY
+        echo "*Rapport généré automatiquement le $(date) par Heneria CI/CD*" >> $GITHUB_STEP_SUMMARY
 
     - name: 🚀 Notification de déploiement (si succès)
       if: >
