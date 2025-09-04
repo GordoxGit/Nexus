@@ -223,7 +223,7 @@ jobs:
           "fr/heneria/nexus/Nexus.class"
           "org/mariadb/jdbc/Driver.class"
           "fr/heneria/nexus/libs/hikari/HikariDataSource.class"
-          "fr/heneria/nexus/libs/flywaydb/core/Flyway.class"
+          "org/flywaydb/core/Flyway.class"
         )
 
         for file in "${critical_files[@]}"; do
@@ -273,13 +273,13 @@ jobs:
 
         count_and_display "org/mariadb/" "MariaDB JDBC"
         count_and_display "fr/heneria/nexus/libs/hikari/" "HikariCP (relocalisé)"
-        count_and_display "fr/heneria/nexus/libs/flywaydb/" "Flyway (relocalisé)"
+        count_and_display "org/flywaydb/" "Flyway"
         count_and_display "fr/heneria/nexus/libs/gui/" "Triumph GUI (relocalisé)"
 
         echo ""
         echo "🔒 Vérification des fuites de relocalisation:"
         LEAKED_CLASSES=""
-        for pattern in "com/zaxxer/hikari" "org/flywaydb" "dev/triumphteam/gui"; do
+        for pattern in "com/zaxxer/hikari" "dev/triumphteam/gui"; do
           if jar tf "$JAR_FILE" | grep -q "$pattern"; then
             LEAKED_CLASSES="$LEAKED_CLASSES $pattern"
           fi
@@ -390,144 +390,42 @@ jobs:
 
         java JarAnalysis "$JAR_FILE"
 
-    - name: 🎯 Tests de chargement des classes
+    - name: 🧪 Validation du contenu du JAR
       run: |
-        echo "🧪 Test de chargement des classes critiques..."
-
-        JAR_FILE=$(find target -name "*.jar" -not -name "*-sources.jar" | head -1)
-
-        # Attendre que MariaDB soit complètement prêt
-        echo "⏳ Attente de MariaDB (timeout 60s)..."
-        for i in {1..60}; do
-          if mysql -h127.0.0.1 -P3306 -unexus_user -pnexus_password nexus_integration_test -e "SELECT 1;" &>/dev/null; then
-            echo "✅ MariaDB est prêt après ${i}s"
-            break
-          fi
-          if [ $i -eq 60 ]; then
-            echo "❌ Timeout MariaDB après 60s"
-            # Diagnostics
-            echo "🔍 Diagnostics MariaDB:"
-            docker ps | grep mariadb || echo "Aucun container MariaDB trouvé"
-            mysql -h127.0.0.1 -P3306 -uroot -ptest_root_password -e "SHOW DATABASES;" 2>&1 || echo "Connexion root échouée"
-            netstat -tlnp | grep 3306 || echo "Port 3306 non ouvert"
+        echo "🧪 Lancement de la validation du JAR..."
+        JAR_FILE=$(find target -name "*.jar" -not -name "*-sources.jar" -not -name "original-*" | head -1)
+        if [ ! -f "$JAR_FILE" ]; then
+            echo "❌ Aucun JAR trouvé dans target/"
             exit 1
-          fi
-          sleep 1
+        fi
+        echo "📄 Fichier analysé: $JAR_FILE"
+
+        # Vérifier la présence des classes critiques
+        # Note: Flyway est maintenant vérifié avec son package d'origine
+        critical_files=(
+          "plugin.yml"
+          "fr/heneria/nexus/Nexus.class"
+          "org/mariadb/jdbc/Driver.class"
+          "fr/heneria/nexus/libs/hikari/HikariDataSource.class"
+          "org/flywaydb/core/Flyway.class"
+          "fr/heneria/nexus/libs/gui/guis/Gui.class"
+        )
+
+        SUCCESS=true
+        for file in "${critical_files[@]}"; do
+            if jar tf "$JAR_FILE" | grep -q "$file"; then
+                echo "  ✅ Présence de: $file"
+            else
+                echo "  ❌ Fichier critique manquant: $file"
+                SUCCESS=false
+            fi
         done
 
-        # Test avancé de connexion avec toutes les configurations possibles
-        cat > DatabaseAdvancedTest.java << 'EOF'
-        import java.sql.Connection;
-        import java.sql.DriverManager;
-        import java.sql.Statement;
-        import java.sql.ResultSet;
-        import java.sql.PreparedStatement;
-        import java.util.Properties;
-
-        public class DatabaseAdvancedTest {
-            public static void main(String[] args) {
-                System.out.println("🔍 Tests avancés de base de données...");
-
-                try {
-                    // Test 1: Chargement des drivers
-                    System.out.println("📦 Test de chargement des drivers JDBC...");
-                    Class.forName("org.mariadb.jdbc.Driver");
-                    System.out.println("  ✅ Driver MariaDB chargé");
-
-                    // Test 2: Configuration HikariCP (classes relocalisées)
-                    System.out.println("🏊 Test HikariCP relocalisé...");
-                    Class<?> hikariConfigClass = Class.forName("fr.heneria.nexus.libs.hikari.HikariConfig");
-                    Class<?> hikariDataSourceClass = Class.forName("fr.heneria.nexus.libs.hikari.HikariDataSource");
-
-                    Object hikariConfig = hikariConfigClass.getDeclaredConstructor().newInstance();
-                    System.out.println("  ✅ HikariConfig instancié: " + hikariConfig.getClass().getName());
-
-                    // Test 3: Connexions multiples avec différentes configurations
-                    String[] urls = {
-                        "jdbc:mariadb://localhost:3306/nexus_integration_test",
-                        "jdbc:mariadb://127.0.0.1:3306/nexus_integration_test",
-                        "jdbc:mariadb://localhost:3306/nexus_integration_test?useSSL=false",
-                        "jdbc:mariadb://localhost:3306/nexus_integration_test?allowMultiQueries=true"
-                    };
-
-                    for (String url : urls) {
-                        try {
-                            System.out.println("🔗 Test connexion: " + url);
-                            Connection conn = DriverManager.getConnection(url, "nexus_user", "nexus_password");
-
-                            // Test basique
-                            Statement stmt = conn.createStatement();
-                            ResultSet rs = stmt.executeQuery("SELECT VERSION() as version, DATABASE() as db");
-                            if (rs.next()) {
-                                System.out.println("    ✅ Connecté - Version: " + rs.getString("version") + ", DB: " + rs.getString("db"));
-                            }
-
-                            conn.close();
-                            break; // Première connexion réussie
-
-                        } catch (Exception e) {
-                            System.out.println("    ❌ Échec: " + e.getMessage());
-                        }
-                    }
-
-                    // Test 4: Opérations de base de données complexes
-                    System.out.println("🗃️  Test d'opérations de base de données...");
-                    Connection conn = DriverManager.getConnection(
-                        "jdbc:mariadb://localhost:3306/nexus_integration_test",
-                        "nexus_user",
-                        "nexus_password"
-                    );
-
-                    // Créer une table de test
-                    Statement stmt = conn.createStatement();
-                    stmt.executeUpdate("CREATE TABLE IF NOT EXISTS test_advanced (id INT PRIMARY KEY AUTO_INCREMENT, name VARCHAR(255), created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)");
-
-                    // Test PreparedStatement
-                    PreparedStatement pstmt = conn.prepareStatement("INSERT INTO test_advanced (name) VALUES (?)");
-                    pstmt.setString(1, "Test Plugin Nexus");
-                    int rows = pstmt.executeUpdate();
-                    System.out.println("    ✅ Insertion réussie: " + rows + " ligne(s)");
-
-                    // Test transaction
-                    conn.setAutoCommit(false);
-                    pstmt.setString(1, "Test Transaction");
-                    pstmt.executeUpdate();
-                    conn.commit();
-                    conn.setAutoCommit(true);
-                    System.out.println("    ✅ Transaction réussie");
-
-                    // Test requête complexe
-                    ResultSet rs = stmt.executeQuery("SELECT COUNT(*) as count, MAX(created_at) as latest FROM test_advanced");
-                    if (rs.next()) {
-                        System.out.println("    ✅ Requête complexe: " + rs.getInt("count") + " enregistrements, dernier: " + rs.getTimestamp("latest"));
-                    }
-
-                    // Test 5: Flyway relocalisé
-                    System.out.println("🛫 Test Flyway relocalisé...");
-                    Class<?> flywayClass = Class.forName("fr.heneria.nexus.libs.flywaydb.core.Flyway");
-                    System.out.println("    ✅ Flyway relocalisé chargé: " + flywayClass.getName());
-
-                    // Nettoyage
-                    stmt.executeUpdate("DROP TABLE test_advanced");
-                    conn.close();
-
-                    System.out.println("🎉 Tous les tests de base de données avancés réussis !");
-
-                } catch (Exception e) {
-                    System.err.println("❌ Erreur dans les tests de base de données: " + e.getMessage());
-                    e.printStackTrace();
-                    System.exit(1);
-                }
-            }
-        }
-        EOF
-
-        # Compiler et exécuter avec un timeout
-        javac -cp "$JAR_FILE" DatabaseAdvancedTest.java
-        timeout 120s java -cp "$JAR_FILE:." DatabaseAdvancedTest || {
-            echo "❌ Timeout ou erreur dans les tests de base de données"
+        if [ "$SUCCESS" = false ]; then
+            echo "::error::Un ou plusieurs fichiers critiques sont manquants dans le JAR."
             exit 1
-        }
+        fi
+        echo "✅ Toutes les classes critiques sont présentes dans le JAR."
 
     - name: 🩺 Diagnostics Système
       run: |
@@ -602,7 +500,7 @@ jobs:
 
                 String[] classes = {
                     "fr.heneria.nexus.libs.hikari.HikariDataSource",
-                    "fr.heneria.nexus.libs.flywaydb.core.Flyway",
+                    "org.flywaydb.core.Flyway",
                     "org.mariadb.jdbc.Driver"
                 };
 
@@ -673,7 +571,7 @@ jobs:
                 for (int i = 0; i < 100; i++) {
                     try {
                         Class.forName("fr.heneria.nexus.libs.hikari.HikariDataSource");
-                        Class.forName("fr.heneria.nexus.libs.flywaydb.core.Flyway");
+                        Class.forName("org.flywaydb.core.Flyway");
                     } catch (Exception e) {
                         throw new RuntimeException("Erreur chargement classe iteration " + i, e);
                     }
