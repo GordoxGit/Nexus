@@ -65,7 +65,7 @@
         </dependency>
         <dependency>
             <groupId>org.flywaydb</groupId>
-            <artifactId>flyway-mysql</artifactId>
+            <artifactId>flyway-mariadb</artifactId>
             <version>10.15.0</version>
             <scope>compile</scope>
         </dependency>
