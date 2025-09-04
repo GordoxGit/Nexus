@@ -23,7 +23,7 @@ Nexus est une réinvention complète du mode de jeu Hikabrain, conçue pour offr
 - [⚙️ Installation](#️-installation)
 - [🔧 Configuration](#-configuration)
 - [🏗️ Développement](#️-développement)
-- [🐛 Debug Build Issues](#-debug-build-issues)
+- [🧪 Tests et Debugging](#-tests-et-debugging)
 - [🤝 Contribution](#-contribution)
 - [📊 Métriques](#-métriques)
 
@@ -259,22 +259,41 @@ Utiliser le script inclus :
 VPS_HOST=your.server.ip ./deploy.sh prod
 ```
 
-## 🐛 Debug Build Issues
+## 🧪 Tests et Debugging
 
-### Investiguer le contenu du JAR
+### Smoke Tests Locaux
 ```bash
-# Lister toutes les classes relocalisées
+# Compiler le plugin
+mvn clean package -q
+
+# Exécuter le smoke test manuellement
+JAR_FILE="target/Nexus-0.0.0-SNAPSHOT.jar"
+javac PluginLoadTest.java
+java -cp "$JAR_FILE:." PluginLoadTest "$JAR_FILE"
+```
+
+### Debugging des Dépendances
+```bash
+# Vérifier les classes relocalisées
 jar tf target/Nexus-*.jar | grep "fr/heneria/nexus/libs/" | sort
 
-# Vérifier une dépendance spécifique
-jar tf target/Nexus-*.jar | grep -i triumph
+# Vérifier les fuites de relocalisation  
+jar tf target/Nexus-*.jar | grep -E "(com/zaxxer|org/flywaydb|dev/triumphteam)" | head -5
 
-# Build avec profil debug
-mvn clean package -P debug-jar
-
-# Test de chargement des classes
-java -cp target/Nexus-*.jar -verbose:class YourTestClass
+# Analyser la structure complète
+javac JarAnalysis.java
+java JarAnalysis target/Nexus-*.jar
 ```
+
+### Problèmes Courants
+
+**NoClassDefFoundError lors des tests**
+- Cause: Les dépendances Bukkit ne sont pas disponibles en CI
+- Solution: Utiliser la vérification de présence sans chargement pour les classes Bukkit-dépendantes
+
+**Dépendances manquantes dans le JAR**  
+- Cause: Filtres Maven Shade incorrects
+- Solution: Vérifier les sections `<filters>` et `<relocations>` dans pom.xml
 
 ## 🤝 Contribution
 

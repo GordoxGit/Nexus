@@ -343,195 +343,52 @@ jobs:
       run: |
         echo "🚀 Test de chargement du plugin (Smoke Test):"
 
-        # Créer un test Java adapté à l'environnement CI
-        cat > PluginLoadTest.java << 'EOF'
-        import java.lang.reflect.Method;
-        import java.lang.reflect.Constructor;
-        import java.util.jar.JarFile;
-        import java.util.jar.JarEntry;
-        import java.util.Enumeration;
-
-        public class PluginLoadTest {
-            public static void main(String[] args) {
-                try {
-                    String jarPath = args.length > 0 ? args[0] : "target/Nexus-0.0.0-SNAPSHOT.jar";
-                    System.out.println("🔍 Test du JAR: " + jarPath);
-
-                    // Test 1: Vérifier que les dépendances relocalisées sont chargeable
-                    testRelocatedDependencies();
-
-                    // Test 2: Vérifier l'intégrité du JAR
-                    testJarIntegrity(jarPath);
-
-                    // Test 3: Vérifier les métadonnées du plugin
-                    testPluginMetadata();
-
-                    // Test 4: Vérifier les configurations
-                    testConfigurations();
-
-                    System.out.println("🎉 Tous les tests de smoke réussis !");
-
-                } catch (Exception e) {
-                    System.err.println("❌ Erreur lors du smoke test: " + e.getMessage());
-                    e.printStackTrace();
-                    System.exit(1);
-                }
-            }
-
-            private static void testRelocatedDependencies() throws Exception {
-                System.out.println("📦 Test des dépendances relocalisées...");
-
-                // Test HikariCP relocalisé
-                Class<?> hikariClass = Class.forName("fr.heneria.nexus.libs.hikari.HikariDataSource");
-                Constructor<?> hikariConstructor = hikariClass.getConstructor();
-                System.out.println("  ✅ HikariCP relocalisé: " + hikariClass.getName());
-
-                // Test Flyway relocalisé
-                Class<?> flywayClass = Class.forName("fr.heneria.nexus.libs.flywaydb.core.Flyway");
-                Method[] flywayMethods = flywayClass.getDeclaredMethods();
-                System.out.println("  ✅ Flyway relocalisé: " + flywayClass.getName() + " (" + flywayMethods.length + " méthodes)");
-
-                // Test Triumph GUI relocalisé (recherche flexible)
-                String[] possibleGuiClasses = {
-                    "fr.heneria.nexus.libs.gui.guis.Gui",
-                    "fr.heneria.nexus.libs.gui.guis.BaseGui",
-                    "fr.heneria.nexus.libs.gui.components.GuiType",
-                    "fr.heneria.nexus.libs.gui.GuiAction"
-                };
-
-                boolean guiFound = false;
-                for (String className : possibleGuiClasses) {
-                    try {
-                        Class<?> guiClass = Class.forName(className);
-                        System.out.println("  ✅ Triumph GUI relocalisé: " + guiClass.getName());
-                        guiFound = true;
-                        break;
-                    } catch (ClassNotFoundException ignored) {
-                        // Essayer la suivante
-                    }
-                }
-
-                if (!guiFound) {
-                    throw new RuntimeException("Aucune classe Triumph GUI relocalisée trouvée");
-                }
-
-                // Test MariaDB (non relocalisé mais inclus)
-                Class<?> mariadbClass = Class.forName("org.mariadb.jdbc.Driver");
-                System.out.println("  ✅ MariaDB JDBC: " + mariadbClass.getName());
-            }
-
-            private static void testJarIntegrity(String jarPath) throws Exception {
-                System.out.println("🔍 Test d'intégrité du JAR...");
-
-                try (JarFile jar = new JarFile(jarPath)) {
-                    int totalEntries = 0;
-                    int classFiles = 0;
-                    int relocatedClasses = 0;
-
-                    Enumeration<JarEntry> entries = jar.entries();
-                    while (entries.hasMoreElements()) {
-                        JarEntry entry = entries.nextElement();
-                        totalEntries++;
-
-                        if (entry.getName().endsWith(".class")) {
-                            classFiles++;
-                            if (entry.getName().startsWith("fr/heneria/nexus/libs/")) {
-                                relocatedClasses++;
-                            }
-                        }
-                    }
-
-                    System.out.println("  📊 Statistiques JAR:");
-                    System.out.println("    Total entrées: " + totalEntries);
-                    System.out.println("    Fichiers .class: " + classFiles);
-                    System.out.println("    Classes relocalisées: " + relocatedClasses);
-
-                    // Vérifications de sanité
-                    if (totalEntries < 100) {
-                        throw new RuntimeException("JAR trop petit: " + totalEntries + " entrées");
-                    }
-                    if (classFiles < 50) {
-                        throw new RuntimeException("Pas assez de classes: " + classFiles);
-                    }
-                    if (relocatedClasses < 10) {
-                        throw new RuntimeException("Pas assez de classes relocalisées: " + relocatedClasses);
-                    }
-
-                    System.out.println("  ✅ Intégrité du JAR validée");
-                }
-            }
-
-            private static void testPluginMetadata() throws Exception {
-                System.out.println("📄 Test des métadonnées du plugin...");
-
-                // Vérifier que plugin.yml est présent et lisible
-                java.io.InputStream pluginYml = PluginLoadTest.class.getClassLoader()
-                    .getResourceAsStream("plugin.yml");
-
-                if (pluginYml == null) {
-                    throw new RuntimeException("plugin.yml introuvable");
-                }
-
-                // Lire le contenu
-                String content = new String(pluginYml.readAllBytes());
-                pluginYml.close();
-
-                // Vérifications basiques
-                if (!content.contains("name: Nexus")) {
-                    throw new RuntimeException("plugin.yml invalide: nom manquant");
-                }
-                if (!content.contains("main: fr.heneria.nexus.Nexus")) {
-                    throw new RuntimeException("plugin.yml invalide: classe principale manquante");
-                }
-                if (!content.contains("api-version: '1.21'")) {
-                    throw new RuntimeException("plugin.yml invalide: version API manquante");
-                }
-
-                System.out.println("  ✅ plugin.yml valide");
-            }
-
-            private static void testConfigurations() throws Exception {
-                System.out.println("⚙️ Test des fichiers de configuration...");
-
-                // Vérifier config.yml
-                java.io.InputStream configYml = PluginLoadTest.class.getClassLoader()
-                    .getResourceAsStream("config.yml");
-
-                if (configYml == null) {
-                    throw new RuntimeException("config.yml introuvable");
-                }
-
-                String configContent = new String(configYml.readAllBytes());
-                configYml.close();
-
-                // Vérifications basiques de la configuration
-                if (!configContent.contains("database:")) {
-                    throw new RuntimeException("config.yml invalide: section database manquante");
-                }
-                if (!configContent.contains("game:")) {
-                    throw new RuntimeException("config.yml invalide: section game manquante");
-                }
-
-                System.out.println("  ✅ config.yml valide");
-
-                // Vérifier les migrations Flyway
-                java.io.InputStream migration = PluginLoadTest.class.getClassLoader()
-                    .getResourceAsStream("db/migration/V2__create_arena_tables.sql");
-
-                if (migration == null) {
-                    throw new RuntimeException("Migration Flyway V2 introuvable");
-                }
-                migration.close();
-
-                System.out.println("  ✅ Migrations Flyway présentes");
-            }
-        }
-        EOF
-
-        # Compiler et exécuter le test avec le JAR en argument
         JAR_FILE=$(find target -name "*.jar" -not -name "*-sources.jar" -not -name "original-*" | head -1)
-        javac PluginLoadTest.java
-        java -cp "$JAR_FILE:." PluginLoadTest "$JAR_FILE"
+        if [ ! -f "$JAR_FILE" ]; then
+            echo "❌ Aucun JAR trouvé dans target/"
+            exit 1
+        fi
+
+        echo "📁 JAR trouvé: $JAR_FILE ($(ls -lh "$JAR_FILE" | awk '{print $5}'))"
+
+        if ! javac PluginLoadTest.java; then
+            echo "❌ Échec de compilation du smoke test"
+            exit 1
+        fi
+
+        echo "🔧 Configuration de l'environnement de test..."
+        cat > simplelogger.properties <<'EOF'
+org.slf4j.simpleLogger.defaultLogLevel=error
+org.slf4j.simpleLogger.showDateTime=false
+org.slf4j.simpleLogger.showThreadName=false
+org.slf4j.simpleLogger.showLogName=false
+EOF
+
+        if ! timeout 60s java -Dorg.slf4j.simpleLogger.defaultLogLevel=error \
+             -Dorg.slf4j.simpleLogger.showDateTime=false \
+             -Dorg.slf4j.simpleLogger.showThreadName=false \
+             -Dorg.slf4j.simpleLogger.showLogName=false \
+             -cp "$JAR_FILE:." PluginLoadTest "$JAR_FILE"; then
+            echo "❌ Échec ou timeout du smoke test"
+            exit 1
+        fi
+
+        echo "✅ Smoke Test terminé avec succès"
+
+    - name: 🔍 Validation Supplémentaire de la Structure JAR
+      run: |
+        echo "🔍 Validation approfondie de la structure du JAR..."
+
+        JAR_FILE=$(find target -name "*.jar" -not -name "*-sources.jar" -not -name "original-*" | head -1)
+
+        echo "📦 Analyse de la structure des packages:"
+
+        if ! javac JarAnalysis.java; then
+            echo "❌ Échec de compilation de JarAnalysis"
+            exit 1
+        fi
+
+        java JarAnalysis "$JAR_FILE"
 
     - name: 🎯 Tests de chargement des classes
       run: |
