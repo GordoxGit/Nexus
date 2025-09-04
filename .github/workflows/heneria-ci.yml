@@ -194,28 +194,38 @@ jobs:
       id: build-info
       run: |
         echo "🔍 Analyse du JAR créé..."
-        
-        JAR_FILE=$(find target -name "*.jar" -not -name "*-sources.jar" | head -1)
+
+        JAR_FILE=$(find target -name "*.jar" -not -name "*-sources.jar" -not -name "original-*" | head -1)
         JAR_NAME=$(basename "$JAR_FILE")
         JAR_SIZE=$(ls -lh "$JAR_FILE" | awk '{print $5}')
-        
+
         echo "jar-name=$JAR_NAME" >> $GITHUB_OUTPUT
         echo "jar-size=$JAR_SIZE" >> $GITHUB_OUTPUT
-        
+
         echo "📊 Informations du JAR:"
         echo "  📁 Nom: $JAR_NAME"
         echo "  📏 Taille: $JAR_SIZE"
-        
+
+        # Vérifier la taille minimale attendue (doit être > 5MB)
+        JAR_SIZE_BYTES=$(stat -c%s "$JAR_FILE")
+        MIN_SIZE_BYTES=5242880  # 5MB
+        if [[ $JAR_SIZE_BYTES -lt $MIN_SIZE_BYTES ]]; then
+            echo "⚠️ ATTENTION: JAR trop petit ($JAR_SIZE), les dépendances sont probablement manquantes"
+            echo "::warning::JAR size is too small, dependencies might be missing"
+        fi
+
         echo ""
         echo "🧪 Vérification du contenu:"
-        
+
         # Vérifier les fichiers critiques
         critical_files=(
           "plugin.yml"
           "fr/heneria/nexus/Nexus.class"
           "org/mariadb/jdbc/Driver.class"
+          "com/zaxxer/hikari/HikariDataSource.class"
+          "org/flywaydb/core/Flyway.class"
         )
-        
+
         for file in "${critical_files[@]}"; do
           if jar tf "$JAR_FILE" | grep -q "$file"; then
             echo "  ✅ $file"
@@ -225,7 +235,13 @@ jobs:
             exit 1
           fi
         done
-        
+
+        echo ""
+        echo "📈 Analyse des dépendances incluses:"
+        echo "  MariaDB classes: $(jar tf "$JAR_FILE" | grep -c "org/mariadb/")"
+        echo "  HikariCP classes: $(jar tf "$JAR_FILE" | grep -c "com/zaxxer/hikari/")"
+        echo "  Flyway classes: $(jar tf "$JAR_FILE" | grep -c "org/flywaydb/")"
+
         echo ""
         echo "🔧 Classes relocalisées:"
         jar tf "$JAR_FILE" | grep -E "fr/heneria/nexus/libs/" | head -5 | sed 's/^/  /' || echo "  ℹ️ Aucune relocalisation détectée"
@@ -289,47 +305,55 @@ jobs:
         import java.sql.DriverManager;
         import java.sql.Statement;
         import java.sql.ResultSet;
-        
+        import com.zaxxer.hikari.HikariConfig;
+
         public class DatabaseConnectionTest {
             public static void main(String[] args) {
                 System.out.println("🔍 Test de chargement du driver MariaDB...");
-                
+
                 try {
                     // Test 1: Chargement du driver
                     Class.forName("org.mariadb.jdbc.Driver");
                     System.out.println("✅ Driver MariaDB chargé avec succès");
-                    
-                    // Test 2: Connexion à la base
-                    System.out.println("🔗 Test de connexion à la base...");
+
                     String url = "jdbc:mariadb://localhost:3306/nexus_integration_test";
                     String username = "nexus_user";
                     String password = "nexus_password";
-                    
+
+                    // Test 2: Vérification des classes HikariCP
+                    HikariConfig config = new HikariConfig();
+                    config.setJdbcUrl(url);
+                    config.setUsername(username);
+                    config.setPassword(password);
+                    System.out.println("✅ HikariCP disponible dans le JAR");
+
+                    // Test 3: Connexion à la base
+                    System.out.println("🔗 Test de connexion à la base...");
                     Connection conn = DriverManager.getConnection(url, username, password);
                     System.out.println("✅ Connexion établie avec succès");
-                    
-                    // Test 3: Opération basique
+
+                    // Test 4: Opération basique
                     Statement stmt = conn.createStatement();
                     ResultSet rs = stmt.executeQuery("SELECT VERSION() as version");
                     if (rs.next()) {
                         System.out.println("📋 Version MariaDB: " + rs.getString("version"));
                     }
-                    
-                    // Test 4: Création de table (simulation Flyway)
+
+                    // Test 5: Création de table (simulation Flyway)
                     stmt.executeUpdate("CREATE TABLE IF NOT EXISTS test_table (id INT PRIMARY KEY, name VARCHAR(255))");
                     stmt.executeUpdate("INSERT INTO test_table (id, name) VALUES (1, 'Test Plugin') ON DUPLICATE KEY UPDATE name = VALUES(name)");
-                    
+
                     ResultSet testRs = stmt.executeQuery("SELECT name FROM test_table WHERE id = 1");
                     if (testRs.next()) {
                         System.out.println("✅ Test CRUD réussi: " + testRs.getString("name"));
                     }
-                    
+
                     // Nettoyage
                     stmt.executeUpdate("DROP TABLE test_table");
                     conn.close();
-                    
+
                     System.out.println("🎉 Tous les tests d'intégration réussis !");
-                    
+
                 } catch (Exception e) {
                     System.err.println("❌ Erreur dans les tests: " + e.getMessage());
                     e.printStackTrace();
