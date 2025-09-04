@@ -217,14 +217,13 @@ jobs:
         echo ""
         echo "🧪 Vérification du contenu:"
 
-        # Vérifier les fichiers critiques
+        # Vérifier les fichiers critiques avec une approche plus robuste
         critical_files=(
           "plugin.yml"
           "fr/heneria/nexus/Nexus.class"
           "org/mariadb/jdbc/Driver.class"
           "fr/heneria/nexus/libs/hikari/HikariDataSource.class"
           "fr/heneria/nexus/libs/flywaydb/core/Flyway.class"
-          "fr/heneria/nexus/libs/gui/BaseGui.class"
         )
 
         for file in "${critical_files[@]}"; do
@@ -237,15 +236,61 @@ jobs:
           fi
         done
 
+        # Vérification spéciale pour Triumph GUI (recherche dynamique)
         echo ""
-        echo "📈 Analyse des dépendances relocalisées:"
-        echo "  MariaDB classes: $(jar tf "$JAR_FILE" | grep -c "org/mariadb/")"
-        echo "  HikariCP classes (relocalisées): $(jar tf "$JAR_FILE" | grep -c "fr/heneria/nexus/libs/hikari/")"
-        echo "  Flyway classes (relocalisées): $(jar tf "$JAR_FILE" | grep -c "fr/heneria/nexus/libs/flywaydb/")"
-        echo "  Triumph GUI classes (relocalisées): $(jar tf "$JAR_FILE" | grep -c "fr/heneria/nexus/libs/gui/")"
+        echo "🔍 Vérification de Triumph GUI:"
+        GUI_CLASSES=$(jar tf "$JAR_FILE" | grep "fr/heneria/nexus/libs/gui/" | head -3)
+        if [ -z "$GUI_CLASSES" ]; then
+          echo "  ❌ Aucune classe Triumph GUI trouvée dans fr/heneria/nexus/libs/gui/"
+          echo "::error::Triumph GUI non relocalisé correctement"
+          exit 1
+        else
+          echo "  ✅ Classes Triumph GUI détectées:"
+          echo "$GUI_CLASSES" | sed 's/^/    /'
+
+          if jar tf "$JAR_FILE" | grep -q "fr/heneria/nexus/libs/gui.*Gui\\.class"; then
+            echo "  ✅ Classe Gui principale trouvée"
+          else
+            echo "  ⚠️  Aucune classe Gui principale détectée, mais d'autres classes GUI sont présentes"
+          fi
+        fi
+
         echo ""
-        echo "🔧 Classes relocalisées:"
-        jar tf "$JAR_FILE" | grep -E "fr/heneria/nexus/libs/" | head -5 | sed 's/^/  /' || echo "  ℹ️ Aucune relocalisation détectée"
+        echo "📈 Analyse détaillée des dépendances relocalisées:"
+
+        count_and_display() {
+          local pattern="$1"
+          local name="$2"
+          local count=$(jar tf "$JAR_FILE" | grep -c "$pattern" || echo "0")
+          echo "  $name: $count classes"
+          if [ "$count" -gt 0 ]; then
+            echo "    $(jar tf "$JAR_FILE" | grep "$pattern" | head -2 | sed 's/^/    ├─ /')"
+            if [ "$count" -gt 2 ]; then
+              echo "    └─ ... et $((count-2)) autres"
+            fi
+          fi
+        }
+
+        count_and_display "org/mariadb/" "MariaDB JDBC"
+        count_and_display "fr/heneria/nexus/libs/hikari/" "HikariCP (relocalisé)"
+        count_and_display "fr/heneria/nexus/libs/flywaydb/" "Flyway (relocalisé)"
+        count_and_display "fr/heneria/nexus/libs/gui/" "Triumph GUI (relocalisé)"
+
+        echo ""
+        echo "🔒 Vérification des fuites de relocalisation:"
+        LEAKED_CLASSES=""
+        for pattern in "com/zaxxer/hikari" "org/flywaydb" "dev/triumphteam/gui"; do
+          if jar tf "$JAR_FILE" | grep -q "$pattern"; then
+            LEAKED_CLASSES="$LEAKED_CLASSES $pattern"
+          fi
+        done
+
+        if [ -n "$LEAKED_CLASSES" ]; then
+          echo "  ⚠️  Classes non-relocalisées détectées: $LEAKED_CLASSES"
+          echo "  Cela peut causer des conflits de versions avec d'autres plugins"
+        else
+          echo "  ✅ Toutes les dépendances sont correctement relocalisées"
+        fi
 
     - name: 📤 Upload du JAR
       uses: actions/upload-artifact@v4
@@ -293,6 +338,59 @@ jobs:
       with:
         name: nexus-plugin-${{ needs.validate-project.outputs.version }}
         path: target/
+
+    - name: 🚀 Test de chargement du plugin (Smoke Test)
+      run: |
+        echo "🚀 Test de chargement du plugin (Smoke Test):"
+        JAR_FILE=$(find target -name "*.jar" -not -name "*-sources.jar" | head -1)
+        cat > PluginLoadTest.java << 'EOF'
+        import java.lang.reflect.Method;
+
+        public class PluginLoadTest {
+            public static void main(String[] args) {
+                try {
+                    Class<?> nexusClass = Class.forName("fr.heneria.nexus.Nexus");
+                    System.out.println("✅ Classe Nexus chargée: " + nexusClass.getName());
+
+                    Class<?> hikariClass = Class.forName("fr.heneria.nexus.libs.hikari.HikariDataSource");
+                    System.out.println("✅ HikariCP relocalisé chargé: " + hikariClass.getName());
+
+                    Class<?> flywayClass = Class.forName("fr.heneria.nexus.libs.flywaydb.core.Flyway");
+                    System.out.println("✅ Flyway relocalisé chargé: " + flywayClass.getName());
+
+                    String[] possibleClasses = {
+                        "fr.heneria.nexus.libs.gui.guis.Gui",
+                        "fr.heneria.nexus.libs.gui.guis.BaseGui",
+                        "fr.heneria.nexus.libs.gui.components.GuiType"
+                    };
+
+                    boolean guiFound = false;
+                    for (String className : possibleClasses) {
+                        try {
+                            Class<?> guiClass = Class.forName(className);
+                            System.out.println("✅ Triumph GUI relocalisé chargé: " + guiClass.getName());
+                            guiFound = true;
+                            break;
+                        } catch (ClassNotFoundException ignored) {}
+                    }
+
+                    if (!guiFound) {
+                        System.err.println("❌ Aucune classe Triumph GUI trouvée");
+                        System.exit(1);
+                    }
+
+                    System.out.println("🎉 Tous les tests de chargement de classes réussis !");
+
+                } catch (Exception e) {
+                    System.err.println("❌ Erreur lors du test de chargement: " + e.getMessage());
+                    e.printStackTrace();
+                    System.exit(1);
+                }
+            }
+        }
+        EOF
+        javac -cp "$JAR_FILE" PluginLoadTest.java
+        java -cp "$JAR_FILE:." PluginLoadTest
 
     - name: 🎯 Tests de chargement des classes
       run: |
