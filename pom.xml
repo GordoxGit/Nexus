@@ -145,18 +145,60 @@
                                 </relocation>
                             </relocations>
                             <filters>
+                                <!-- Filtre global pour exclure les métadonnées inutiles -->
                                 <filter>
                                     <artifact>*:*</artifact>
                                     <excludes>
                                         <exclude>META-INF/*.SF</exclude>
                                         <exclude>META-INF/*.DSA</exclude>
                                         <exclude>META-INF/*.RSA</exclude>
+                                        <exclude>META-INF/maven/**</exclude>
+                                        <exclude>META-INF/DEPENDENCIES</exclude>
+                                        <exclude>META-INF/LICENSE*</exclude>
+                                        <exclude>META-INF/NOTICE*</exclude>
+                                        <exclude>**/*.kotlin_metadata</exclude>
+                                        <exclude>**/*.kotlin_module</exclude>
+                                        <exclude>**/*.kotlin_builtins</exclude>
                                     </excludes>
                                 </filter>
+
+                        <!-- MariaDB - inclusion explicite -->
                                 <filter>
                                     <artifact>org.mariadb.jdbc:mariadb-java-client</artifact>
                                     <includes>
                                         <include>org/mariadb/**</include>
+                                    </includes>
+                                </filter>
+
+                        <!-- HikariCP -->
+                                <filter>
+                                    <artifact>com.zaxxer:HikariCP</artifact>
+                                    <includes>
+                                        <include>com/zaxxer/hikari/**</include>
+                                    </includes>
+                                </filter>
+
+                        <!-- Flyway Core -->
+                                <filter>
+                                    <artifact>org.flywaydb:flyway-core</artifact>
+                                    <includes>
+                                        <include>org/flywaydb/**</include>
+                                    </includes>
+                                </filter>
+
+                        <!-- Flyway MySQL -->
+                                <filter>
+                                    <artifact>org.flywaydb:flyway-mysql</artifact>
+                                    <includes>
+                                        <include>org/flywaydb/**</include>
+                                    </includes>
+                                </filter>
+
+                        <!-- Triumph GUI -->
+                                <filter>
+                                    <artifact>dev.triumphteam:triumph-gui</artifact>
+                                    <includes>
+                                        <include>dev/triumphteam/**</include>
                                     </includes>
                                 </filter>
                             </filters>
