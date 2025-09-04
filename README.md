@@ -312,7 +312,7 @@ Utiliser le [template de bug report](.github/ISSUE_TEMPLATE/bug_report.md) avec 
 
 ### 💬 Communauté
 
-- **Discord** : [Heneria Community](https://discord.gg/heneria)
+- **Discord** : [Heneria Community](https://discord.gg/Xw3pbXDU7s)
 - **GitHub Issues** : [Issues](https://github.com/GordoxGit/Nexus/issues)
 - **Discussions** : [GitHub Discussions](https://github.com/GordoxGit/Nexus/discussions)
 
@@ -341,7 +341,7 @@ Ce projet est sous licence MIT. Voir [LICENSE](LICENSE) pour plus de détails.
 
 <div align="center">
 
-**[🏠 Heneria Project](https://heneria.fr) • [📖 Documentation](https://github.com/GordoxGit/Nexus/wiki) • [🐛 Issues](https://github.com/GordoxGit/Nexus/issues) • [💬 Discord](https://discord.gg/heneria)**
+**[🏠 Heneria Project](https://heneria.fr) • [📖 Documentation](https://github.com/GordoxGit/Nexus/wiki) • [🐛 Issues](https://github.com/GordoxGit/Nexus/issues) • [💬 Discord](https://discord.gg/Xw3pbXDU7s)**
 
 *Développé avec ❤️ pour la communauté Minecraft francophone*
 
