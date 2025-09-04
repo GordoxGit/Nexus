@@ -6,6 +6,11 @@ import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import javax.sql.DataSource;
+import java.sql.Connection;
+import java.sql.Driver;
+import java.sql.DriverManager;
+import java.sql.SQLException;
+import java.util.Enumeration;
 
 /**
  * Fournit une instance unique de {@link DataSource} basée sur HikariCP.
@@ -45,15 +50,35 @@ public class HikariDataSourceProvider {
         String username = config.getString("database.username", "nexus_user");
         String password = config.getString("database.password", "your_password_here");
 
-        // Construction de l'URL JDBC
+        if (host == null || host.isBlank() || database == null || database.isBlank() || username == null || username.isBlank()) {
+            plugin.getLogger().severe("❌ Configuration de base de données invalide. Veuillez vérifier config.yml");
+            throw new IllegalArgumentException("Invalid database configuration");
+        }
+
+        // Construction de l'URL JDBC avec fallback MariaDB/MySQL
         String jdbcUrl = String.format("jdbc:mariadb://%s:%d/%s", host, port, database);
+        String driverClass = "org.mariadb.jdbc.Driver";
+        try {
+            Class.forName(driverClass);
+            plugin.getLogger().info("Driver JDBC MariaDB chargé");
+        } catch (ClassNotFoundException e) {
+            plugin.getLogger().warning("Driver MariaDB introuvable, tentative avec le driver MySQL...");
+            jdbcUrl = String.format("jdbc:mysql://%s:%d/%s", host, port, database);
+            driverClass = "com.mysql.cj.jdbc.Driver";
+            try {
+                Class.forName(driverClass);
+                plugin.getLogger().info("Driver JDBC MySQL chargé");
+            } catch (ClassNotFoundException ex) {
+                listDrivers(plugin);
+                throw new RuntimeException("No suitable JDBC driver found", ex);
+            }
+        }
+
+        plugin.getLogger().info("Connexion à la base de données: " + jdbcUrl + " utilisateur=" + username);
+
         hikariConfig.setJdbcUrl(jdbcUrl);
         hikariConfig.setUsername(username);
         hikariConfig.setPassword(password);
-
-        // IMPORTANT : Laisser HikariCP détecter automatiquement le driver MariaDB
-        // Ne pas spécifier explicitement le driver - HikariCP le détectera depuis l'URL JDBC
-        // hikariConfig.setDriverClassName("org.mariadb.jdbc.Driver"); // Pas nécessaire
 
         // Configuration du pool HikariCP
         hikariConfig.setMaximumPoolSize(config.getInt("database.hikari.maximum-pool-size", 10));
@@ -76,11 +101,18 @@ public class HikariDataSourceProvider {
 
         try {
             this.dataSource = new HikariDataSource(hikariConfig);
-            plugin.getLogger().info("✅ Connexion à la base de données établie avec succès !");
+            try (Connection connection = this.dataSource.getConnection()) {
+                plugin.getLogger().info("✅ Connexion à la base de données établie et testée avec succès !");
+            }
+        } catch (SQLException e) {
+            plugin.getLogger().severe("❌ Échec de test de connexion à la base de données: " + e.getMessage());
+            listDrivers(plugin);
+            throw new RuntimeException("Database connection failed", e);
         } catch (Exception e) {
             plugin.getLogger().severe("❌ Impossible de se connecter à la base de données !");
             plugin.getLogger().severe("Vérifiez votre configuration dans config.yml");
             plugin.getLogger().severe("Erreur: " + e.getMessage());
+            listDrivers(plugin);
             throw new RuntimeException("Database connection failed", e);
         }
     }
@@ -97,5 +129,15 @@ public class HikariDataSourceProvider {
         if (this.dataSource != null) {
             this.dataSource.close();
         }
+    }
+
+    private static void listDrivers(JavaPlugin plugin) {
+        StringBuilder builder = new StringBuilder("Drivers JDBC disponibles: ");
+        Enumeration<Driver> drivers = DriverManager.getDrivers();
+        while (drivers.hasMoreElements()) {
+            Driver d = drivers.nextElement();
+            builder.append(d.getClass().getName()).append(' ');
+        }
+        plugin.getLogger().severe(builder.toString().trim());
     }
 }
