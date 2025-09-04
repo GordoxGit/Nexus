@@ -142,10 +142,6 @@
                                     <pattern>org.flywaydb</pattern>
                                     <shadedPattern>fr.heneria.nexus.libs.flywaydb</shadedPattern>
                                 </relocation>
-                                <relocation>
-                                    <pattern>org.mariadb.jdbc</pattern>
-                                    <shadedPattern>fr.heneria.nexus.libs.mariadb</shadedPattern>
-                                </relocation>
                             </relocations>
                             <filters>
                                 <filter>
