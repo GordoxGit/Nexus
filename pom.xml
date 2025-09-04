@@ -25,12 +25,10 @@
             <id>papermc</id>
             <url>https://repo.papermc.io/repository/maven-public/</url>
         </repository>
-        
         <repository>
             <id>placeholderapi</id>
             <url>https://repo.extendedclip.com/content/repositories/placeholderapi/</url>
         </repository>
-        
         <repository>
             <id>maven-central</id>
             <url>https://repo1.maven.org/maven2/</url>
@@ -44,7 +42,6 @@
             <version>1.21-R0.1-SNAPSHOT</version>
             <scope>provided</scope>
         </dependency>
-
         <dependency>
             <groupId>org.mariadb.jdbc</groupId>
             <artifactId>mariadb-java-client</artifactId>
@@ -69,14 +66,12 @@
             <version>10.15.0</version>
             <scope>compile</scope>
         </dependency>
-
         <dependency>
             <groupId>dev.triumphteam</groupId>
             <artifactId>triumph-gui</artifactId>
             <version>3.1.12</version>
             <scope>compile</scope>
         </dependency>
-        
         <dependency>
             <groupId>me.clip</groupId>
             <artifactId>placeholderapi</artifactId>
@@ -91,7 +86,7 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
-                <version>3.13.0</version>
+                <version>3.1.0</version>
                 <configuration>
                     <source>21</source>
                     <target>21</target>
@@ -116,10 +111,6 @@
                             <shadedPattern>fr.heneria.nexus.libs.gui</shadedPattern>
                         </relocation>
                         <relocation>
-                            <pattern>org.mariadb.jdbc</pattern>
-                            <shadedPattern>fr.heneria.nexus.libs.mariadb</shadedPattern>
-                        </relocation>
-                        <relocation>
                             <pattern>com.zaxxer.hikari</pattern>
                             <shadedPattern>fr.heneria.nexus.libs.hikari</shadedPattern>
                         </relocation>
@@ -127,7 +118,7 @@
                             <pattern>org.flywaydb</pattern>
                             <shadedPattern>fr.heneria.nexus.libs.flywaydb</shadedPattern>
                         </relocation>
-                    </relocations>
+                        </relocations>
                 </configuration>
             </plugin>
         </plugins>
