@@ -45,16 +45,12 @@
                                     <shadedPattern>fr.heneria.nexus.libs.hikari</shadedPattern>
                                 </relocation>
                                 <relocation>
-                                    <pattern>org.flywaydb</pattern>
-                                    <shadedPattern>fr.heneria.nexus.libs.flywaydb</shadedPattern>
+                                    <pattern>liquibase</pattern>
+                                    <shadedPattern>fr.heneria.nexus.libs.liquibase</shadedPattern>
                                 </relocation>
                                 <relocation>
                                     <pattern>dev.triumphteam.gui</pattern>
                                     <shadedPattern>fr.heneria.nexus.libs.gui</shadedPattern>
-                                </relocation>
-                                <relocation>
-                                    <pattern>com.mysql</pattern>
-                                    <shadedPattern>fr.heneria.nexus.libs.mysql</shadedPattern>
                                 </relocation>
                             </relocations>
                         </configuration>
@@ -90,9 +86,9 @@
         </dependency>
 
         <dependency>
-            <groupId>com.mysql</groupId>
-            <artifactId>mysql-connector-j</artifactId>
-            <version>8.4.0</version>
+            <groupId>org.mariadb.jdbc</groupId>
+            <artifactId>mariadb-java-client</artifactId>
+            <version>3.4.0</version>
             <scope>compile</scope>
         </dependency>
 
@@ -104,15 +100,9 @@
         </dependency>
 
         <dependency>
-            <groupId>org.flywaydb</groupId>
-            <artifactId>flyway-core</artifactId>
-            <version>9.22.3</version>
-            <scope>compile</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.flywaydb</groupId>
-            <artifactId>flyway-mysql</artifactId>
-            <version>9.22.3</version>
+            <groupId>org.liquibase</groupId>
+            <artifactId>liquibase-core</artifactId>
+            <version>4.27.0</version>
             <scope>compile</scope>
         </dependency>
 
