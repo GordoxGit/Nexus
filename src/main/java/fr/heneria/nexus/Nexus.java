@@ -5,31 +5,32 @@ import fr.heneria.nexus.arena.repository.ArenaRepository;
 import fr.heneria.nexus.arena.repository.JdbcArenaRepository;
 import fr.heneria.nexus.command.ArenaCommand;
 import fr.heneria.nexus.db.HikariDataSourceProvider;
+
+// Imports avec les noms de packages ORIGINAUX de Liquibase
 import liquibase.Liquibase;
+import liquibase.Scope;
 import liquibase.database.Database;
 import liquibase.database.DatabaseFactory;
-import liquibase.database.jvm.JdbcConnection;
+import liqu.database.jvm.JdbcConnection;
+import liquibase.logging.LogService;
+import liquibase.logging.LogType;
+import liquibase.logging.Logger;
+import liquibase.logging.core.JavaLogService;
 import liquibase.resource.ClassLoaderResourceAccessor;
+
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.sql.Connection;
+import java.util.HashMap;
+import java.util.Map;
 
 public final class Nexus extends JavaPlugin {
-
-    // Ce bloc 'static' est la clé. Il est exécuté par Java dès que la classe Nexus est chargée,
-    // AVANT même l'exécution de la méthode onEnable().
-    // C'est ce qui garantit que la configuration du logger est en place à temps.
-    static {
-        System.setProperty("liquibase.hub.logService", "liquibase.logging.core.JavaLogService");
-    }
 
     private HikariDataSourceProvider dataSourceProvider;
     private ArenaManager arenaManager;
 
     @Override
     public void onEnable() {
-        // La manipulation du ClassLoader ici est une sécurité supplémentaire pour garantir
-        // que Liquibase trouve bien ses fichiers de migration dans le JAR.
         ClassLoader originalClassLoader = Thread.currentThread().getContextClassLoader();
         Thread.currentThread().setContextClassLoader(this.getClassLoader());
 
@@ -38,15 +39,24 @@ public final class Nexus extends JavaPlugin {
             this.dataSourceProvider = new HikariDataSourceProvider();
             this.dataSourceProvider.init(this);
 
-            // 2. Exécuter les migrations
-            try (Connection connection = this.dataSourceProvider.getDataSource().getConnection()) {
-                Database database = DatabaseFactory.getInstance().findCorrectDatabaseImplementation(new JdbcConnection(connection));
-                Liquibase liquibase = new Liquibase("db/changelog/master.xml", new ClassLoaderResourceAccessor(getClassLoader()), database);
-                liquibase.update();
-                getLogger().info("✅ Migrations de la base de données gérées par Liquibase.");
-            }
+            // 2. Exécuter les migrations avec Liquibase en injectant manuellement le logger
+            // C'est la solution définitive basée sur les recommandations des développeurs de Liquibase.
+            Map<String, Object> scopeValues = new HashMap<>();
+            scopeValues.put(Scope.Attr.logService.name(), new JavaLogService());
+            
+            Scope.child(scopeValues, () -> {
+                try (Connection connection = this.dataSourceProvider.getDataSource().getConnection()) {
+                    Database database = DatabaseFactory.getInstance().findCorrectDatabaseImplementation(new JdbcConnection(connection));
+                    Liquibase liquibase = new Liquibase("db/changelog/master.xml", new ClassLoaderResourceAccessor(getClassLoader()), database);
+                    liquibase.update();
+                    getLogger().info("✅ Migrations de la base de données gérées par Liquibase.");
+                } catch (Exception e) {
+                    // Remonter l'exception pour qu'elle soit capturée par le bloc try/catch principal
+                    throw new RuntimeException("Échec des migrations de base de données", e);
+                }
+            });
 
-            // 3. Initialiser le repository
+            // 3. Initialiser le repository des arènes
             ArenaRepository arenaRepository = new JdbcArenaRepository(this.dataSourceProvider.getDataSource());
 
             // 4. Initialiser le manager
@@ -66,7 +76,7 @@ public final class Nexus extends JavaPlugin {
             e.printStackTrace();
             getServer().getPluginManager().disablePlugin(this);
         } finally {
-            // Restaurer le ClassLoader original est crucial pour la compatibilité avec d'autres plugins.
+            // Restaurer le ClassLoader original
             Thread.currentThread().setContextClassLoader(originalClassLoader);
         }
     }
