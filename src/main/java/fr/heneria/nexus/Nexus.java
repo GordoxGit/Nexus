@@ -5,12 +5,24 @@ import fr.heneria.nexus.arena.repository.ArenaRepository;
 import fr.heneria.nexus.arena.repository.JdbcArenaRepository;
 import fr.heneria.nexus.command.ArenaCommand;
 import fr.heneria.nexus.db.HikariDataSourceProvider;
+import liquibase.Liquibase;
+import liquibase.database.Database;
+import liquibase.database.DatabaseFactory;
+import liquibase.database.jvm.JdbcConnection;
+import liquibase.resource.ClassLoaderResourceAccessor;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.sql.Connection;
-import java.sql.Statement;
 
 public final class Nexus extends JavaPlugin {
+
+    // ======================= CORRECTION DÉFINITIVE CI-DESSOUS =======================
+    // Ce bloc 'static' est exécuté une seule fois, au moment où la classe Nexus est chargée en mémoire par Java.
+    // C'est la méthode la plus précoce pour définir une propriété système, ce qui résout l'erreur d'initialisation de Liquibase.
+    static {
+        System.setProperty("liquibase.hub.logService", "liquibase.logging.core.JavaLogService");
+    }
+    // ==============================================================================
 
     private HikariDataSourceProvider dataSourceProvider;
     private ArenaManager arenaManager;
@@ -22,8 +34,13 @@ public final class Nexus extends JavaPlugin {
             this.dataSourceProvider = new HikariDataSourceProvider();
             this.dataSourceProvider.init(this);
 
-            // 2. Créer les tables manuellement (plus simple que Liquibase relocalisé)
-            createTablesIfNotExists();
+            // 2. Exécuter les migrations avec Liquibase
+            try (Connection connection = this.dataSourceProvider.getDataSource().getConnection()) {
+                Database database = DatabaseFactory.getInstance().findCorrectDatabaseImplementation(new JdbcConnection(connection));
+                Liquibase liquibase = new Liquibase("db/changelog/master.xml", new ClassLoaderResourceAccessor(getClassLoader()), database);
+                liquibase.update();
+                getLogger().info("✅ Migrations de la base de données gérées par Liquibase.");
+            }
 
             // 3. Initialiser le repository des arènes
             ArenaRepository arenaRepository = new JdbcArenaRepository(this.dataSourceProvider.getDataSource());
@@ -44,50 +61,6 @@ public final class Nexus extends JavaPlugin {
             getLogger().severe("❌ Erreur critique lors du démarrage de Nexus :");
             e.printStackTrace();
             getServer().getPluginManager().disablePlugin(this);
-        }
-    }
-
-    private void createTablesIfNotExists() {
-        try (Connection connection = this.dataSourceProvider.getDataSource().getConnection();
-             Statement statement = connection.createStatement()) {
-            
-            // Créer la table des arènes
-            statement.executeUpdate("""
-                CREATE TABLE IF NOT EXISTS arenas (
-                    id INT AUTO_INCREMENT PRIMARY KEY,
-                    name VARCHAR(255) NOT NULL UNIQUE,
-                    max_players INT NOT NULL,
-                    creation_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
-                """);
-
-            // Créer la table des spawns
-            statement.executeUpdate("""
-                CREATE TABLE IF NOT EXISTS arena_spawns (
-                    id INT AUTO_INCREMENT PRIMARY KEY,
-                    arena_id INT NOT NULL,
-                    team_id INT NOT NULL,
-                    spawn_number INT NOT NULL,
-                    world VARCHAR(255) NOT NULL,
-                    x DOUBLE NOT NULL,
-                    y DOUBLE NOT NULL,
-                    z DOUBLE NOT NULL,
-                    yaw FLOAT NOT NULL,
-                    pitch FLOAT NOT NULL,
-                    CONSTRAINT fk_arena
-                        FOREIGN KEY (arena_id)
-                        REFERENCES arenas(id)
-                        ON DELETE CASCADE,
-                    UNIQUE KEY unique_spawn (arena_id, team_id, spawn_number)
-                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
-                """);
-
-            getLogger().info("✅ Tables de base de données créées/vérifiées avec succès !");
-
-        } catch (Exception e) {
-            getLogger().severe("❌ Erreur lors de la création des tables :");
-            e.printStackTrace();
-            throw new RuntimeException("Failed to create database tables", e);
         }
     }
 
