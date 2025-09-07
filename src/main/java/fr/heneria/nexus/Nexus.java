@@ -22,6 +22,12 @@ public final class Nexus extends JavaPlugin {
     @Override
     public void onEnable() {
         try {
+            // ======================= CORRECTION CI-DESSOUS =======================
+            // Définit le service de logging de Liquibase pour qu'il utilise le logger Java standard,
+            // compatible avec l'environnement Bukkit/Paper.
+            System.setProperty("liquibase.hub.logService", "liquibase.logging.core.JavaLogService");
+            // =====================================================================
+
             // 1. Initialiser le pool de connexions
             this.dataSourceProvider = new HikariDataSourceProvider();
             this.dataSourceProvider.init(this);
@@ -29,7 +35,6 @@ public final class Nexus extends JavaPlugin {
             // 2. Exécuter les migrations avec Liquibase
             try (Connection connection = this.dataSourceProvider.getDataSource().getConnection()) {
                 Database database = DatabaseFactory.getInstance().findCorrectDatabaseImplementation(new JdbcConnection(connection));
-                // Le chemin pointe vers le fichier maître de changelog
                 Liquibase liquibase = new Liquibase("db/changelog/master.xml", new ClassLoaderResourceAccessor(getClassLoader()), database);
                 liquibase.update();
                 getLogger().info("✅ Migrations de la base de données gérées par Liquibase.");
