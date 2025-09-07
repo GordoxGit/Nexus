@@ -6,20 +6,15 @@ import fr.heneria.nexus.arena.repository.JdbcArenaRepository;
 import fr.heneria.nexus.command.ArenaCommand;
 import fr.heneria.nexus.db.HikariDataSourceProvider;
 
-// Imports corrigés : seuls les classes nécessaires sont importées
 import liquibase.Liquibase;
-import liquibase.Scope;
 import liquibase.database.Database;
 import liquibase.database.DatabaseFactory;
 import liquibase.database.jvm.JdbcConnection;
-import liquibase.logging.core.JavaLogService;
 import liquibase.resource.ClassLoaderResourceAccessor;
 
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.sql.Connection;
-import java.util.HashMap;
-import java.util.Map;
 
 public final class Nexus extends JavaPlugin {
 
@@ -28,6 +23,7 @@ public final class Nexus extends JavaPlugin {
 
     @Override
     public void onEnable() {
+        // Définir le ClassLoader du thread est une bonne pratique pour assurer la compatibilité
         ClassLoader originalClassLoader = Thread.currentThread().getContextClassLoader();
         Thread.currentThread().setContextClassLoader(this.getClassLoader());
 
@@ -36,22 +32,15 @@ public final class Nexus extends JavaPlugin {
             this.dataSourceProvider = new HikariDataSourceProvider();
             this.dataSourceProvider.init(this);
 
-            // 2. Exécuter les migrations avec Liquibase en injectant manuellement le logger
-            Map<String, Object> scopeValues = new HashMap<>();
-            scopeValues.put(Scope.Attr.logService.name(), new JavaLogService());
-            
-            Scope.child(scopeValues, () -> {
-                try (Connection connection = this.dataSourceProvider.getDataSource().getConnection()) {
-                    Database database = DatabaseFactory.getInstance().findCorrectDatabaseImplementation(new JdbcConnection(connection));
-                    Liquibase liquibase = new Liquibase("db/changelog/master.xml", new ClassLoaderResourceAccessor(getClassLoader()), database);
-                    liquibase.update();
-                    getLogger().info("✅ Migrations de la base de données gérées par Liquibase.");
-                } catch (Exception e) {
-                    throw new RuntimeException("Échec des migrations de base de données", e);
-                }
-            });
+            // 2. Exécuter les migrations avec Liquibase
+            try (Connection connection = this.dataSourceProvider.getDataSource().getConnection()) {
+                Database database = DatabaseFactory.getInstance().findCorrectDatabaseImplementation(new JdbcConnection(connection));
+                Liquibase liquibase = new Liquibase("db/changelog/master.xml", new ClassLoaderResourceAccessor(getClassLoader()), database);
+                liquibase.update();
+                getLogger().info("✅ Migrations de la base de données gérées par Liquibase.");
+            }
 
-            // 3. Initialiser le repository des arènes
+            // 3. Initialiser le repository
             ArenaRepository arenaRepository = new JdbcArenaRepository(this.dataSourceProvider.getDataSource());
 
             // 4. Initialiser le manager
