@@ -1,6 +1,5 @@
 # 🚀 Nexus Plugin - Heneria Project
 
-[![CI/CD Pipeline](https://github.com/GordoxGit/Nexus/actions/workflows/heneria-ci.yml/badge.svg)](https://github.com/GordoxGit/Nexus/actions/workflows/heneria-ci.yml)
 [![Java 21](https://img.shields.io/badge/Java-21-orange.svg)](https://openjdk.java.net/projects/jdk/21/)
 [![Minecraft 1.21](https://img.shields.io/badge/Minecraft-1.21-green.svg)](https://www.minecraft.net/)
 [![Paper](https://img.shields.io/badge/Paper-1.21-blue.svg)](https://papermc.io/)
