@@ -6,15 +6,12 @@ import fr.heneria.nexus.arena.repository.JdbcArenaRepository;
 import fr.heneria.nexus.command.ArenaCommand;
 import fr.heneria.nexus.db.HikariDataSourceProvider;
 
-// Imports avec les noms de packages ORIGINAUX de Liquibase
+// Imports corrigés : seuls les classes nécessaires sont importées
 import liquibase.Liquibase;
 import liquibase.Scope;
 import liquibase.database.Database;
 import liquibase.database.DatabaseFactory;
-import liqu.database.jvm.JdbcConnection;
-import liquibase.logging.LogService;
-import liquibase.logging.LogType;
-import liquibase.logging.Logger;
+import liquibase.database.jvm.JdbcConnection;
 import liquibase.logging.core.JavaLogService;
 import liquibase.resource.ClassLoaderResourceAccessor;
 
@@ -40,7 +37,6 @@ public final class Nexus extends JavaPlugin {
             this.dataSourceProvider.init(this);
 
             // 2. Exécuter les migrations avec Liquibase en injectant manuellement le logger
-            // C'est la solution définitive basée sur les recommandations des développeurs de Liquibase.
             Map<String, Object> scopeValues = new HashMap<>();
             scopeValues.put(Scope.Attr.logService.name(), new JavaLogService());
             
@@ -51,7 +47,6 @@ public final class Nexus extends JavaPlugin {
                     liquibase.update();
                     getLogger().info("✅ Migrations de la base de données gérées par Liquibase.");
                 } catch (Exception e) {
-                    // Remonter l'exception pour qu'elle soit capturée par le bloc try/catch principal
                     throw new RuntimeException("Échec des migrations de base de données", e);
                 }
             });
