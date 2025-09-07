@@ -22,11 +22,10 @@ public final class Nexus extends JavaPlugin {
     @Override
     public void onEnable() {
         try {
-            // ======================= CORRECTION CI-DESSOUS =======================
-            // Définit le service de logging de Liquibase pour qu'il utilise le logger Java standard,
-            // compatible avec l'environnement Bukkit/Paper.
-            System.setProperty("liquibase.hub.logService", "liquibase.logging.core.JavaLogService");
             // =====================================================================
+            // CETTE LIGNE EST LA SOLUTION. ELLE DOIT ÊTRE LA TOUTE PREMIÈRE.
+            // =====================================================================
+            System.setProperty("liquibase.hub.logService", "liquibase.logging.core.JavaLogService");
 
             // 1. Initialiser le pool de connexions
             this.dataSourceProvider = new HikariDataSourceProvider();
