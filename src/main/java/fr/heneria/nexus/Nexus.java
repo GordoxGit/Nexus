@@ -5,10 +5,10 @@ import fr.heneria.nexus.arena.repository.ArenaRepository;
 import fr.heneria.nexus.arena.repository.JdbcArenaRepository;
 import fr.heneria.nexus.command.ArenaCommand;
 import fr.heneria.nexus.db.HikariDataSourceProvider;
-import fr.heneria.nexus.listener.PlayerConnectionListener; // NOUVEL IMPORT
-import fr.heneria.nexus.player.manager.PlayerManager;     // NOUVEL IMPORT
-import fr.heneria.nexus.player.repository.JdbcPlayerRepository; // NOUVEL IMPORT
-import fr.heneria.nexus.player.repository.PlayerRepository;   // NOUVEL IMPORT
+import fr.heneria.nexus.listener.PlayerConnectionListener;
+import fr.heneria.nexus.player.manager.PlayerManager;
+import fr.heneria.nexus.player.repository.JdbcPlayerRepository;
+import fr.heneria.nexus.player.repository.PlayerRepository;
 import liquibase.Liquibase;
 import liquibase.database.Database;
 import liquibase.database.DatabaseFactory;
@@ -22,7 +22,7 @@ public final class Nexus extends JavaPlugin {
 
     private HikariDataSourceProvider dataSourceProvider;
     private ArenaManager arenaManager;
-    private PlayerManager playerManager; // NOUVEAU CHAMP
+    private PlayerManager playerManager;
 
     @Override
     public void onEnable() {
@@ -30,7 +30,6 @@ public final class Nexus extends JavaPlugin {
         Thread.currentThread().setContextClassLoader(this.getClassLoader());
 
         try {
-            // ... (Le code de connexion et de migration reste le même)
             this.dataSourceProvider = new HikariDataSourceProvider();
             this.dataSourceProvider.init(this);
 
@@ -41,21 +40,18 @@ public final class Nexus extends JavaPlugin {
                 getLogger().info("✅ Migrations de la base de données gérées par Liquibase.");
             }
 
-            // Initialisation des Repositories
-            ArenaRepository arenaRepository = new JdbcArenaRepository(this.dataSourceProvider.getDataSource());
-            PlayerRepository playerRepository = new JdbcPlayerRepository(this.dataSourceProvider.getDataSource(), this); // NOUVELLE LIGNE
+            // CORRECTION: L'instance du plugin n'est plus passée ici
+            PlayerRepository playerRepository = new JdbcPlayerRepository(this.dataSourceProvider.getDataSource());
 
-            // Initialisation des Managers
-            this.arenaManager = new ArenaManager(arenaRepository);
-            this.playerManager = new PlayerManager(playerRepository); // NOUVELLE LIGNE
+            this.arenaManager = new ArenaManager(new JdbcArenaRepository(this.dataSourceProvider.getDataSource()));
+            this.playerManager = new PlayerManager(playerRepository);
 
-            // Chargement des données
             this.arenaManager.loadArenas();
             getLogger().info(this.arenaManager.getAllArenas().size() + " arène(s) chargée(s).");
 
-            // Enregistrement des commandes et des listeners
             getCommand("nx").setExecutor(new ArenaCommand(this.arenaManager));
-            getServer().getPluginManager().registerEvents(new PlayerConnectionListener(this.playerManager), this); // LIGNE CRUCIALE AJOUTÉE
+            // CORRECTION: L'instance du plugin (this) est maintenant passée au listener
+            getServer().getPluginManager().registerEvents(new PlayerConnectionListener(this.playerManager, this), this);
 
             getLogger().info("✅ Le plugin Nexus a été activé avec succès !");
 
@@ -70,9 +66,9 @@ public final class Nexus extends JavaPlugin {
 
     @Override
     public void onDisable() {
-        // Sauvegarder tous les profils en ligne avant de fermer la connexion
         if (this.playerManager != null) {
-            this.playerManager.saveAllProfiles();
+            // CORRECTION: Appel de la méthode qui existe réellement
+            this.playerManager.unloadAllProfiles(); 
         }
         if (this.dataSourceProvider != null) {
             this.dataSourceProvider.close();
