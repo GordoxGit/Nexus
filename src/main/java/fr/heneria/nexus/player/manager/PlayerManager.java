@@ -3,50 +3,47 @@ package fr.heneria.nexus.player.manager;
 import fr.heneria.nexus.player.model.PlayerProfile;
 import fr.heneria.nexus.player.repository.PlayerRepository;
 
-import java.time.Instant;
 import java.util.Map;
-import java.util.Optional;
 import java.util.UUID;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class PlayerManager {
 
-    private final PlayerRepository repository;
-    private final Map<UUID, PlayerProfile> cache = new ConcurrentHashMap<>();
+    private final PlayerRepository playerRepository;
+    private final Map<UUID, PlayerProfile> profileCache = new ConcurrentHashMap<>();
 
-    public PlayerManager(PlayerRepository repository) {
-        this.repository = repository;
+    public PlayerManager(PlayerRepository playerRepository) {
+        this.playerRepository = playerRepository;
     }
 
-    public CompletableFuture<PlayerProfile> loadProfile(UUID uuid, String playerName) {
-        return repository.findProfileByUUID(uuid).thenApply(optional -> {
-            PlayerProfile profile = optional.orElseGet(() -> new PlayerProfile(uuid, playerName));
-            profile.setPlayerName(playerName);
-            profile.setLastLogin(Instant.now());
-            cache.put(uuid, profile);
-            return profile;
+    public void loadPlayerProfile(UUID uuid, String name) {
+        playerRepository.findProfileByUUID(uuid).thenAccept(optionalProfile -> {
+            PlayerProfile profile = optionalProfile.orElseGet(() -> {
+                PlayerProfile newProfile = new PlayerProfile(uuid, name);
+                playerRepository.saveProfile(newProfile);
+                return newProfile;
+            });
+            profileCache.put(uuid, profile);
+        }).exceptionally(throwable -> {
+            // Gérer l'erreur de chargement
+            return null;
         });
     }
 
-    public Optional<PlayerProfile> getProfile(UUID uuid) {
-        return Optional.ofNullable(cache.get(uuid));
+    public void unloadPlayerProfile(UUID uuid) {
+        PlayerProfile profile = profileCache.remove(uuid);
+        if (profile != null) {
+            playerRepository.saveProfile(profile);
+        }
     }
 
-    public CompletableFuture<Void> saveProfile(UUID uuid) {
-        PlayerProfile profile = cache.get(uuid);
-        if (profile == null) {
-            return CompletableFuture.completedFuture(null);
-        }
-        return repository.saveProfile(profile);
+    public PlayerProfile getPlayerProfile(UUID uuid) {
+        return profileCache.get(uuid);
     }
-
-    public CompletableFuture<Void> unloadProfile(UUID uuid) {
-        PlayerProfile profile = cache.remove(uuid);
-        if (profile == null) {
-            return CompletableFuture.completedFuture(null);
-        }
-        profile.setLastLogin(Instant.now());
-        return repository.saveProfile(profile);
+    
+    // CORRECTION: Ajout de la méthode pour sauvegarder tous les profils à la désactivation
+    public void unloadAllProfiles() {
+        profileCache.values().forEach(playerRepository::saveProfile);
+        profileCache.clear();
     }
 }
