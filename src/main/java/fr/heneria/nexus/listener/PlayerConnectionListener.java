@@ -7,14 +7,12 @@ import org.bukkit.event.player.AsyncPlayerPreLoginEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.plugin.java.JavaPlugin;
 
-import java.util.UUID;
-import java.util.concurrent.ExecutionException;
-
 public class PlayerConnectionListener implements Listener {
 
     private final PlayerManager playerManager;
-    private final JavaPlugin plugin;
+    private final JavaPlugin plugin; // CORRECTION: Ajout du champ pour le plugin
 
+    // CORRECTION: Le constructeur accepte maintenant le plugin
     public PlayerConnectionListener(PlayerManager playerManager, JavaPlugin plugin) {
         this.playerManager = playerManager;
         this.plugin = plugin;
@@ -22,19 +20,13 @@ public class PlayerConnectionListener implements Listener {
 
     @EventHandler
     public void onPreLogin(AsyncPlayerPreLoginEvent event) {
-        UUID uuid = event.getUniqueId();
-        String name = event.getName();
-        try {
-            playerManager.loadProfile(uuid, name).get();
-        } catch (InterruptedException | ExecutionException e) {
-            event.disallow(AsyncPlayerPreLoginEvent.Result.KICK_OTHER, "§cErreur lors du chargement de votre profil.");
-            plugin.getLogger().severe("Failed to load profile for " + name + ": " + e.getMessage());
-            e.printStackTrace();
-        }
+        plugin.getLogger().info("Chargement du profil pour " + event.getName() + "...");
+        playerManager.loadPlayerProfile(event.getUniqueId(), event.getName());
     }
 
     @EventHandler
     public void onQuit(PlayerQuitEvent event) {
-        playerManager.unloadProfile(event.getPlayer().getUniqueId());
+        plugin.getLogger().info("Sauvegarde du profil pour " + event.getPlayer().getName() + "...");
+        playerManager.unloadPlayerProfile(event.getPlayer().getUniqueId());
     }
 }
