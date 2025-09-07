@@ -5,6 +5,10 @@ import fr.heneria.nexus.arena.repository.ArenaRepository;
 import fr.heneria.nexus.arena.repository.JdbcArenaRepository;
 import fr.heneria.nexus.command.ArenaCommand;
 import fr.heneria.nexus.db.HikariDataSourceProvider;
+import fr.heneria.nexus.listener.PlayerConnectionListener;
+import fr.heneria.nexus.player.manager.PlayerManager;
+import fr.heneria.nexus.player.repository.JdbcPlayerRepository;
+import fr.heneria.nexus.player.repository.PlayerRepository;
 
 import liquibase.Liquibase;
 import liquibase.database.Database;
@@ -20,6 +24,7 @@ public final class Nexus extends JavaPlugin {
 
     private HikariDataSourceProvider dataSourceProvider;
     private ArenaManager arenaManager;
+    private PlayerManager playerManager;
 
     @Override
     public void onEnable() {
@@ -40,11 +45,13 @@ public final class Nexus extends JavaPlugin {
                 getLogger().info("✅ Migrations de la base de données gérées par Liquibase.");
             }
 
-            // 3. Initialiser le repository
+            // 3. Initialiser les repositories
             ArenaRepository arenaRepository = new JdbcArenaRepository(this.dataSourceProvider.getDataSource());
+            PlayerRepository playerRepository = new JdbcPlayerRepository(this.dataSourceProvider.getDataSource());
 
-            // 4. Initialiser le manager
+            // 4. Initialiser les managers
             this.arenaManager = new ArenaManager(arenaRepository);
+            this.playerManager = new PlayerManager(playerRepository);
 
             // 5. Charger les arènes
             this.arenaManager.loadArenas();
@@ -52,6 +59,9 @@ public final class Nexus extends JavaPlugin {
 
             // 6. Enregistrer les commandes
             getCommand("nx").setExecutor(new ArenaCommand(this.arenaManager));
+
+            // 7. Enregistrer les listeners
+            getServer().getPluginManager().registerEvents(new PlayerConnectionListener(this.playerManager, this), this);
 
             getLogger().info("✅ Le plugin Nexus a été activé avec succès !");
 
