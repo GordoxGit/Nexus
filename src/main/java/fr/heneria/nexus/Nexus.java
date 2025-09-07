@@ -5,17 +5,15 @@ import fr.heneria.nexus.arena.repository.ArenaRepository;
 import fr.heneria.nexus.arena.repository.JdbcArenaRepository;
 import fr.heneria.nexus.command.ArenaCommand;
 import fr.heneria.nexus.db.HikariDataSourceProvider;
-import fr.heneria.nexus.listener.PlayerConnectionListener;
-import fr.heneria.nexus.player.manager.PlayerManager;
-import fr.heneria.nexus.player.repository.JdbcPlayerRepository;
-import fr.heneria.nexus.player.repository.PlayerRepository;
-
+import fr.heneria.nexus.listener.PlayerConnectionListener; // NOUVEL IMPORT
+import fr.heneria.nexus.player.manager.PlayerManager;     // NOUVEL IMPORT
+import fr.heneria.nexus.player.repository.JdbcPlayerRepository; // NOUVEL IMPORT
+import fr.heneria.nexus.player.repository.PlayerRepository;   // NOUVEL IMPORT
 import liquibase.Liquibase;
 import liquibase.database.Database;
 import liquibase.database.DatabaseFactory;
 import liquibase.database.jvm.JdbcConnection;
 import liquibase.resource.ClassLoaderResourceAccessor;
-
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.sql.Connection;
@@ -24,20 +22,18 @@ public final class Nexus extends JavaPlugin {
 
     private HikariDataSourceProvider dataSourceProvider;
     private ArenaManager arenaManager;
-    private PlayerManager playerManager;
+    private PlayerManager playerManager; // NOUVEAU CHAMP
 
     @Override
     public void onEnable() {
-        // Définir le ClassLoader du thread est une bonne pratique pour assurer la compatibilité
         ClassLoader originalClassLoader = Thread.currentThread().getContextClassLoader();
         Thread.currentThread().setContextClassLoader(this.getClassLoader());
 
         try {
-            // 1. Initialiser le pool de connexions
+            // ... (Le code de connexion et de migration reste le même)
             this.dataSourceProvider = new HikariDataSourceProvider();
             this.dataSourceProvider.init(this);
 
-            // 2. Exécuter les migrations avec Liquibase
             try (Connection connection = this.dataSourceProvider.getDataSource().getConnection()) {
                 Database database = DatabaseFactory.getInstance().findCorrectDatabaseImplementation(new JdbcConnection(connection));
                 Liquibase liquibase = new Liquibase("db/changelog/master.xml", new ClassLoaderResourceAccessor(getClassLoader()), database);
@@ -45,23 +41,21 @@ public final class Nexus extends JavaPlugin {
                 getLogger().info("✅ Migrations de la base de données gérées par Liquibase.");
             }
 
-            // 3. Initialiser les repositories
+            // Initialisation des Repositories
             ArenaRepository arenaRepository = new JdbcArenaRepository(this.dataSourceProvider.getDataSource());
-            PlayerRepository playerRepository = new JdbcPlayerRepository(this.dataSourceProvider.getDataSource());
+            PlayerRepository playerRepository = new JdbcPlayerRepository(this.dataSourceProvider.getDataSource(), this); // NOUVELLE LIGNE
 
-            // 4. Initialiser les managers
+            // Initialisation des Managers
             this.arenaManager = new ArenaManager(arenaRepository);
-            this.playerManager = new PlayerManager(playerRepository);
+            this.playerManager = new PlayerManager(playerRepository); // NOUVELLE LIGNE
 
-            // 5. Charger les arènes
+            // Chargement des données
             this.arenaManager.loadArenas();
             getLogger().info(this.arenaManager.getAllArenas().size() + " arène(s) chargée(s).");
 
-            // 6. Enregistrer les commandes
+            // Enregistrement des commandes et des listeners
             getCommand("nx").setExecutor(new ArenaCommand(this.arenaManager));
-
-            // 7. Enregistrer les listeners
-            getServer().getPluginManager().registerEvents(new PlayerConnectionListener(this.playerManager, this), this);
+            getServer().getPluginManager().registerEvents(new PlayerConnectionListener(this.playerManager), this); // LIGNE CRUCIALE AJOUTÉE
 
             getLogger().info("✅ Le plugin Nexus a été activé avec succès !");
 
@@ -70,13 +64,16 @@ public final class Nexus extends JavaPlugin {
             e.printStackTrace();
             getServer().getPluginManager().disablePlugin(this);
         } finally {
-            // Restaurer le ClassLoader original
             Thread.currentThread().setContextClassLoader(originalClassLoader);
         }
     }
 
     @Override
     public void onDisable() {
+        // Sauvegarder tous les profils en ligne avant de fermer la connexion
+        if (this.playerManager != null) {
+            this.playerManager.saveAllProfiles();
+        }
         if (this.dataSourceProvider != null) {
             this.dataSourceProvider.close();
         }
