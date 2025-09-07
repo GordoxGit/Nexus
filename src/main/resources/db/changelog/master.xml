@@ -6,5 +6,6 @@
                            http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.3.xsd">
 
     <include file="db/changelog/001_create_initial_arena_tables.sql"/>
+    <include file="db/changelog/002_create_player_tables.sql"/>
 
 </databaseChangeLog>
