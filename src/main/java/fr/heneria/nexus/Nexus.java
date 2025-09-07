@@ -16,25 +16,24 @@ import java.sql.Connection;
 
 public final class Nexus extends JavaPlugin {
 
-    // ======================= CORRECTION DÉFINITIVE CI-DESSOUS =======================
-    // Ce bloc 'static' est exécuté une seule fois, au moment où la classe Nexus est chargée en mémoire par Java.
-    // C'est la méthode la plus précoce pour définir une propriété système, ce qui résout l'erreur d'initialisation de Liquibase.
-    static {
-        System.setProperty("liquibase.hub.logService", "liquibase.logging.core.JavaLogService");
-    }
-    // ==============================================================================
-
     private HikariDataSourceProvider dataSourceProvider;
     private ArenaManager arenaManager;
 
     @Override
     public void onEnable() {
+        // ======================= SOLUTION DÉFINITIVE =======================
+        // On sauvegarde le ClassLoader actuel du thread.
+        ClassLoader originalClassLoader = Thread.currentThread().getContextClassLoader();
+        // On le remplace par le ClassLoader de notre plugin.
+        Thread.currentThread().setContextClassLoader(this.getClassLoader());
+        // =====================================================================
+
         try {
             // 1. Initialiser le pool de connexions
             this.dataSourceProvider = new HikariDataSourceProvider();
             this.dataSourceProvider.init(this);
 
-            // 2. Exécuter les migrations avec Liquibase
+            // 2. Exécuter les migrations avec Liquibase (maintenant dans le bon contexte de ClassLoader)
             try (Connection connection = this.dataSourceProvider.getDataSource().getConnection()) {
                 Database database = DatabaseFactory.getInstance().findCorrectDatabaseImplementation(new JdbcConnection(connection));
                 Liquibase liquibase = new Liquibase("db/changelog/master.xml", new ClassLoaderResourceAccessor(getClassLoader()), database);
@@ -61,6 +60,12 @@ public final class Nexus extends JavaPlugin {
             getLogger().severe("❌ Erreur critique lors du démarrage de Nexus :");
             e.printStackTrace();
             getServer().getPluginManager().disablePlugin(this);
+        } finally {
+            // =====================================================================
+            // Il est CRUCIAL de restaurer le ClassLoader original après nos opérations
+            // pour ne pas causer de problèmes à d'autres plugins.
+            Thread.currentThread().setContextClassLoader(originalClassLoader);
+            // =====================================================================
         }
     }
 
