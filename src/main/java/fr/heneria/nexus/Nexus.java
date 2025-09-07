@@ -5,8 +5,14 @@ import fr.heneria.nexus.arena.repository.ArenaRepository;
 import fr.heneria.nexus.arena.repository.JdbcArenaRepository;
 import fr.heneria.nexus.command.ArenaCommand;
 import fr.heneria.nexus.db.HikariDataSourceProvider;
+import liquibase.Liquibase;
+import liquibase.database.Database;
+import liquibase.database.DatabaseFactory;
+import liquibase.database.jvm.JdbcConnection;
+import liquibase.resource.ClassLoaderResourceAccessor;
 import org.bukkit.plugin.java.JavaPlugin;
-import org.flywaydb.core.Flyway;
+
+import java.sql.Connection;
 
 public final class Nexus extends JavaPlugin {
 
@@ -15,35 +21,44 @@ public final class Nexus extends JavaPlugin {
 
     @Override
     public void onEnable() {
-        // 1. Initialiser le pool de connexions à la base de données
-        this.dataSourceProvider = new HikariDataSourceProvider();
-        this.dataSourceProvider.init(this);
+        try {
+            // 1. Initialiser le pool de connexions
+            this.dataSourceProvider = new HikariDataSourceProvider();
+            this.dataSourceProvider.init(this);
 
-        // 2. Exécuter les migrations Flyway
-        Flyway.configure()
-                .dataSource(this.dataSourceProvider.getDataSource())
-                .load()
-                .migrate();
+            // 2. Exécuter les migrations avec Liquibase
+            try (Connection connection = this.dataSourceProvider.getDataSource().getConnection()) {
+                Database database = DatabaseFactory.getInstance().findCorrectDatabaseImplementation(new JdbcConnection(connection));
+                // Le chemin pointe vers le fichier maître de changelog
+                Liquibase liquibase = new Liquibase("db/changelog/master.xml", new ClassLoaderResourceAccessor(getClassLoader()), database);
+                liquibase.update();
+                getLogger().info("✅ Migrations de la base de données gérées par Liquibase.");
+            }
 
-        // 3. Initialiser le repository des arènes
-        ArenaRepository arenaRepository = new JdbcArenaRepository(this.dataSourceProvider.getDataSource());
+            // 3. Initialiser le repository des arènes
+            ArenaRepository arenaRepository = new JdbcArenaRepository(this.dataSourceProvider.getDataSource());
 
-        // 4. CORRECTION : initialiser le manager et l'assigner au champ de la classe
-        this.arenaManager = new ArenaManager(arenaRepository);
+            // 4. Initialiser le manager
+            this.arenaManager = new ArenaManager(arenaRepository);
 
-        // 5. Charger les arènes existantes (this.arenaManager n'est plus null)
-        this.arenaManager.loadArenas();
-        getLogger().info(this.arenaManager.getAllArenas().size() + " arène(s) chargée(s).");
+            // 5. Charger les arènes
+            this.arenaManager.loadArenas();
+            getLogger().info(this.arenaManager.getAllArenas().size() + " arène(s) chargée(s).");
 
-        // 6. Enregistrer les commandes
-        getCommand("nx").setExecutor(new ArenaCommand(this.arenaManager));
+            // 6. Enregistrer les commandes
+            getCommand("nx").setExecutor(new ArenaCommand(this.arenaManager));
 
-        getLogger().info("Le plugin Nexus a été activé avec succès !");
+            getLogger().info("✅ Le plugin Nexus a été activé avec succès !");
+
+        } catch (Exception e) {
+            getLogger().severe("❌ Erreur critique lors du démarrage de Nexus :");
+            e.printStackTrace();
+            getServer().getPluginManager().disablePlugin(this);
+        }
     }
 
     @Override
     public void onDisable() {
-        // Fermer le pool de connexions
         if (this.dataSourceProvider != null) {
             this.dataSourceProvider.close();
         }
