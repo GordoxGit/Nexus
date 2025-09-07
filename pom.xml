@@ -113,7 +113,7 @@
         </dependency>
 
         <dependency>
-            <groupId>com.github.triumphteam</groupId>
+            <groupId>com.github.TriumphTeam</groupId>
             <artifactId>triumph-gui</artifactId>
             <version>3.1.8</version>
             <scope>compile</scope>
