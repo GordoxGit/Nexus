@@ -52,6 +52,10 @@
                                     <pattern>dev.triumphteam.gui</pattern>
                                     <shadedPattern>fr.heneria.nexus.libs.gui</shadedPattern>
                                 </relocation>
+                                <relocation>
+                                    <pattern>com.mysql</pattern>
+                                    <shadedPattern>fr.heneria.nexus.libs.mysql</shadedPattern>
+                                </relocation>
                             </relocations>
                         </configuration>
                     </execution>
@@ -86,9 +90,9 @@
         </dependency>
 
         <dependency>
-            <groupId>org.mariadb.jdbc</groupId>
-            <artifactId>mariadb-java-client</artifactId>
-            <version>3.4.0</version>
+            <groupId>com.mysql</groupId>
+            <artifactId>mysql-connector-j</artifactId>
+            <version>8.4.0</version>
             <scope>compile</scope>
         </dependency>
 
