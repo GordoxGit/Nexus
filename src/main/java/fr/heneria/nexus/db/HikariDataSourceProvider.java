@@ -42,11 +42,7 @@ public class HikariDataSourceProvider {
             throw new IllegalArgumentException("Invalid database configuration");
         }
 
-        // CORRECTION : Forcer l'utilisation de l'URL et du driver MySQL pour la compatibilité avec Flyway
-        String jdbcUrl = String.format("jdbc:mysql://%s:%d/%s", host, port, database);
-        hikariConfig.setDriverClassName("com.mysql.cj.jdbc.Driver");
-        plugin.getLogger().info("Utilisation du driver JDBC MySQL pour la compatibilité.");
-
+        String jdbcUrl = String.format("jdbc:mariadb://%s:%d/%s", host, port, database);
         plugin.getLogger().info("Connexion à la base de données: " + jdbcUrl);
 
         hikariConfig.setJdbcUrl(jdbcUrl);
@@ -60,18 +56,12 @@ public class HikariDataSourceProvider {
         hikariConfig.setMaxLifetime(config.getLong("database.hikari.max-lifetime", 1800000));
         hikariConfig.setLeakDetectionThreshold(config.getLong("database.hikari.leak-detection-threshold", 60000));
 
-        // Propriétés de performance pour le driver MySQL
-        hikariConfig.addDataSourceProperty("cachePrepStmts", "true");
+        hikariConfig.addDataSourceProperty("useServerPrepStmts", "true");
         hikariConfig.addDataSourceProperty("prepStmtCacheSize", "250");
         hikariConfig.addDataSourceProperty("prepStmtCacheSqlLimit", "2048");
-        hikariConfig.addDataSourceProperty("useServerPrepStmts", "true");
-        hikariConfig.addDataSourceProperty("useLocalSessionState", "true");
-        hikariConfig.addDataSourceProperty("rewriteBatchedStatements", "true");
-        hikariConfig.addDataSourceProperty("cacheResultSetMetadata", "true");
-        hikariConfig.addDataSourceProperty("cacheServerConfiguration", "true");
-        hikariConfig.addDataSourceProperty("elideSetAutoCommits", "true");
-        hikariConfig.addDataSourceProperty("maintainTimeStats", "false");
-
+        hikariConfig.addDataSourceProperty("useUnicode", "true");
+        hikariConfig.addDataSourceProperty("characterEncoding", "utf8mb4");
+        
         hikariConfig.setPoolName("NexusHikariPool");
 
         try {
