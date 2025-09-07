@@ -41,6 +41,17 @@ public class HikariDataSourceProvider {
             plugin.getLogger().severe("❌ Configuration de base de données invalide. Veuillez vérifier config.yml");
             throw new IllegalArgumentException("Invalid database configuration");
         }
+        
+        // ======================= CORRECTION CI-DESSOUS =======================
+        // Force le chargement de la classe du driver MariaDB pour l'enregistrer.
+        // C'est la solution définitive au problème "No suitable driver".
+        try {
+            Class.forName("org.mariadb.jdbc.Driver");
+        } catch (ClassNotFoundException e) {
+            plugin.getLogger().severe("❌ Le driver JDBC MariaDB est introuvable ! Le plugin ne peut pas démarrer.");
+            throw new RuntimeException("Failed to load MariaDB JDBC driver", e);
+        }
+        // =====================================================================
 
         String jdbcUrl = String.format("jdbc:mariadb://%s:%d/%s", host, port, database);
         plugin.getLogger().info("Connexion à la base de données: " + jdbcUrl);
