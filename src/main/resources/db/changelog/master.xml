@@ -7,5 +7,6 @@
 
     <include file="db/changelog/001_create_initial_arena_tables.sql"/>
     <include file="db/changelog/002_create_player_tables.sql"/>
+    <include file="db/changelog/003_create_economy_tables.sql"/>
 
 </databaseChangeLog>
