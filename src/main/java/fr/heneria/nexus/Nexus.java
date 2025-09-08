@@ -9,6 +9,7 @@ import fr.heneria.nexus.listener.PlayerConnectionListener;
 import fr.heneria.nexus.player.manager.PlayerManager;
 import fr.heneria.nexus.player.repository.JdbcPlayerRepository;
 import fr.heneria.nexus.player.repository.PlayerRepository;
+import fr.heneria.nexus.economy.manager.EconomyManager;
 import liquibase.Liquibase;
 import liquibase.database.Database;
 import liquibase.database.DatabaseFactory;
@@ -23,6 +24,7 @@ public final class Nexus extends JavaPlugin {
     private HikariDataSourceProvider dataSourceProvider;
     private ArenaManager arenaManager;
     private PlayerManager playerManager;
+    private EconomyManager economyManager;
 
     @Override
     public void onEnable() {
@@ -45,6 +47,7 @@ public final class Nexus extends JavaPlugin {
 
             this.arenaManager = new ArenaManager(new JdbcArenaRepository(this.dataSourceProvider.getDataSource()));
             this.playerManager = new PlayerManager(playerRepository);
+            this.economyManager = new EconomyManager(this.playerManager);
 
             this.arenaManager.loadArenas();
             getLogger().info(this.arenaManager.getAllArenas().size() + " arène(s) chargée(s).");
