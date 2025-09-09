@@ -9,6 +9,7 @@ import fr.heneria.nexus.shop.model.ShopItem;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.entity.Player;
+import org.bukkit.Material;
 
 import java.util.List;
 
@@ -47,6 +48,19 @@ public class ShopCategoryGui {
                     });
             gui.addItem(guiItem);
         }
+
+        GuiItem back = ItemBuilder.from(Material.BARRIER)
+                .name(Component.text("Retour", NamedTextColor.RED))
+                .asGuiItem(event -> {
+                    event.setCancelled(true);
+                    new ShopAdminGui(shopManager).open((Player) event.getWhoClicked());
+                });
+
+        gui.setItem(rows * 9 - 1, back);
+
+        gui.getFiller().fill(ItemBuilder.from(Material.GRAY_STAINED_GLASS_PANE)
+                .name(Component.text(" "))
+                .asGuiItem());
 
         gui.open(player);
     }

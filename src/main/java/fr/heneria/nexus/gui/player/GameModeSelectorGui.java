@@ -7,6 +7,7 @@ import fr.heneria.nexus.game.model.MatchType;
 import fr.heneria.nexus.game.queue.GameMode;
 import fr.heneria.nexus.game.queue.QueueManager;
 import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -33,12 +34,18 @@ public class GameModeSelectorGui {
         gui.setDefaultClickAction(event -> event.setCancelled(true));
 
         gui.addItem(ItemBuilder.from(Material.IRON_SWORD)
-                .name(Component.text("Partie Normale"))
+                .name(Component.text("Partie Normale", NamedTextColor.GREEN))
+                .lore(Component.text("Mode de jeu standard", NamedTextColor.GRAY))
                 .asGuiItem(e -> openModeMenu((Player) e.getWhoClicked(), MatchType.NORMAL)));
 
         gui.addItem(ItemBuilder.from(Material.DIAMOND_SWORD)
-                .name(Component.text("Partie Classée"))
+                .name(Component.text("Partie Classée", NamedTextColor.GREEN))
+                .lore(Component.text("Affrontez les meilleurs", NamedTextColor.GRAY))
                 .asGuiItem(e -> openModeMenu((Player) e.getWhoClicked(), MatchType.RANKED)));
+
+        gui.getFiller().fill(ItemBuilder.from(Material.GRAY_STAINED_GLASS_PANE)
+                .name(Component.text(" "))
+                .asGuiItem());
 
         gui.open(player);
     }
@@ -59,6 +66,19 @@ public class GameModeSelectorGui {
                 gui.updateItem(mode.ordinal(), createItem(type, mode));
             }
         }, 20L, 40L);
+
+        GuiItem back = ItemBuilder.from(Material.BARRIER)
+                .name(Component.text("Retour", NamedTextColor.RED))
+                .asGuiItem(e -> {
+                    e.setCancelled(true);
+                    task.cancel();
+                    open((Player) e.getWhoClicked());
+                });
+        gui.setItem(8, back);
+
+        gui.getFiller().fill(ItemBuilder.from(Material.GRAY_STAINED_GLASS_PANE)
+                .name(Component.text(" "))
+                .asGuiItem());
 
         gui.setCloseGuiAction(event -> task.cancel());
         gui.open(player);

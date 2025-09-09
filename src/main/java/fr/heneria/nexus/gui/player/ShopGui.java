@@ -55,6 +55,10 @@ public class ShopGui {
             gui.addItem(guiItem);
         }
 
+        gui.getFiller().fill(ItemBuilder.from(Material.GRAY_STAINED_GLASS_PANE)
+                .name(Component.text(" "))
+                .asGuiItem());
+
         gui.open(player);
     }
 }

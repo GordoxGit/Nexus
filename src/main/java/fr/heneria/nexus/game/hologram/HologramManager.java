@@ -2,6 +2,7 @@ package fr.heneria.nexus.game.hologram;
 
 import eu.decentsoftware.holograms.api.DHAPI;
 import eu.decentsoftware.holograms.api.holograms.Hologram;
+import fr.heneria.nexus.game.model.TeamColor;
 import org.bukkit.Location;
 
 import java.util.ArrayList;
@@ -45,11 +46,7 @@ public class HologramManager {
         Collections.sort(teamIds);
         for (int teamId : teamIds) {
             double progress = progresses.getOrDefault(teamId, 0D);
-            String name = switch (teamId) {
-                case 1 -> "§9Équipe Bleue";
-                case 2 -> "§cÉquipe Rouge";
-                default -> "Équipe " + teamId;
-            };
+            String name = TeamColor.coloredName(teamId);
             lines.add(name + ": §f" + (int) progress + " / 60s");
         }
         if (contested) {

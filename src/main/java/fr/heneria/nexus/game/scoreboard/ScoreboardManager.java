@@ -2,6 +2,7 @@ package fr.heneria.nexus.game.scoreboard;
 
 import fr.heneria.nexus.game.model.Match;
 import fr.heneria.nexus.game.model.Team;
+import fr.heneria.nexus.game.model.TeamColor;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.scoreboard.DisplaySlot;
@@ -79,11 +80,7 @@ public class ScoreboardManager {
             obj.getScore(" ").setScore(line--);
             for (Team team : match.getTeams().values()) {
                 int teamScore = match.getTeamScores().getOrDefault(team.getTeamId(), 0);
-                String name = switch (team.getTeamId()) {
-                    case 1 -> "§9Équipe Bleue";
-                    case 2 -> "§cÉquipe Rouge";
-                    default -> "Équipe " + team.getTeamId();
-                };
+                String name = TeamColor.coloredName(team.getTeamId());
                 obj.getScore(name + ": §f" + teamScore).setScore(line--);
             }
             obj.getScore("  ").setScore(line--);

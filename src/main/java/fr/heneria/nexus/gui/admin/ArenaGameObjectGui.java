@@ -84,6 +84,10 @@ public class ArenaGameObjectGui {
 
         gui.setItem(8, back);
 
+        gui.getFiller().fill(ItemBuilder.from(Material.GRAY_STAINED_GLASS_PANE)
+                .name(Component.text(" "))
+                .asGuiItem());
+
         gui.open(player);
     }
 }
