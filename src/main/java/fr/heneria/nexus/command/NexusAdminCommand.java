@@ -74,33 +74,17 @@ public class NexusAdminCommand implements CommandExecutor {
 
         // Anciennes sous-commandes pour la gestion des arènes
         if (!"arena".equalsIgnoreCase(args[0])) {
-            sender.sendMessage("Usage: /" + label + " arena <create|list|save> | /" + label + " setspawn <équipe> <numéroSpawn>");
+            sender.sendMessage("Usage: /" + label + " arena <list|save> | /" + label + " setspawn <équipe> <numéroSpawn>");
             return true;
         }
 
         if (args.length < 2) {
-            sender.sendMessage("Usage: /" + label + " arena <create|list|save> | /" + label + " setspawn <équipe> <numéroSpawn>");
+            sender.sendMessage("Usage: /" + label + " arena <list|save> | /" + label + " setspawn <équipe> <numéroSpawn>");
             return true;
         }
 
         String sub = args[1].toLowerCase();
         switch (sub) {
-            case "create":
-                if (args.length < 4) {
-                    sender.sendMessage("Usage: /" + label + " arena create <nom> <maxJoueurs>");
-                    return true;
-                }
-                String name = args[2];
-                int maxPlayers;
-                try {
-                    maxPlayers = Integer.parseInt(args[3]);
-                } catch (NumberFormatException e) {
-                    sender.sendMessage("maxJoueurs doit être un nombre");
-                    return true;
-                }
-                arenaManager.createArena(name, maxPlayers);
-                sender.sendMessage("Arène " + name + " créée en mémoire. N'oubliez pas de la sauvegarder.");
-                return true;
             case "list":
                 String arenas = arenaManager.getAllArenas().stream()
                         .map(Arena::getName)
