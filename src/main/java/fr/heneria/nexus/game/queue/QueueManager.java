@@ -5,6 +5,8 @@ import fr.heneria.nexus.arena.model.Arena;
 import fr.heneria.nexus.game.manager.GameManager;
 import fr.heneria.nexus.game.model.Match;
 import fr.heneria.nexus.game.model.MatchType;
+import fr.heneria.nexus.sanction.SanctionManager;
+import fr.heneria.nexus.sanction.model.Sanction;
 import org.bukkit.entity.Player;
 
 import java.util.*;
@@ -19,12 +21,14 @@ public class QueueManager {
 
     private final GameManager gameManager;
     private final ArenaManager arenaManager;
+    private final SanctionManager sanctionManager;
     private final Map<MatchType, Map<GameMode, MatchmakingQueue>> queues = new EnumMap<>(MatchType.class);
     private final Map<UUID, QueueEntry> playerQueues = new ConcurrentHashMap<>();
 
-    private QueueManager(GameManager gameManager, ArenaManager arenaManager) {
+    private QueueManager(GameManager gameManager, ArenaManager arenaManager, SanctionManager sanctionManager) {
         this.gameManager = gameManager;
         this.arenaManager = arenaManager;
+        this.sanctionManager = sanctionManager;
         for (MatchType type : MatchType.values()) {
             Map<GameMode, MatchmakingQueue> map = new EnumMap<>(GameMode.class);
             for (GameMode mode : GameMode.values()) {
@@ -34,8 +38,8 @@ public class QueueManager {
         }
     }
 
-    public static void init(GameManager gameManager, ArenaManager arenaManager) {
-        instance = new QueueManager(gameManager, arenaManager);
+    public static void init(GameManager gameManager, ArenaManager arenaManager, SanctionManager sanctionManager) {
+        instance = new QueueManager(gameManager, arenaManager, sanctionManager);
     }
 
     public static QueueManager getInstance() {
@@ -43,6 +47,19 @@ public class QueueManager {
     }
 
     public void joinQueue(Player player, MatchType type, GameMode mode) {
+        if (type == MatchType.RANKED) {
+            Optional<Sanction> sanction = sanctionManager.getActiveRankedPenalty(player.getUniqueId());
+            if (sanction.isPresent()) {
+                Sanction s = sanction.get();
+                if (s.getExpirationTime() != null) {
+                    long seconds = java.time.Duration.between(java.time.Instant.now(), s.getExpirationTime()).toSeconds();
+                    player.sendMessage("§cSanction active. Temps restant: " + formatDuration(seconds));
+                } else {
+                    player.sendMessage("§cSanction permanente active.");
+                }
+                return;
+            }
+        }
         QueueEntry current = playerQueues.get(player.getUniqueId());
         if (current != null && current.type == type && current.mode == mode) {
             leaveQueue(player);
@@ -111,6 +128,21 @@ public class QueueManager {
                 .orElse(MatchType.NORMAL);
         Match match = gameManager.createMatch(arena, teams, type);
         gameManager.startMatchCountdown(match);
+    }
+
+    private String formatDuration(long seconds) {
+        long minutes = seconds / 60;
+        long hours = minutes / 60;
+        long days = hours / 24;
+        if (days > 0) {
+            return days + " jour(s)";
+        } else if (hours > 0) {
+            return hours + " heure(s)";
+        } else if (minutes > 0) {
+            return minutes + " minute(s)";
+        } else {
+            return seconds + " seconde(s)";
+        }
     }
 
     public record QueueEntry(MatchType type, GameMode mode) {}
