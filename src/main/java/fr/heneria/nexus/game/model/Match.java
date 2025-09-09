@@ -1,6 +1,8 @@
 package fr.heneria.nexus.game.model;
 
 import fr.heneria.nexus.arena.model.Arena;
+import fr.heneria.nexus.game.phase.GamePhase;
+import fr.heneria.nexus.game.phase.PhaseManager;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.scheduler.BukkitTask;
@@ -20,6 +22,8 @@ public class Match {
     private Instant endTime;
     private final Map<UUID, Integer> kills = new ConcurrentHashMap<>();
     private final Map<UUID, Integer> deaths = new ConcurrentHashMap<>();
+    private GamePhase currentPhase = GamePhase.PREPARATION;
+    private PhaseManager phaseManager;
 
     public Match(UUID matchId, Arena arena) {
         this.matchId = matchId;
@@ -130,5 +134,21 @@ public class Match {
 
     public Map<UUID, Integer> getDeathsMap() {
         return deaths;
+    }
+
+    public GamePhase getCurrentPhase() {
+        return currentPhase;
+    }
+
+    public void setCurrentPhase(GamePhase currentPhase) {
+        this.currentPhase = currentPhase;
+    }
+
+    public PhaseManager getPhaseManager() {
+        return phaseManager;
+    }
+
+    public void setPhaseManager(PhaseManager phaseManager) {
+        this.phaseManager = phaseManager;
     }
 }

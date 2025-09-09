@@ -10,5 +10,6 @@
     <include file="db/changelog/003_create_economy_tables.sql"/>
     <include file="db/changelog/004_create_shop_items_table.sql"/>
     <include file="db/changelog/005_create_match_tables.sql"/>
+    <include file="db/changelog/006_create_arena_objects_table.sql"/>
 
 </databaseChangeLog>

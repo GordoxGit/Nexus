@@ -1,5 +1,6 @@
 package fr.heneria.nexus.admin.placement;
 
+import fr.heneria.nexus.arena.model.ArenaGameObject;
 import org.bukkit.entity.Player;
 
 import java.util.Map;
@@ -21,7 +22,7 @@ public class AdminPlacementManager {
         return instance;
     }
 
-    private final Map<UUID, SpawnPlacementContext> placementSessions = new ConcurrentHashMap<>();
+    private final Map<UUID, PlacementContext> placementSessions = new ConcurrentHashMap<>();
 
     private AdminPlacementManager() {
     }
@@ -29,10 +30,16 @@ public class AdminPlacementManager {
     /**
      * Démarre le mode de placement pour un administrateur.
      */
-    public void startPlacementMode(Player admin, SpawnPlacementContext context) {
+    public void startPlacementMode(Player admin, PlacementContext context) {
         placementSessions.put(admin.getUniqueId(), context);
-        admin.sendMessage("§eMode placement activé. Cliquez-gauche sur un bloc pour définir le spawn de l'Équipe "
-                + context.teamId() + ", Spawn " + context.spawnNumber() + ". Clic-droit pour annuler.");
+        if (context instanceof SpawnPlacementContext spawn) {
+            admin.sendMessage("§eMode placement activé. Cliquez-gauche sur un bloc pour définir le spawn de l'Équipe "
+                    + spawn.teamId() + ", Spawn " + spawn.spawnNumber() + ". Clic-droit pour annuler.");
+        } else if (context instanceof GameObjectPlacementContext objectCtx) {
+            ArenaGameObject obj = objectCtx.gameObject();
+            admin.sendMessage("§eMode placement activé. Cliquez-gauche pour définir l'emplacement de "
+                    + obj.getObjectType() + " " + obj.getObjectIndex() + ". Clic-droit pour annuler.");
+        }
     }
 
     /**
@@ -49,7 +56,7 @@ public class AdminPlacementManager {
     /**
      * Récupère le contexte de placement d'un administrateur.
      */
-    public SpawnPlacementContext getPlacementContext(Player admin) {
+    public PlacementContext getPlacementContext(Player admin) {
         return placementSessions.get(admin.getUniqueId());
     }
 

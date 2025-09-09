@@ -32,6 +32,7 @@ public class ArenaManager {
     public void saveArena(Arena arena) {
         arenaRepository.saveArena(arena);
         arenaRepository.saveSpawns(arena);
+        arenaRepository.saveGameObjects(arena);
     }
 
     public void deleteArena(Arena arena) {
