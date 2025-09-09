@@ -9,6 +9,7 @@ import org.bukkit.entity.Player;
 import org.bukkit.scheduler.BukkitTask;
 import org.bukkit.plugin.java.JavaPlugin;
 import fr.heneria.nexus.game.hologram.HologramManager;
+import fr.heneria.nexus.game.GameConfig;
 
 import java.util.HashMap;
 import java.util.List;
@@ -53,9 +54,10 @@ public class CapturePhase implements IPhase {
     public void tick(Match match) {
         if (energyCell == null) return;
         Location loc = energyCell.getLocation();
+        double radius = GameConfig.get().getEnergyCellCaptureRadius();
         List<Player> nearby = loc.getWorld().getPlayers().stream()
                 .filter(p -> match.getPlayers().contains(p.getUniqueId()))
-                .filter(p -> p.getLocation().distance(loc) <= 5)
+                .filter(p -> p.getLocation().distance(loc) <= radius)
                 .toList();
         Map<Integer, Double> progresses = new HashMap<>();
         for (Team team : match.getTeams().values()) {
@@ -88,7 +90,7 @@ public class CapturePhase implements IPhase {
         double progress = energyCell.getCaptureProgress().merge(winningTeamId, 1D, Double::sum);
         progresses.put(winningTeamId, progress);
         hologramManager.updateCaptureHologram(progresses, winningTeamId, false);
-        if (progress >= 60) {
+        if (progress >= GameConfig.get().getEnergyCellCaptureTimeSeconds()) {
             match.broadcastMessage("§aL'équipe " + winningTeamId + " a capturé la Cellule d'Énergie !");
             Team team = match.getTeams().get(winningTeamId);
             if (team != null) {

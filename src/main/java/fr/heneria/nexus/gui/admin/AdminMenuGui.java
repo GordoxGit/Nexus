@@ -53,6 +53,15 @@ public class AdminMenuGui {
         // Place l'item au centre
         gui.setItem(13, arenaManagement);
 
+        GuiItem rulesManagement = ItemBuilder.from(Material.COMMAND_BLOCK)
+                .name(Component.text("Règles du Jeu", NamedTextColor.GOLD))
+                .lore(Component.text("Modifier les paramètres de gameplay"))
+                .asGuiItem(event -> {
+                    event.setCancelled(true);
+                    new GameRulesGui().open((Player) event.getWhoClicked());
+                });
+        gui.setItem(11, rulesManagement);
+
         GuiItem shopManagement = ItemBuilder.from(Material.CHEST)
                 .name(Component.text("Gestion de la Boutique", NamedTextColor.GREEN))
                 .lore(Component.text("Configurer la boutique en jeu"))

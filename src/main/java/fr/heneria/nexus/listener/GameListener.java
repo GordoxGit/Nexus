@@ -12,6 +12,7 @@ import fr.heneria.nexus.game.phase.TransportPhase;
 import fr.heneria.nexus.game.phase.IPhase;
 import fr.heneria.nexus.game.queue.QueueManager;
 import fr.heneria.nexus.game.scoreboard.ScoreboardManager;
+import fr.heneria.nexus.game.GameConfig;
 import fr.heneria.nexus.sanction.SanctionManager;
 import org.bukkit.Bukkit;
 import org.bukkit.GameMode;
@@ -89,7 +90,7 @@ public class GameListener implements Listener {
         Player killer = player.getKiller();
         if (killer != null) {
             match.incrementKill(killer.getUniqueId());
-            int reward = plugin.getConfig().getInt("game.economy.kill-reward", 0);
+            int reward = GameConfig.get().getKillReward();
             match.getRoundPoints().merge(killer.getUniqueId(), reward, Integer::sum);
             killer.sendMessage("§6+" + reward + " points (Élimination)");
             ScoreboardManager.getInstance().updatePlayer(match, killer.getUniqueId());

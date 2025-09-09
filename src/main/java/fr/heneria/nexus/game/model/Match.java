@@ -30,7 +30,6 @@ public class Match {
     private int currentRound = 1;
     private final Map<Integer, Integer> teamScores = new ConcurrentHashMap<>();
     private final Map<UUID, Integer> roundPoints = new ConcurrentHashMap<>();
-    public static final int ROUNDS_TO_WIN = 3;
 
     public Match(UUID matchId, Arena arena, MatchType matchType) {
         this.matchId = matchId;
