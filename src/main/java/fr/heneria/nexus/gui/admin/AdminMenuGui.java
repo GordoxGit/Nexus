@@ -11,6 +11,8 @@ import net.kyori.adventure.text.format.NamedTextColor;
 import fr.heneria.nexus.admin.conversation.AdminConversationManager;
 import fr.heneria.nexus.admin.placement.AdminPlacementManager;
 import fr.heneria.nexus.shop.manager.ShopManager;
+import fr.heneria.nexus.game.kit.manager.KitManager;
+import fr.heneria.nexus.gui.admin.kit.KitListGui;
 import fr.heneria.nexus.gui.admin.shop.ShopAdminGui;
 
 /**
@@ -21,11 +23,13 @@ public class AdminMenuGui {
     private final ArenaManager arenaManager;
     private final AdminPlacementManager adminPlacementManager;
     private final ShopManager shopManager;
+    private final KitManager kitManager;
 
-    public AdminMenuGui(ArenaManager arenaManager, AdminPlacementManager adminPlacementManager, ShopManager shopManager) {
+    public AdminMenuGui(ArenaManager arenaManager, AdminPlacementManager adminPlacementManager, ShopManager shopManager, KitManager kitManager) {
         this.arenaManager = arenaManager;
         this.adminPlacementManager = adminPlacementManager;
         this.shopManager = shopManager;
+        this.kitManager = kitManager;
     }
 
     /**
@@ -70,6 +74,15 @@ public class AdminMenuGui {
                     new ShopAdminGui(shopManager).open((Player) event.getWhoClicked());
                 });
         gui.setItem(15, shopManagement);
+
+        GuiItem kitManagement = ItemBuilder.from(Material.IRON_CHESTPLATE)
+                .name(Component.text("Gestion des Kits", NamedTextColor.LIGHT_PURPLE))
+                .lore(Component.text("Créer et modifier les kits"))
+                .asGuiItem(event -> {
+                    event.setCancelled(true);
+                    new KitListGui(kitManager, AdminConversationManager.getInstance()).open((Player) event.getWhoClicked());
+                });
+        gui.setItem(17, kitManagement);
         gui.open(player);
     }
 }

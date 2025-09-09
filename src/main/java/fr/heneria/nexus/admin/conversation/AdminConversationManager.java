@@ -7,6 +7,11 @@ import fr.heneria.nexus.admin.placement.AdminPlacementManager;
 import fr.heneria.nexus.shop.manager.ShopManager;
 import fr.heneria.nexus.shop.repository.ShopRepository;
 import fr.heneria.nexus.shop.model.ShopItem;
+import fr.heneria.nexus.game.kit.manager.KitManager;
+import fr.heneria.nexus.game.kit.model.Kit;
+import fr.heneria.nexus.gui.admin.kit.KitEditorGui;
+import fr.heneria.nexus.gui.admin.kit.KitListGui;
+import org.bukkit.inventory.ItemStack;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -24,8 +29,8 @@ public class AdminConversationManager {
 
     private static AdminConversationManager instance;
 
-    public static void init(ArenaManager arenaManager, ShopManager shopManager, ShopRepository shopRepository, JavaPlugin plugin) {
-        instance = new AdminConversationManager(arenaManager, shopManager, shopRepository, plugin);
+    public static void init(ArenaManager arenaManager, ShopManager shopManager, ShopRepository shopRepository, KitManager kitManager, JavaPlugin plugin) {
+        instance = new AdminConversationManager(arenaManager, shopManager, shopRepository, kitManager, plugin);
     }
 
     public static AdminConversationManager getInstance() {
@@ -35,15 +40,18 @@ public class AdminConversationManager {
     private final ArenaManager arenaManager;
     private final ShopManager shopManager;
     private final ShopRepository shopRepository;
+    private final KitManager kitManager;
     private final JavaPlugin plugin;
     private final Map<UUID, ArenaCreationConversation> conversations = new ConcurrentHashMap<>();
     private final Map<UUID, PriceUpdateConversation> priceConversations = new ConcurrentHashMap<>();
     private final Map<UUID, GameRuleUpdateConversation> ruleConversations = new ConcurrentHashMap<>();
+    private final Map<UUID, KitCreationConversation> kitConversations = new ConcurrentHashMap<>();
 
-    private AdminConversationManager(ArenaManager arenaManager, ShopManager shopManager, ShopRepository shopRepository, JavaPlugin plugin) {
+    private AdminConversationManager(ArenaManager arenaManager, ShopManager shopManager, ShopRepository shopRepository, KitManager kitManager, JavaPlugin plugin) {
         this.arenaManager = arenaManager;
         this.shopManager = shopManager;
         this.shopRepository = shopRepository;
+        this.kitManager = kitManager;
         this.plugin = plugin;
     }
 
@@ -68,6 +76,27 @@ public class AdminConversationManager {
                 new ArenaListGui(arenaManager, this, AdminPlacementManager.getInstance()).open(admin);
             }
         }, 5 * 60 * 20L); // 5 minutes
+    }
+
+    /**
+     * Démarre une conversation de création de kit.
+     */
+    public void startKitCreationConversation(Player admin) {
+        UUID id = admin.getUniqueId();
+        if (isInConversation(admin)) {
+            admin.sendMessage("Une conversation est déjà en cours.");
+            return;
+        }
+        kitConversations.put(id, new KitCreationConversation(id));
+        admin.sendMessage("Entrez le nom du nouveau kit (ou 'annuler').");
+
+        Bukkit.getScheduler().runTaskLater(plugin, () -> {
+            if (kitConversations.containsKey(id)) {
+                admin.sendMessage("Création de kit annulée (timeout).");
+                cancelConversation(admin);
+                new KitListGui(kitManager, this).open(admin);
+            }
+        }, 5 * 60 * 20L);
     }
 
     /**
@@ -162,7 +191,8 @@ public class AdminConversationManager {
 
         PriceUpdateConversation priceConv = priceConversations.get(id);
         GameRuleUpdateConversation ruleConv = ruleConversations.get(id);
-        if (priceConv == null && ruleConv == null) {
+        KitCreationConversation kitConv = kitConversations.get(id);
+        if (priceConv == null && ruleConv == null && kitConv == null) {
             return;
         }
 
@@ -212,6 +242,24 @@ public class AdminConversationManager {
             admin.sendMessage("Valeur mise à jour.");
             cancelConversation(admin);
             ruleConv.getReopen().accept(admin);
+            return;
+        }
+
+        if (kitConv != null) {
+            if ("annuler".equalsIgnoreCase(message)) {
+                admin.sendMessage("Création de kit annulée.");
+                cancelConversation(admin);
+                new KitListGui(kitManager, this).open(admin);
+                return;
+            }
+            if (kitManager.getKit(message) != null) {
+                admin.sendMessage("Ce nom de kit est déjà utilisé. Essayez encore.");
+                return;
+            }
+            Kit kit = new Kit(message, new ItemStack[41]);
+            kitManager.saveKit(kit);
+            cancelConversation(admin);
+            new KitEditorGui(kitManager, kit).open(admin);
         }
     }
 
@@ -223,6 +271,7 @@ public class AdminConversationManager {
         conversations.remove(id);
         priceConversations.remove(id);
         ruleConversations.remove(id);
+        kitConversations.remove(id);
     }
 
     /**
@@ -230,6 +279,6 @@ public class AdminConversationManager {
      */
     public boolean isInConversation(Player admin) {
         UUID id = admin.getUniqueId();
-        return conversations.containsKey(id) || priceConversations.containsKey(id) || ruleConversations.containsKey(id);
+        return conversations.containsKey(id) || priceConversations.containsKey(id) || ruleConversations.containsKey(id) || kitConversations.containsKey(id);
     }
 }
