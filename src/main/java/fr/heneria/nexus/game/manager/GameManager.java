@@ -100,6 +100,8 @@ public class GameManager {
         match.setState(GameState.IN_PROGRESS);
         match.setStartTime(Instant.now());
 
+        match.initNexusCores();
+
         boolean teamMode = match.getTeams().values().stream().anyMatch(t -> t.getPlayers().size() > 1);
         Kit kit = kitManager.getKit(teamMode ? "Equipe" : "Solo");
 

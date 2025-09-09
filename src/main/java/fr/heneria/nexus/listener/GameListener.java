@@ -4,19 +4,25 @@ import fr.heneria.nexus.arena.model.ArenaGameObject;
 import fr.heneria.nexus.game.manager.GameManager;
 import fr.heneria.nexus.game.model.Match;
 import fr.heneria.nexus.game.model.Team;
+import fr.heneria.nexus.game.model.NexusCore;
 import fr.heneria.nexus.game.phase.GamePhase;
 import fr.heneria.nexus.game.phase.TransportPhase;
 import fr.heneria.nexus.game.phase.IPhase;
 import fr.heneria.nexus.game.queue.QueueManager;
 import org.bukkit.Bukkit;
+import org.bukkit.GameMode;
 import org.bukkit.Location;
+import org.bukkit.Material;
 import org.bukkit.entity.Player;
+import org.bukkit.entity.Entity;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
+import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.block.Action;
+import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
@@ -87,14 +93,92 @@ public class GameListener implements Listener {
                 match.getPhaseManager().transitionTo(match, GamePhase.CAPTURE);
             }
         }
+        if (team != null && match.getEliminatedTeamIds().contains(team.getTeamId())) {
+            Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                player.spigot().respawn();
+                player.setGameMode(GameMode.SPECTATOR);
+            }, 1L);
+            match.broadcastMessage("§c" + player.getName() + " est définitivement éliminé !");
+        } else {
+            Location finalSpawn = spawn;
+            Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                player.spigot().respawn();
+                if (finalSpawn != null) {
+                    player.teleport(finalSpawn);
+                }
+            }, 1L);
+        }
 
-        Location finalSpawn = spawn;
-        Bukkit.getScheduler().runTaskLater(plugin, () -> {
-            player.spigot().respawn();
-            if (finalSpawn != null) {
-                player.teleport(finalSpawn);
+        Bukkit.getScheduler().runTaskLater(plugin, () -> checkEndConditions(match), 5L);
+    }
+
+    @EventHandler
+    public void onEntityDamage(EntityDamageByEntityEvent event) {
+        Entity damaged = event.getEntity();
+        if (!(event.getDamager() instanceof Player player)) {
+            return;
+        }
+        Match match = gameManager.getPlayerMatch(player.getUniqueId());
+        if (match == null || match.getCurrentPhase() != GamePhase.DESTRUCTION) {
+            return;
+        }
+        for (NexusCore core : match.getNexusCores().values()) {
+            if (!core.isVulnerable()) {
+                continue;
             }
-        }, 1L);
+            if (core.getLocation() == null || !core.getLocation().getWorld().equals(damaged.getWorld())) {
+                continue;
+            }
+            if (damaged.getLocation().distance(core.getLocation()) > 1) {
+                continue;
+            }
+            Team attackerTeam = match.getTeamOfPlayer(player.getUniqueId());
+            if (attackerTeam != null && attackerTeam.getTeamId() == core.getTeam().getTeamId()) {
+                event.setCancelled(true);
+                return;
+            }
+            double dmg = computeWeaponDamage(player.getInventory().getItemInMainHand());
+            core.damage(dmg);
+            event.setCancelled(true);
+            if (core.isDestroyed()) {
+                match.getPhaseManager().transitionTo(match, GamePhase.ELIMINATION, core.getTeam());
+            }
+            break;
+        }
+    }
+
+    private double computeWeaponDamage(ItemStack item) {
+        Material type = item.getType();
+        return switch (type) {
+            case WOODEN_SWORD -> 2;
+            case STONE_SWORD -> 3;
+            case IRON_SWORD -> 4;
+            case DIAMOND_SWORD -> 6;
+            case NETHERITE_SWORD -> 8;
+            default -> 1;
+        };
+    }
+
+    private void checkEndConditions(Match match) {
+        int aliveTeams = 0;
+        int lastTeamId = -1;
+        for (Team t : match.getTeams().values()) {
+            boolean hasAlive = false;
+            for (UUID pid : t.getPlayers()) {
+                Player p = Bukkit.getPlayer(pid);
+                if (p != null && p.getGameMode() != GameMode.SPECTATOR) {
+                    hasAlive = true;
+                    break;
+                }
+            }
+            if (hasAlive) {
+                aliveTeams++;
+                lastTeamId = t.getTeamId();
+            }
+        }
+        if (aliveTeams <= 1 && lastTeamId != -1) {
+            gameManager.endMatch(match, lastTeamId);
+        }
     }
 
     @EventHandler
