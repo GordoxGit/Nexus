@@ -9,6 +9,7 @@ import org.bukkit.entity.Player;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import fr.heneria.nexus.admin.conversation.AdminConversationManager;
+import fr.heneria.nexus.admin.placement.AdminPlacementManager;
 
 /**
  * Menu principal du centre de contrôle Nexus.
@@ -16,9 +17,11 @@ import fr.heneria.nexus.admin.conversation.AdminConversationManager;
 public class AdminMenuGui {
 
     private final ArenaManager arenaManager;
+    private final AdminPlacementManager adminPlacementManager;
 
-    public AdminMenuGui(ArenaManager arenaManager) {
+    public AdminMenuGui(ArenaManager arenaManager, AdminPlacementManager adminPlacementManager) {
         this.arenaManager = arenaManager;
+        this.adminPlacementManager = adminPlacementManager;
     }
 
     /**
@@ -40,7 +43,7 @@ public class AdminMenuGui {
                 .lore(Component.text("Configurer et gérer les arènes"))
                 .asGuiItem(event -> {
                     event.setCancelled(true);
-                    new ArenaListGui(arenaManager, AdminConversationManager.getInstance()).open((Player) event.getWhoClicked());
+                    new ArenaListGui(arenaManager, AdminConversationManager.getInstance(), adminPlacementManager).open((Player) event.getWhoClicked());
                 });
 
         // Place l'item au centre

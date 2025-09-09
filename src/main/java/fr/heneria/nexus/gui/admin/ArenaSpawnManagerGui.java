@@ -5,6 +5,9 @@ import dev.triumphteam.gui.guis.Gui;
 import dev.triumphteam.gui.guis.GuiItem;
 import fr.heneria.nexus.arena.manager.ArenaManager;
 import fr.heneria.nexus.arena.model.Arena;
+import fr.heneria.nexus.gui.admin.ArenaEditorGui;
+import fr.heneria.nexus.admin.placement.AdminPlacementManager;
+import fr.heneria.nexus.admin.placement.SpawnPlacementContext;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Location;
@@ -21,10 +24,12 @@ public class ArenaSpawnManagerGui {
 
     private final ArenaManager arenaManager;
     private final Arena arena;
+    private final AdminPlacementManager adminPlacementManager;
 
-    public ArenaSpawnManagerGui(ArenaManager arenaManager, Arena arena) {
+    public ArenaSpawnManagerGui(ArenaManager arenaManager, Arena arena, AdminPlacementManager adminPlacementManager) {
         this.arenaManager = arenaManager;
         this.arena = arena;
+        this.adminPlacementManager = adminPlacementManager;
     }
 
     public void open(Player player) {
@@ -67,9 +72,8 @@ public class ArenaSpawnManagerGui {
                     event.setCancelled(true);
                     Player p = (Player) event.getWhoClicked();
                     p.closeInventory();
-                    p.sendMessage("§6[Nexus] §fConfiguration du spawn §e" + finalSpawn + "§f de l'équipe §e" + finalTeamId + "§f pour l'arène '§e" + arena.getName() + "§f'.");
-                    p.sendMessage("§71. Placez-vous à l'emplacement souhaité.");
-                    p.sendMessage("§72. Tapez la commande: §c/nx setspawn " + finalTeamId + " " + finalSpawn);
+                    SpawnPlacementContext context = new SpawnPlacementContext(arena, finalTeamId, finalSpawn);
+                    adminPlacementManager.startPlacementMode(p, context);
                 });
 
                 gui.addItem(item);
@@ -80,7 +84,7 @@ public class ArenaSpawnManagerGui {
                 .name(Component.text("Retour", NamedTextColor.RED))
                 .asGuiItem(event -> {
                     event.setCancelled(true);
-                    new ArenaEditorGui(arenaManager, arena).open((Player) event.getWhoClicked());
+                    new ArenaEditorGui(arenaManager, arena, adminPlacementManager).open((Player) event.getWhoClicked());
                 });
 
         gui.setItem(rows * 9 - 1, back);

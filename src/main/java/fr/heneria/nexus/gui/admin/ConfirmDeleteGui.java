@@ -6,6 +6,7 @@ import dev.triumphteam.gui.guis.GuiItem;
 import fr.heneria.nexus.arena.manager.ArenaManager;
 import fr.heneria.nexus.arena.model.Arena;
 import fr.heneria.nexus.admin.conversation.AdminConversationManager;
+import fr.heneria.nexus.admin.placement.AdminPlacementManager;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Material;
@@ -18,10 +19,12 @@ public class ConfirmDeleteGui {
 
     private final ArenaManager arenaManager;
     private final Arena arena;
+    private final AdminPlacementManager adminPlacementManager;
 
-    public ConfirmDeleteGui(ArenaManager arenaManager, Arena arena) {
+    public ConfirmDeleteGui(ArenaManager arenaManager, Arena arena, AdminPlacementManager adminPlacementManager) {
         this.arenaManager = arenaManager;
         this.arena = arena;
+        this.adminPlacementManager = adminPlacementManager;
     }
 
     public void open(Player player) {
@@ -44,14 +47,14 @@ public class ConfirmDeleteGui {
                     Player p = (Player) event.getWhoClicked();
                     arenaManager.deleteArena(arena);
                     arenaManager.stopEditing(p.getUniqueId());
-                    new ArenaListGui(arenaManager, AdminConversationManager.getInstance()).open(p);
+                    new ArenaListGui(arenaManager, AdminConversationManager.getInstance(), adminPlacementManager).open(p);
                 });
 
         GuiItem no = ItemBuilder.from(Material.RED_CONCRETE)
                 .name(Component.text("NON, ANNULER", NamedTextColor.RED))
                 .asGuiItem(event -> {
                     event.setCancelled(true);
-                    new ArenaEditorGui(arenaManager, arena).open((Player) event.getWhoClicked());
+                    new ArenaEditorGui(arenaManager, arena, adminPlacementManager).open((Player) event.getWhoClicked());
                 });
 
         gui.setItem(12, yes);

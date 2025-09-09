@@ -6,6 +6,7 @@ import dev.triumphteam.gui.guis.GuiItem;
 import fr.heneria.nexus.arena.manager.ArenaManager;
 import fr.heneria.nexus.arena.model.Arena;
 import fr.heneria.nexus.admin.conversation.AdminConversationManager;
+import fr.heneria.nexus.admin.placement.AdminPlacementManager;
 import org.bukkit.Location;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
@@ -21,10 +22,12 @@ public class ArenaEditorGui {
 
     private final ArenaManager arenaManager;
     private final Arena arena;
+    private final AdminPlacementManager adminPlacementManager;
 
-    public ArenaEditorGui(ArenaManager arenaManager, Arena arena) {
+    public ArenaEditorGui(ArenaManager arenaManager, Arena arena, AdminPlacementManager adminPlacementManager) {
         this.arenaManager = arenaManager;
         this.arena = arena;
+        this.adminPlacementManager = adminPlacementManager;
     }
 
     /**
@@ -59,7 +62,7 @@ public class ArenaEditorGui {
                     event.setCancelled(true);
                     Player p = (Player) event.getWhoClicked();
                     gui.setCloseGuiAction(closeEvent -> {});
-                    new ArenaSpawnManagerGui(arenaManager, arena).open(p);
+                    new ArenaSpawnManagerGui(arenaManager, arena, adminPlacementManager).open(p);
                 });
 
         GuiItem save = ItemBuilder.from(Material.ANVIL)
@@ -97,14 +100,14 @@ public class ArenaEditorGui {
                     event.setCancelled(true);
                     Player p = (Player) event.getWhoClicked();
                     gui.setCloseGuiAction(closeEvent -> {});
-                    new ConfirmDeleteGui(arenaManager, arena).open(p);
+                    new ConfirmDeleteGui(arenaManager, arena, adminPlacementManager).open(p);
                 });
 
         GuiItem back = ItemBuilder.from(Material.BARRIER)
                 .name(Component.text("Retour", NamedTextColor.RED))
                 .asGuiItem(event -> {
                     event.setCancelled(true);
-                    new ArenaListGui(arenaManager, AdminConversationManager.getInstance()).open((Player) event.getWhoClicked());
+                    new ArenaListGui(arenaManager, AdminConversationManager.getInstance(), adminPlacementManager).open((Player) event.getWhoClicked());
                 });
 
         gui.setItem(13, info);
