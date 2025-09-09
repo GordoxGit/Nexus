@@ -39,21 +39,25 @@ public class KitManager {
 
         // Kit Solo
         List<ItemStack> soloItems = new ArrayList<>();
-        soloItems.add(enchant(new ItemStack(Material.LEATHER_HELMET), Enchantment.PROTECTION_ENVIRONMENTAL, 2));
-        soloItems.add(enchant(new ItemStack(Material.IRON_CHESTPLATE), Enchantment.PROTECTION_ENVIRONMENTAL, 2));
-        soloItems.add(enchant(new ItemStack(Material.IRON_LEGGINGS), Enchantment.PROTECTION_ENVIRONMENTAL, 2));
-        soloItems.add(enchant(new ItemStack(Material.LEATHER_BOOTS), Enchantment.PROTECTION_ENVIRONMENTAL, 2));
-        soloItems.add(enchant(new ItemStack(Material.STONE_SWORD), Enchantment.DAMAGE_ALL, 2));
+        // ===== CORRECTION CI-DESSOUS =====
+        soloItems.add(enchant(new ItemStack(Material.LEATHER_HELMET), Enchantment.PROTECTION, 2));
+        soloItems.add(enchant(new ItemStack(Material.IRON_CHESTPLATE), Enchantment.PROTECTION, 2));
+        soloItems.add(enchant(new ItemStack(Material.IRON_LEGGINGS), Enchantment.PROTECTION, 2));
+        soloItems.add(enchant(new ItemStack(Material.LEATHER_BOOTS), Enchantment.PROTECTION, 2));
+        soloItems.add(enchant(new ItemStack(Material.STONE_SWORD), Enchantment.SHARPNESS, 2));
+        // ===================================
         soloItems.add(new ItemStack(Material.BOW));
         kits.put("Solo", new Kit("Solo", soloItems));
 
         // Kit Équipe
         List<ItemStack> teamItems = new ArrayList<>();
-        teamItems.add(enchant(new ItemStack(Material.LEATHER_HELMET), Enchantment.PROTECTION_ENVIRONMENTAL, 2));
-        teamItems.add(enchant(new ItemStack(Material.LEATHER_CHESTPLATE), Enchantment.PROTECTION_ENVIRONMENTAL, 2));
-        teamItems.add(enchant(new ItemStack(Material.LEATHER_LEGGINGS), Enchantment.PROTECTION_ENVIRONMENTAL, 2));
-        teamItems.add(enchant(new ItemStack(Material.LEATHER_BOOTS), Enchantment.PROTECTION_ENVIRONMENTAL, 2));
-        teamItems.add(enchant(new ItemStack(Material.WOODEN_SWORD), Enchantment.DAMAGE_ALL, 2));
+        // ===== CORRECTION CI-DESSOUS =====
+        teamItems.add(enchant(new ItemStack(Material.LEATHER_HELMET), Enchantment.PROTECTION, 2));
+        teamItems.add(enchant(new ItemStack(Material.LEATHER_CHESTPLATE), Enchantment.PROTECTION, 2));
+        teamItems.add(enchant(new ItemStack(Material.LEATHER_LEGGINGS), Enchantment.PROTECTION, 2));
+        teamItems.add(enchant(new ItemStack(Material.LEATHER_BOOTS), Enchantment.PROTECTION, 2));
+        teamItems.add(enchant(new ItemStack(Material.WOODEN_SWORD), Enchantment.SHARPNESS, 2));
+        // ===================================
         kits.put("Equipe", new Kit("Equipe", teamItems));
     }
 
@@ -74,7 +78,18 @@ public class KitManager {
         }
         player.getInventory().clear();
         for (ItemStack item : kit.getItems()) {
-            player.getInventory().addItem(item.clone());
+            // Appliquer l'équipement directement dans les bons slots
+            if (item.getType().name().endsWith("_HELMET")) {
+                player.getInventory().setHelmet(item.clone());
+            } else if (item.getType().name().endsWith("_CHESTPLATE")) {
+                player.getInventory().setChestplate(item.clone());
+            } else if (item.getType().name().endsWith("_LEGGINGS")) {
+                player.getInventory().setLeggings(item.clone());
+            } else if (item.getType().name().endsWith("_BOOTS")) {
+                player.getInventory().setBoots(item.clone());
+            } else {
+                player.getInventory().addItem(item.clone());
+            }
         }
     }
 }
