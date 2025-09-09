@@ -7,6 +7,7 @@ import org.bukkit.Material;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class ShopManager {
@@ -37,5 +38,9 @@ public class ShopManager {
 
     public List<ShopItem> getItemsForCategory(String category) {
         return itemsByCategory.getOrDefault(category, Collections.emptyList());
+    }
+
+    public Set<String> getCategories() {
+        return itemsByCategory.keySet();
     }
 }

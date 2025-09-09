@@ -2,10 +2,15 @@ package fr.heneria.nexus.game.manager;
 
 import fr.heneria.nexus.arena.manager.ArenaManager;
 import fr.heneria.nexus.arena.model.Arena;
+import fr.heneria.nexus.economy.manager.EconomyManager;
+import fr.heneria.nexus.game.kit.manager.KitManager;
+import fr.heneria.nexus.game.kit.model.Kit;
 import fr.heneria.nexus.game.model.GameState;
 import fr.heneria.nexus.game.model.Match;
 import fr.heneria.nexus.game.model.Team;
 import fr.heneria.nexus.game.repository.MatchRepository;
+import fr.heneria.nexus.gui.player.ShopGui;
+import fr.heneria.nexus.shop.manager.ShopManager;
 import fr.heneria.nexus.player.manager.PlayerManager;
 import org.bukkit.Bukkit;
 import org.bukkit.GameMode;
@@ -13,6 +18,7 @@ import org.bukkit.Location;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitRunnable;
+import org.bukkit.scheduler.BukkitTask;
 
 import java.time.Instant;
 import java.util.List;
@@ -28,18 +34,26 @@ public class GameManager {
     private final ArenaManager arenaManager;
     private final PlayerManager playerManager;
     private final MatchRepository matchRepository;
+    private final KitManager kitManager;
+    private final ShopManager shopManager;
+    private final EconomyManager economyManager;
     private final Map<UUID, Match> matches = new ConcurrentHashMap<>();
     private final Map<UUID, Match> playerMatches = new ConcurrentHashMap<>();
 
-    private GameManager(JavaPlugin plugin, ArenaManager arenaManager, PlayerManager playerManager, MatchRepository matchRepository) {
+    private GameManager(JavaPlugin plugin, ArenaManager arenaManager, PlayerManager playerManager, MatchRepository matchRepository,
+                        KitManager kitManager, ShopManager shopManager, EconomyManager economyManager) {
         this.plugin = plugin;
         this.arenaManager = arenaManager;
         this.playerManager = playerManager;
         this.matchRepository = matchRepository;
+        this.kitManager = kitManager;
+        this.shopManager = shopManager;
+        this.economyManager = economyManager;
     }
 
-    public static void init(JavaPlugin plugin, ArenaManager arenaManager, PlayerManager playerManager, MatchRepository matchRepository) {
-        instance = new GameManager(plugin, arenaManager, playerManager, matchRepository);
+    public static void init(JavaPlugin plugin, ArenaManager arenaManager, PlayerManager playerManager, MatchRepository matchRepository,
+                            KitManager kitManager, ShopManager shopManager, EconomyManager economyManager) {
+        instance = new GameManager(plugin, arenaManager, playerManager, matchRepository, kitManager, shopManager, economyManager);
     }
 
     public static GameManager getInstance() {
@@ -82,6 +96,10 @@ public class GameManager {
     public void startMatch(Match match) {
         match.setState(GameState.IN_PROGRESS);
         match.setStartTime(Instant.now());
+
+        boolean teamMode = match.getTeams().values().stream().anyMatch(t -> t.getPlayers().size() > 1);
+        Kit kit = kitManager.getKit(teamMode ? "Equipe" : "Solo");
+
         for (Team team : match.getTeams().values()) {
             Map<Integer, Location> spawns = match.getArena().getSpawns().get(team.getTeamId());
             Location spawn = null;
@@ -94,13 +112,25 @@ public class GameManager {
                     if (spawn != null) {
                         player.teleport(spawn);
                     }
-                    player.getInventory().clear();
                     player.setGameMode(GameMode.SURVIVAL);
                     player.setHealth(player.getMaxHealth());
                     player.setFoodLevel(20);
+                    kitManager.applyKit(player, kit);
+                    new ShopGui(shopManager, economyManager, playerManager, plugin).open(player);
                 }
             }
         }
+
+        BukkitTask task = Bukkit.getScheduler().runTaskLater(plugin, () -> {
+            for (UUID playerId : match.getPlayers()) {
+                Player p = Bukkit.getPlayer(playerId);
+                if (p != null) {
+                    p.closeInventory();
+                    p.sendMessage("La phase d'achat est terminée !");
+                }
+            }
+        }, 400L);
+        match.setShopPhaseTask(task);
     }
 
     public void endMatch(Match match, int winningTeamId) {

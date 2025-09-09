@@ -15,6 +15,7 @@ public class Match {
     private GameState state = GameState.WAITING;
     private final Map<Integer, Team> teams = new ConcurrentHashMap<>();
     private BukkitTask countdownTask;
+    private BukkitTask shopPhaseTask;
     private Instant startTime;
     private Instant endTime;
     private final Map<UUID, Integer> kills = new ConcurrentHashMap<>();
@@ -55,6 +56,14 @@ public class Match {
 
     public void setCountdownTask(BukkitTask countdownTask) {
         this.countdownTask = countdownTask;
+    }
+
+    public BukkitTask getShopPhaseTask() {
+        return shopPhaseTask;
+    }
+
+    public void setShopPhaseTask(BukkitTask shopPhaseTask) {
+        this.shopPhaseTask = shopPhaseTask;
     }
 
     public Instant getStartTime() {
