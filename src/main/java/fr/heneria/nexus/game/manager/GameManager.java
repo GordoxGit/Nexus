@@ -24,10 +24,14 @@ import fr.heneria.nexus.ranking.RankManager;
 import org.bukkit.Bukkit;
 import org.bukkit.GameMode;
 import org.bukkit.Location;
+import org.bukkit.GameRule;
+import org.bukkit.World;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.scheduler.BukkitTask;
+import org.bukkit.potion.PotionEffect;
+import org.bukkit.potion.PotionEffectType;
 
 import java.time.Instant;
 import java.util.HashMap;
@@ -110,6 +114,15 @@ public class GameManager {
 
         match.initNexusCores();
 
+        Location refLoc = match.getArena().getSpawns().values().stream()
+                .flatMap(m -> m.values().stream())
+                .findFirst()
+                .orElse(null);
+        World world = refLoc != null ? refLoc.getWorld() : null;
+        if (world != null) {
+            world.setGameRule(GameRule.KEEP_INVENTORY, true);
+        }
+
         boolean teamMode = match.getTeams().values().stream().anyMatch(t -> t.getPlayers().size() > 1);
         Kit kit = kitManager.getKit(teamMode ? "Equipe" : "Solo");
 
@@ -129,6 +142,7 @@ public class GameManager {
                     player.setHealth(player.getMaxHealth());
                     player.setFoodLevel(20);
                     kitManager.applyKit(player, kit);
+                    player.addPotionEffect(new PotionEffect(PotionEffectType.SLOW, 400, 255, false, false));
                     match.getRoundPoints().put(playerId, 100);
                     new ShopGui(shopManager, playerManager, plugin, match).open(player);
                 }
@@ -137,19 +151,35 @@ public class GameManager {
 
         ScoreboardManager.getInstance().createMatchScoreboard(match);
 
-        BukkitTask task = Bukkit.getScheduler().runTaskLater(plugin, () -> {
-            for (UUID playerId : match.getPlayers()) {
-                Player p = Bukkit.getPlayer(playerId);
-                if (p != null) {
-                    p.closeInventory();
-                    p.sendMessage("La phase d'achat est terminée !");
+        BukkitRunnable runnable = new BukkitRunnable() {
+            int timeLeft = 20;
+            @Override
+            public void run() {
+                if (timeLeft <= 0) {
+                    for (UUID playerId : match.getPlayers()) {
+                        Player p = Bukkit.getPlayer(playerId);
+                        if (p != null) {
+                            p.closeInventory();
+                            p.sendMessage("La phase d'achat est terminée !");
+                            p.removePotionEffect(PotionEffectType.SLOW);
+                        }
+                    }
+                    if (match.getPhaseManager() != null) {
+                        match.getPhaseManager().transitionTo(match, GamePhase.CAPTURE);
+                    }
+                    cancel();
+                    return;
                 }
+                for (UUID playerId : match.getPlayers()) {
+                    Player p = Bukkit.getPlayer(playerId);
+                    if (p != null) {
+                        p.sendActionBar("§eLa boutique se ferme dans §c" + timeLeft + " seconde(s)");
+                    }
+                }
+                timeLeft--;
             }
-            if (match.getPhaseManager() != null) {
-                match.getPhaseManager().transitionTo(match, GamePhase.CAPTURE);
-            }
-        }, 400L);
-        match.setShopPhaseTask(task);
+        };
+        match.setShopPhaseTask(runnable.runTaskTimer(plugin, 0L, 20L));
     }
 
     public void endRound(Match match, int winningTeamId) {
@@ -195,6 +225,7 @@ public class GameManager {
                         player.teleport(spawn);
                     }
                     match.getRoundPoints().put(playerId, 100);
+                    player.addPotionEffect(new PotionEffect(PotionEffectType.SLOW, 400, 255, false, false));
                     new ShopGui(shopManager, playerManager, plugin, match).open(player);
                 }
             }
@@ -203,24 +234,48 @@ public class GameManager {
         if (match.getPhaseManager() != null) {
             match.getPhaseManager().transitionTo(match, GamePhase.PREPARATION);
         }
-        BukkitTask task = Bukkit.getScheduler().runTaskLater(plugin, () -> {
-            for (UUID playerId : match.getPlayers()) {
-                Player p = Bukkit.getPlayer(playerId);
-                if (p != null) {
-                    p.closeInventory();
-                    p.sendMessage("La phase d'achat est terminée !");
+        BukkitRunnable runnable = new BukkitRunnable() {
+            int timeLeft = 20;
+            @Override
+            public void run() {
+                if (timeLeft <= 0) {
+                    for (UUID playerId : match.getPlayers()) {
+                        Player p = Bukkit.getPlayer(playerId);
+                        if (p != null) {
+                            p.closeInventory();
+                            p.sendMessage("La phase d'achat est terminée !");
+                            p.removePotionEffect(PotionEffectType.SLOW);
+                        }
+                    }
+                    if (match.getPhaseManager() != null) {
+                        match.getPhaseManager().transitionTo(match, GamePhase.CAPTURE);
+                    }
+                    cancel();
+                    return;
                 }
+                for (UUID playerId : match.getPlayers()) {
+                    Player p = Bukkit.getPlayer(playerId);
+                    if (p != null) {
+                        p.sendActionBar("§eLa boutique se ferme dans §c" + timeLeft + " seconde(s)");
+                    }
+                }
+                timeLeft--;
             }
-            if (match.getPhaseManager() != null) {
-                match.getPhaseManager().transitionTo(match, GamePhase.CAPTURE);
-            }
-        }, 400L);
-        match.setShopPhaseTask(task);
+        };
+        match.setShopPhaseTask(runnable.runTaskTimer(plugin, 0L, 20L));
     }
 
     public void endGame(Match match, int winningTeamId) {
         match.setState(GameState.ENDING);
         match.setEndTime(Instant.now());
+        Location refLoc = match.getArena().getSpawns().values().stream()
+                .flatMap(m -> m.values().stream())
+                .findFirst()
+                .orElse(null);
+        World world = refLoc != null ? refLoc.getWorld() : null;
+        if (world != null) {
+            world.setGameRule(GameRule.KEEP_INVENTORY, false);
+        }
         matchRepository.saveMatchResult(match, winningTeamId);
         matchRepository.saveMatchParticipants(match);
         Team winningTeam = match.getTeams().get(winningTeamId);

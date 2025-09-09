@@ -76,7 +76,12 @@ public class GameListener implements Listener {
         if (match == null) {
             return;
         }
-        event.getDrops().clear();
+        Team team = match.getTeamOfPlayer(uuid);
+        if (team == null || !match.getEliminatedTeamIds().contains(team.getTeamId())) {
+            event.setKeepInventory(true);
+        } else {
+            event.getDrops().clear();
+        }
         event.setDeathMessage(null);
 
         match.incrementDeath(uuid);
@@ -85,7 +90,6 @@ public class GameListener implements Listener {
             match.incrementKill(killer.getUniqueId());
         }
 
-        Team team = match.getTeamOfPlayer(uuid);
         Location spawn = null;
         if (team != null) {
             Map<Integer, Location> spawns = match.getArena().getSpawns().get(team.getTeamId());
