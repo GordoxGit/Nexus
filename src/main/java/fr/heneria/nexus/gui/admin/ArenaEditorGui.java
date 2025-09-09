@@ -39,6 +39,7 @@ public class ArenaEditorGui {
                 .create();
 
         gui.setDefaultClickAction(event -> event.setCancelled(true));
+        // L'action de fermeture est définie une seule fois sur le GUI
         gui.setCloseGuiAction(event -> arenaManager.stopEditing(player.getUniqueId()));
 
         GuiItem info = ItemBuilder.from(Material.PAPER)
@@ -54,7 +55,11 @@ public class ArenaEditorGui {
                 .asGuiItem(event -> {
                     event.setCancelled(true);
                     Player p = (Player) event.getWhoClicked();
-                    event.getGui().setCloseGuiAction(closeEvent -> {});
+
+                    // CORRECTION: On utilise la variable 'gui' qui est dans le scope
+                    gui.setCloseGuiAction(closeEvent -> {
+                    }); // On désactive temporairement l'action de fermeture pour ne pas enlever le joueur du mode édition
+
                     p.closeInventory();
                     p.sendMessage("§6[Nexus] §fMode édition des spawns pour l'arène '§e" + arena.getName() + "§f'.");
                     p.sendMessage("§71. Placez-vous à l'emplacement souhaité.");
@@ -67,7 +72,7 @@ public class ArenaEditorGui {
                 .asGuiItem(event -> {
                     event.setCancelled(true);
                     arenaManager.saveArena(arena);
-                    ((Player) event.getWhoClicked()).sendMessage("Arène sauvegardée.");
+                    ((Player) event.getWhoClicked()).sendMessage("§aArène '" + arena.getName() + "' sauvegardée avec succès !");
                 });
 
         GuiItem back = ItemBuilder.from(Material.BARRIER)
