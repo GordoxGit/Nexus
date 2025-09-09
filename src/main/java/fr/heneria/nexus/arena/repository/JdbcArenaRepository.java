@@ -162,4 +162,16 @@ public class JdbcArenaRepository implements ArenaRepository {
         }
         return Optional.empty();
     }
+
+    @Override
+    public void deleteArena(Arena arena) {
+        String sql = "DELETE FROM arenas WHERE id = ?";
+        try (Connection connection = dataSource.getConnection();
+             PreparedStatement stmt = connection.prepareStatement(sql)) {
+            stmt.setInt(1, arena.getId());
+            stmt.executeUpdate();
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
 }

@@ -6,10 +6,13 @@ import dev.triumphteam.gui.guis.GuiItem;
 import fr.heneria.nexus.arena.manager.ArenaManager;
 import fr.heneria.nexus.arena.model.Arena;
 import fr.heneria.nexus.admin.conversation.AdminConversationManager;
+import org.bukkit.Location;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
+
+import java.util.Map;
 
 /**
  * Interface d'édition d'une arène spécifique.
@@ -55,16 +58,8 @@ public class ArenaEditorGui {
                 .asGuiItem(event -> {
                     event.setCancelled(true);
                     Player p = (Player) event.getWhoClicked();
-
-                    // CORRECTION: On utilise la variable 'gui' qui est dans le scope
-                    gui.setCloseGuiAction(closeEvent -> {
-                    }); // On désactive temporairement l'action de fermeture pour ne pas enlever le joueur du mode édition
-
-                    p.closeInventory();
-                    p.sendMessage("§6[Nexus] §fMode édition des spawns pour l'arène '§e" + arena.getName() + "§f'.");
-                    p.sendMessage("§71. Placez-vous à l'emplacement souhaité.");
-                    p.sendMessage("§72. Tapez la commande: §c/nx setspawn <teamId> <spawnNum>");
-                    p.sendMessage("§7Exemple: §c/nx setspawn 1 1 §7pour le premier spawn de l'équipe 1.");
+                    gui.setCloseGuiAction(closeEvent -> {});
+                    new ArenaSpawnManagerGui(arenaManager, arena).open(p);
                 });
 
         GuiItem save = ItemBuilder.from(Material.ANVIL)
@@ -73,6 +68,36 @@ public class ArenaEditorGui {
                     event.setCancelled(true);
                     arenaManager.saveArena(arena);
                     ((Player) event.getWhoClicked()).sendMessage("§aArène '" + arena.getName() + "' sauvegardée avec succès !");
+                });
+
+        GuiItem teleport = ItemBuilder.from(Material.ENDER_PEARL)
+                .name(Component.text("Se Téléporter à l'arène", NamedTextColor.AQUA))
+                .asGuiItem(event -> {
+                    event.setCancelled(true);
+                    Player p = (Player) event.getWhoClicked();
+                    Location loc = null;
+                    if (!arena.getSpawns().isEmpty()) {
+                        int firstTeam = arena.getSpawns().keySet().stream().min(Integer::compareTo).orElse(1);
+                        Map<Integer, Location> teamSpawns = arena.getSpawns().get(firstTeam);
+                        if (teamSpawns != null && !teamSpawns.isEmpty()) {
+                            int firstSpawn = teamSpawns.keySet().stream().min(Integer::compareTo).orElse(1);
+                            loc = teamSpawns.get(firstSpawn);
+                        }
+                    }
+                    if (loc != null) {
+                        p.teleport(loc);
+                    } else {
+                        p.sendMessage("§cAucun spawn défini pour cette arène.");
+                    }
+                });
+
+        GuiItem delete = ItemBuilder.from(Material.TNT)
+                .name(Component.text("Supprimer l'arène", NamedTextColor.RED))
+                .asGuiItem(event -> {
+                    event.setCancelled(true);
+                    Player p = (Player) event.getWhoClicked();
+                    gui.setCloseGuiAction(closeEvent -> {});
+                    new ConfirmDeleteGui(arenaManager, arena).open(p);
                 });
 
         GuiItem back = ItemBuilder.from(Material.BARRIER)
@@ -85,6 +110,8 @@ public class ArenaEditorGui {
         gui.setItem(13, info);
         gui.setItem(11, setSpawns);
         gui.setItem(15, save);
+        gui.setItem(20, teleport);
+        gui.setItem(24, delete);
         gui.setItem(26, back);
 
         arenaManager.setEditingArena(player.getUniqueId(), arena);
