@@ -48,7 +48,7 @@ public class ArenaListGui {
                     )
                     .asGuiItem(event -> {
                         event.setCancelled(true);
-                        ((Player) event.getWhoClicked()).sendMessage("Fonctionnalité à venir");
+                        new ArenaEditorGui(arenaManager, arena).open((Player) event.getWhoClicked());
                     });
             gui.addItem(item);
         }

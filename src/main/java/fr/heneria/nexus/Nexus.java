@@ -54,7 +54,7 @@ public final class Nexus extends JavaPlugin {
 
             getCommand("nx").setExecutor(new NexusAdminCommand(this.arenaManager));
             // CORRECTION: L'instance du plugin (this) est maintenant passée au listener
-            getServer().getPluginManager().registerEvents(new PlayerConnectionListener(this.playerManager, this), this);
+            getServer().getPluginManager().registerEvents(new PlayerConnectionListener(this.playerManager, this.arenaManager, this), this);
 
             getLogger().info("✅ Le plugin Nexus a été activé avec succès !");
 
