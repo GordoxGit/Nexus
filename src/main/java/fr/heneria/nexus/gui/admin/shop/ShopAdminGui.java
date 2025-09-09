@@ -46,7 +46,20 @@ public class ShopAdminGui {
                     new ShopCategoryGui(shopManager, "Utilitaires").open((Player) event.getWhoClicked());
                 });
 
+        GuiItem back = ItemBuilder.from(Material.BARRIER)
+                .name(Component.text("Retour", NamedTextColor.RED))
+                .asGuiItem(event -> {
+                    event.setCancelled(true);
+                    ((Player) event.getWhoClicked()).performCommand("nx admin");
+                });
+
         gui.addItem(armes, armures, utilitaires);
+        gui.setItem(26, back);
+
+        gui.getFiller().fill(ItemBuilder.from(Material.GRAY_STAINED_GLASS_PANE)
+                .name(Component.text(" "))
+                .asGuiItem());
+
         gui.open(player);
     }
 }

@@ -89,6 +89,10 @@ public class ArenaSpawnManagerGui {
 
         gui.setItem(rows * 9 - 1, back);
 
+        gui.getFiller().fill(ItemBuilder.from(Material.GRAY_STAINED_GLASS_PANE)
+                .name(Component.text(" "))
+                .asGuiItem());
+
         gui.open(player);
     }
 }

@@ -16,6 +16,7 @@ import org.bukkit.Sound;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.java.JavaPlugin;
+import org.bukkit.Material;
 
 import java.util.List;
 
@@ -77,6 +78,18 @@ public class ShopCategoryViewGui {
                     });
             gui.addItem(guiItem);
         }
+
+        GuiItem back = ItemBuilder.from(Material.BARRIER)
+                .name(Component.text("Retour", NamedTextColor.RED))
+                .asGuiItem(event -> {
+                    event.setCancelled(true);
+                    new ShopGui(shopManager, playerManager, plugin, match).open((Player) event.getWhoClicked());
+                });
+        gui.setItem(rows * 9 - 1, back);
+
+        gui.getFiller().fill(ItemBuilder.from(Material.GRAY_STAINED_GLASS_PANE)
+                .name(Component.text(" "))
+                .asGuiItem());
 
         gui.open(player);
     }

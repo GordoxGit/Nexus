@@ -76,8 +76,18 @@ public class NexusAdminCommand implements CommandExecutor {
             return true;
         }
 
-        // Ouvre le GUI principal pour /nx ou /nx admin
-        if (args.length == 0 || "admin".equalsIgnoreCase(args[0])) {
+        // Affiche l'aide si aucune sous-commande ou demande d'aide
+        if (args.length == 0 || "help".equalsIgnoreCase(args[0])) {
+            sender.sendMessage("§6Commandes Nexus :");
+            sender.sendMessage("§e/nx admin §7- ouvre le centre de contrôle Nexus");
+            sender.sendMessage("§e/nx arena list §7- liste les arènes chargées");
+            sender.sendMessage("§e/nx arena save <nom> §7- sauvegarde l'arène spécifiée");
+            sender.sendMessage("§e/nx sanction pardon <joueur> §7- annule la dernière sanction du joueur");
+            return true;
+        }
+
+        // Ouvre le GUI principal pour /nx admin
+        if ("admin".equalsIgnoreCase(args[0])) {
             if (!(sender instanceof Player)) {
                 sender.sendMessage("Cette commande doit être exécutée par un joueur.");
                 return true;

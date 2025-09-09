@@ -128,6 +128,10 @@ public class ArenaEditorGui {
         gui.setItem(24, delete);
         gui.setItem(26, back);
 
+        gui.getFiller().fill(ItemBuilder.from(Material.GRAY_STAINED_GLASS_PANE)
+                .name(Component.text(" "))
+                .asGuiItem());
+
         arenaManager.setEditingArena(player.getUniqueId(), arena);
         gui.open(player);
     }

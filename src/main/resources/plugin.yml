@@ -13,6 +13,7 @@ commands:
   play:
     description: Ouvre la sélection de mode de jeu
     usage: /play
+    aliases: [jouer]
 permissions:
   nexus.admin:
     description: Accès à l'administration de Nexus
