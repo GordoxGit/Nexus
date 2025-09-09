@@ -5,10 +5,13 @@ import fr.heneria.nexus.game.manager.GameManager;
 import fr.heneria.nexus.game.model.Match;
 import fr.heneria.nexus.game.model.Team;
 import fr.heneria.nexus.game.model.NexusCore;
+import fr.heneria.nexus.game.model.MatchType;
+import fr.heneria.nexus.game.model.GameState;
 import fr.heneria.nexus.game.phase.GamePhase;
 import fr.heneria.nexus.game.phase.TransportPhase;
 import fr.heneria.nexus.game.phase.IPhase;
 import fr.heneria.nexus.game.queue.QueueManager;
+import fr.heneria.nexus.sanction.SanctionManager;
 import org.bukkit.Bukkit;
 import org.bukkit.GameMode;
 import org.bukkit.Location;
@@ -35,11 +38,13 @@ public class GameListener implements Listener {
     private final GameManager gameManager;
     private final JavaPlugin plugin;
     private final QueueManager queueManager;
+    private final SanctionManager sanctionManager;
 
-    public GameListener(GameManager gameManager, JavaPlugin plugin, QueueManager queueManager) {
+    public GameListener(GameManager gameManager, JavaPlugin plugin, QueueManager queueManager, SanctionManager sanctionManager) {
         this.gameManager = gameManager;
         this.plugin = plugin;
         this.queueManager = queueManager;
+        this.sanctionManager = sanctionManager;
     }
 
     @EventHandler
@@ -48,6 +53,9 @@ public class GameListener implements Listener {
         queueManager.leaveQueue(event.getPlayer());
         Match match = gameManager.getPlayerMatch(uuid);
         if (match != null) {
+            if (match.getMatchType() == MatchType.RANKED && match.getState() == GameState.IN_PROGRESS) {
+                sanctionManager.penalizeLeaver(event.getPlayer(), match);
+            }
             match.broadcastMessage(event.getPlayer().getName() + " a quitté la partie.");
             gameManager.removePlayer(uuid);
             long remainingTeams = match.getTeams().values().stream().filter(t -> !t.getPlayers().isEmpty()).count();

@@ -24,6 +24,9 @@ import fr.heneria.nexus.game.manager.GameManager;
 import fr.heneria.nexus.game.repository.MatchRepository;
 import fr.heneria.nexus.game.repository.JdbcMatchRepository;
 import fr.heneria.nexus.game.queue.QueueManager;
+import fr.heneria.nexus.sanction.SanctionManager;
+import fr.heneria.nexus.sanction.repository.JdbcSanctionRepository;
+import fr.heneria.nexus.sanction.repository.SanctionRepository;
 import liquibase.Liquibase;
 import liquibase.database.Database;
 import liquibase.database.DatabaseFactory;
@@ -43,6 +46,7 @@ public final class Nexus extends JavaPlugin {
     private KitManager kitManager;
     private GameManager gameManager;
     private QueueManager queueManager;
+    private SanctionManager sanctionManager;
 
     @Override
     public void onEnable() {
@@ -64,6 +68,7 @@ public final class Nexus extends JavaPlugin {
             PlayerRepository playerRepository = new JdbcPlayerRepository(this.dataSourceProvider.getDataSource());
             ShopRepository shopRepository = new JdbcShopRepository(this.dataSourceProvider.getDataSource());
             MatchRepository matchRepository = new JdbcMatchRepository(this.dataSourceProvider.getDataSource());
+            SanctionRepository sanctionRepository = new JdbcSanctionRepository(this.dataSourceProvider.getDataSource());
 
             this.arenaManager = new ArenaManager(new JdbcArenaRepository(this.dataSourceProvider.getDataSource()));
             this.playerManager = new PlayerManager(playerRepository);
@@ -73,7 +78,9 @@ public final class Nexus extends JavaPlugin {
             this.kitManager.loadKits();
             GameManager.init(this, this.arenaManager, this.playerManager, matchRepository, this.kitManager, this.shopManager, this.economyManager);
             this.gameManager = GameManager.getInstance();
-            QueueManager.init(this.gameManager, this.arenaManager);
+            SanctionManager.init(sanctionRepository, playerRepository, this.economyManager);
+            this.sanctionManager = SanctionManager.getInstance();
+            QueueManager.init(this.gameManager, this.arenaManager, this.sanctionManager);
             this.queueManager = QueueManager.getInstance();
 
             AdminConversationManager.init(this.arenaManager, this.shopManager, shopRepository, this);
@@ -82,13 +89,13 @@ public final class Nexus extends JavaPlugin {
             this.shopManager.loadItems();
             getLogger().info(this.arenaManager.getAllArenas().size() + " arène(s) chargée(s).");
 
-            getCommand("nx").setExecutor(new NexusAdminCommand(this.arenaManager, this.shopManager));
+            getCommand("nx").setExecutor(new NexusAdminCommand(this.arenaManager, this.shopManager, this.sanctionManager));
             getCommand("play").setExecutor(new PlayCommand(this.queueManager, this));
             // CORRECTION: L'instance du plugin (this) est maintenant passée au listener
             getServer().getPluginManager().registerEvents(new PlayerConnectionListener(this.playerManager, this.arenaManager, AdminPlacementManager.getInstance(), this), this);
             getServer().getPluginManager().registerEvents(new AdminConversationListener(AdminConversationManager.getInstance(), this), this);
             getServer().getPluginManager().registerEvents(new AdminPlacementListener(AdminPlacementManager.getInstance(), this.arenaManager, this), this);
-            getServer().getPluginManager().registerEvents(new GameListener(this.gameManager, this, this.queueManager), this);
+            getServer().getPluginManager().registerEvents(new GameListener(this.gameManager, this, this.queueManager, this.sanctionManager), this);
 
             getLogger().info("✅ Le plugin Nexus a été activé avec succès !");
 

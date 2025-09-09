@@ -13,6 +13,7 @@ public class PlayerProfile {
     private long points;
     private final Instant firstLogin;
     private Instant lastLogin;
+    private int leaverLevel;
 
     public PlayerProfile(UUID playerId, String playerName) {
         this.playerId = playerId;
@@ -22,9 +23,10 @@ public class PlayerProfile {
         this.points = 0;
         this.firstLogin = Instant.now();
         this.lastLogin = this.firstLogin;
+        this.leaverLevel = 0;
     }
 
-    public PlayerProfile(UUID playerId, String playerName, int eloRating, PlayerRank rank, long points, Instant firstLogin, Instant lastLogin) {
+    public PlayerProfile(UUID playerId, String playerName, int eloRating, PlayerRank rank, long points, Instant firstLogin, Instant lastLogin, int leaverLevel) {
         this.playerId = playerId;
         this.playerName = playerName;
         this.eloRating = eloRating;
@@ -32,6 +34,7 @@ public class PlayerProfile {
         this.points = points;
         this.firstLogin = firstLogin;
         this.lastLogin = lastLogin;
+        this.leaverLevel = leaverLevel;
     }
 
     public UUID getPlayerId() {
@@ -80,5 +83,13 @@ public class PlayerProfile {
 
     public void setLastLogin(Instant lastLogin) {
         this.lastLogin = lastLogin;
+    }
+
+    public int getLeaverLevel() {
+        return leaverLevel;
+    }
+
+    public void setLeaverLevel(int leaverLevel) {
+        this.leaverLevel = leaverLevel;
     }
 }

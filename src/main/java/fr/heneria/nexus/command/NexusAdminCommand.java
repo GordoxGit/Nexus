@@ -8,6 +8,7 @@ import fr.heneria.nexus.shop.manager.ShopManager;
 import fr.heneria.nexus.game.manager.GameManager;
 import fr.heneria.nexus.game.model.Match;
 import fr.heneria.nexus.game.model.MatchType;
+import fr.heneria.nexus.sanction.SanctionManager;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
@@ -28,10 +29,12 @@ public class NexusAdminCommand implements CommandExecutor {
 
     private final ArenaManager arenaManager;
     private final ShopManager shopManager;
+    private final SanctionManager sanctionManager;
 
-    public NexusAdminCommand(ArenaManager arenaManager, ShopManager shopManager) {
+    public NexusAdminCommand(ArenaManager arenaManager, ShopManager shopManager, SanctionManager sanctionManager) {
         this.arenaManager = arenaManager;
         this.shopManager = shopManager;
+        this.sanctionManager = sanctionManager;
     }
 
     @Override
@@ -55,6 +58,21 @@ public class NexusAdminCommand implements CommandExecutor {
             Match match = GameManager.getInstance().createMatch(arena, Arrays.asList(team1, team2), MatchType.NORMAL);
             GameManager.getInstance().startMatchCountdown(match);
             sender.sendMessage("Match de test lancé.");
+            return true;
+        }
+
+        if (args.length >= 3 && "sanction".equalsIgnoreCase(args[0]) && "pardon".equalsIgnoreCase(args[1])) {
+            if (!sender.hasPermission("nexus.admin.sanction")) {
+                sender.sendMessage("Vous n'avez pas la permission nécessaire.");
+                return true;
+            }
+            Player target = Bukkit.getPlayer(args[2]);
+            if (target == null) {
+                sender.sendMessage("Joueur introuvable.");
+                return true;
+            }
+            sanctionManager.pardonLastPenalty(target.getUniqueId());
+            sender.sendMessage("Sanction levée pour " + target.getName());
             return true;
         }
 
