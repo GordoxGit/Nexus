@@ -34,6 +34,11 @@ public class ArenaManager {
         arenaRepository.saveSpawns(arena);
     }
 
+    public void deleteArena(Arena arena) {
+        arenasByName.remove(arena.getName());
+        arenaRepository.deleteArena(arena);
+    }
+
     public Arena getArena(String name) {
         return arenasByName.get(name);
     }

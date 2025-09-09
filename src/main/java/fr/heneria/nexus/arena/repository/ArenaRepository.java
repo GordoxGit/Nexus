@@ -14,4 +14,6 @@ public interface ArenaRepository {
     Map<Integer, Arena> loadAllArenas();
     // Trouve une arène par son nom.
     Optional<Arena> findArenaByName(String name);
+    // Supprime une arène existante.
+    void deleteArena(Arena arena);
 }
