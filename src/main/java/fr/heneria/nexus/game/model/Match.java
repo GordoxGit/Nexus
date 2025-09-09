@@ -24,7 +24,8 @@ public class Match {
     private final Map<UUID, Integer> deaths = new ConcurrentHashMap<>();
     private GamePhase currentPhase = GamePhase.PREPARATION;
     private PhaseManager phaseManager;
-    private final Map<Integer, Integer> nexusSurcharges = new ConcurrentHashMap<>();
+    private final Map<Integer, NexusCore> nexusCores = new ConcurrentHashMap<>();
+    private final Set<Integer> eliminatedTeamIds = new HashSet<>();
 
     public Match(UUID matchId, Arena arena) {
         this.matchId = matchId;
@@ -153,11 +154,23 @@ public class Match {
         this.phaseManager = phaseManager;
     }
 
-    public void addSurcharge(int teamId) {
-        nexusSurcharges.merge(teamId, 1, Integer::sum);
+    public void initNexusCores() {
+        for (Team team : teams.values()) {
+            arena.getNexusCore(team.getTeamId()).ifPresent(obj -> {
+                nexusCores.put(team.getTeamId(), new NexusCore(team, obj.getLocation()));
+            });
+        }
     }
 
-    public int getSurchargeCount(int teamId) {
-        return nexusSurcharges.getOrDefault(teamId, 0);
+    public NexusCore getNexusCore(int teamId) {
+        return nexusCores.get(teamId);
+    }
+
+    public Map<Integer, NexusCore> getNexusCores() {
+        return nexusCores;
+    }
+
+    public Set<Integer> getEliminatedTeamIds() {
+        return eliminatedTeamIds;
     }
 }

@@ -3,6 +3,7 @@ package fr.heneria.nexus.game.phase;
 import fr.heneria.nexus.arena.model.ArenaGameObject;
 import fr.heneria.nexus.game.model.Match;
 import fr.heneria.nexus.game.model.Team;
+import fr.heneria.nexus.game.model.NexusCore;
 import fr.heneria.nexus.game.phase.GamePhase;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
@@ -108,13 +109,17 @@ public class TransportPhase implements IPhase {
             if (carrierLoc.distance(coreLoc) < 3) {
                 carrier.removePotionEffect(PotionEffectType.GLOWING);
                 int targetTeamId = obj.getObjectIndex();
-                match.addSurcharge(targetTeamId);
-                match.broadcastMessage("§aLe Cœur Nexus de l'équipe " + targetTeamId + " a été surchargé !");
-                carrierId = null;
-                if (match.getSurchargeCount(targetTeamId) >= 2) {
-                    match.getPhaseManager().transitionTo(match, GamePhase.DESTRUCTION);
-                } else {
-                    match.getPhaseManager().transitionTo(match, GamePhase.CAPTURE);
+                NexusCore nexusCore = match.getNexusCore(targetTeamId);
+                if (nexusCore != null) {
+                    nexusCore.addSurcharge();
+                    match.broadcastMessage("§aLe Cœur Nexus de l'équipe " + targetTeamId + " a été surchargé !");
+                    carrierId = null;
+                    if (nexusCore.isVulnerable()) {
+                        Team targetTeam = match.getTeams().get(targetTeamId);
+                        match.getPhaseManager().transitionTo(match, GamePhase.DESTRUCTION, targetTeam);
+                    } else {
+                        match.getPhaseManager().transitionTo(match, GamePhase.CAPTURE);
+                    }
                 }
                 break;
             }

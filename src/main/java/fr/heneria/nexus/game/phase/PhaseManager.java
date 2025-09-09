@@ -38,7 +38,7 @@ public class PhaseManager {
         }
     }
 
-    public void transitionTo(Match match, GamePhase nextPhase, Team capturingTeam) {
+    public void transitionTo(Match match, GamePhase nextPhase, Team team) {
         GamePhase current = match.getCurrentPhase();
         IPhase currentImpl = phases.get(current);
         if (currentImpl != null) {
@@ -46,11 +46,20 @@ public class PhaseManager {
         }
         match.setCurrentPhase(nextPhase);
         IPhase nextImpl;
-        if (nextPhase == GamePhase.TRANSPORT) {
-            nextImpl = new TransportPhase(plugin, capturingTeam);
-            phases.put(GamePhase.TRANSPORT, nextImpl);
-        } else {
-            nextImpl = phases.get(nextPhase);
+        switch (nextPhase) {
+            case TRANSPORT -> {
+                nextImpl = new TransportPhase(plugin, team);
+                phases.put(GamePhase.TRANSPORT, nextImpl);
+            }
+            case DESTRUCTION -> {
+                nextImpl = new DestructionPhase(plugin, team);
+                phases.put(GamePhase.DESTRUCTION, nextImpl);
+            }
+            case ELIMINATION -> {
+                nextImpl = new EliminationPhase(plugin, team);
+                phases.put(GamePhase.ELIMINATION, nextImpl);
+            }
+            default -> nextImpl = phases.get(nextPhase);
         }
         if (nextImpl != null) {
             nextImpl.onStart(match);
