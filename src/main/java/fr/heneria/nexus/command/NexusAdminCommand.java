@@ -5,11 +5,15 @@ import fr.heneria.nexus.gui.admin.AdminMenuGui;
 import fr.heneria.nexus.admin.placement.AdminPlacementManager;
 import fr.heneria.nexus.arena.model.Arena;
 import fr.heneria.nexus.shop.manager.ShopManager;
+import fr.heneria.nexus.game.manager.GameManager;
+import fr.heneria.nexus.game.model.Match;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
+import org.bukkit.Bukkit;
 
+import java.util.*;
 import java.util.stream.Collectors;
 
 /**
@@ -31,6 +35,28 @@ public class NexusAdminCommand implements CommandExecutor {
 
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
+        if (args.length > 0 && "starttest".equalsIgnoreCase(args[0])) {
+            Arena arena = arenaManager.getAllArenas().stream().findFirst().orElse(null);
+            if (arena == null) {
+                sender.sendMessage("Aucune arène disponible.");
+                return true;
+            }
+            List<UUID> team1 = new ArrayList<>();
+            List<UUID> team2 = new ArrayList<>();
+            int i = 0;
+            for (Player p : Bukkit.getOnlinePlayers()) {
+                if (i++ % 2 == 0) {
+                    team1.add(p.getUniqueId());
+                } else {
+                    team2.add(p.getUniqueId());
+                }
+            }
+            Match match = GameManager.getInstance().createMatch(arena, Arrays.asList(team1, team2));
+            GameManager.getInstance().startMatchCountdown(match);
+            sender.sendMessage("Match de test lancé.");
+            return true;
+        }
+
         // Ouvre le GUI principal pour /nx ou /nx admin
         if (args.length == 0 || "admin".equalsIgnoreCase(args[0])) {
             if (!(sender instanceof Player)) {
