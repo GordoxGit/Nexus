@@ -1,7 +1,6 @@
 package fr.heneria.nexus.game.phase;
 
 import org.bukkit.Location;
-import org.bukkit.boss.BossBar;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -12,11 +11,9 @@ import java.util.Map;
 public class EnergyCell {
     private final Location location;
     private final Map<Integer, Double> captureProgress = new HashMap<>();
-    private final BossBar bossBar;
 
-    public EnergyCell(Location location, BossBar bossBar) {
+    public EnergyCell(Location location) {
         this.location = location;
-        this.bossBar = bossBar;
     }
 
     public Location getLocation() {
@@ -27,7 +24,4 @@ public class EnergyCell {
         return captureProgress;
     }
 
-    public BossBar getBossBar() {
-        return bossBar;
-    }
 }

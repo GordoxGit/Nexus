@@ -5,17 +5,14 @@ import fr.heneria.nexus.game.model.Match;
 import fr.heneria.nexus.game.model.Team;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
-import org.bukkit.boss.BarColor;
-import org.bukkit.boss.BarStyle;
-import org.bukkit.boss.BossBar;
 import org.bukkit.entity.Player;
 import org.bukkit.scheduler.BukkitTask;
 import org.bukkit.plugin.java.JavaPlugin;
+import fr.heneria.nexus.game.hologram.HologramManager;
 
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 
 /**
  * Phase de capture d'une cellule d'énergie.
@@ -25,6 +22,7 @@ public class CapturePhase implements IPhase {
     private final JavaPlugin plugin;
     private BukkitTask task;
     private EnergyCell energyCell;
+    private final HologramManager hologramManager = new HologramManager();
 
     public CapturePhase(JavaPlugin plugin) {
         this.plugin = plugin;
@@ -37,14 +35,8 @@ public class CapturePhase implements IPhase {
             match.broadcastMessage("§cAucune Cellule d'Énergie définie pour cette arène.");
             return;
         }
-        BossBar bossBar = Bukkit.createBossBar("Cellule d'Énergie", BarColor.WHITE, BarStyle.SOLID);
-        for (UUID playerId : match.getPlayers()) {
-            Player p = Bukkit.getPlayer(playerId);
-            if (p != null) {
-                bossBar.addPlayer(p);
-            }
-        }
-        this.energyCell = new EnergyCell(obj.getLocation(), bossBar);
+        this.energyCell = new EnergyCell(obj.getLocation());
+        hologramManager.createCaptureHologram(obj.getLocation());
         this.task = Bukkit.getScheduler().runTaskTimer(plugin, () -> tick(match), 20L, 20L);
     }
 
@@ -54,9 +46,7 @@ public class CapturePhase implements IPhase {
             task.cancel();
             task = null;
         }
-        if (energyCell != null) {
-            energyCell.getBossBar().removeAll();
-        }
+        hologramManager.removeCaptureHologram();
     }
 
     @Override
@@ -67,8 +57,12 @@ public class CapturePhase implements IPhase {
                 .filter(p -> match.getPlayers().contains(p.getUniqueId()))
                 .filter(p -> p.getLocation().distance(loc) <= 5)
                 .toList();
+        Map<Integer, Double> progresses = new HashMap<>();
+        for (Team team : match.getTeams().values()) {
+            progresses.put(team.getTeamId(), energyCell.getCaptureProgress().getOrDefault(team.getTeamId(), 0D));
+        }
         if (nearby.isEmpty()) {
-            energyCell.getBossBar().setTitle("Cellule contestée");
+            hologramManager.updateCaptureHologram(progresses, -1, true);
             return;
         }
         Map<Integer, Long> counts = new HashMap<>();
@@ -88,15 +82,14 @@ public class CapturePhase implements IPhase {
             }
         }
         if (winningTeamId == -1 || max <= total - max) {
-            energyCell.getBossBar().setTitle("Cellule contestée");
+            hologramManager.updateCaptureHologram(progresses, -1, true);
             return;
         }
         double progress = energyCell.getCaptureProgress().merge(winningTeamId, 1D, Double::sum);
-        energyCell.getBossBar().setColor(BarColor.GREEN);
-        energyCell.getBossBar().setTitle("Équipe " + winningTeamId + " - " + (int) progress + "s");
-       energyCell.getBossBar().setProgress(Math.min(progress, 60.0) / 60.0);
-       if (progress >= 60) {
-           match.broadcastMessage("§aL'équipe " + winningTeamId + " a capturé la Cellule d'Énergie !");
+        progresses.put(winningTeamId, progress);
+        hologramManager.updateCaptureHologram(progresses, winningTeamId, false);
+        if (progress >= 60) {
+            match.broadcastMessage("§aL'équipe " + winningTeamId + " a capturé la Cellule d'Énergie !");
             Team team = match.getTeams().get(winningTeamId);
             if (team != null) {
                 match.getPhaseManager().transitionTo(match, GamePhase.TRANSPORT, team);
