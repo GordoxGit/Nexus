@@ -1,6 +1,7 @@
 package fr.heneria.nexus.listener;
 
 import fr.heneria.nexus.admin.placement.*;
+import fr.heneria.nexus.arena.manager.ArenaManager; // <-- CORRECTION ICI
 import fr.heneria.nexus.gui.admin.*;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
@@ -75,4 +76,3 @@ public class AdminPlacementListener implements Listener {
         }
     }
 }
-
