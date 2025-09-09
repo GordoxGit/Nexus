@@ -1,8 +1,10 @@
 -- liquibase formatted sql
+
 -- changeset gordox:6
 CREATE TABLE matches (
     id VARCHAR(36) PRIMARY KEY,
-    arena_id INT NOT NULL,
+    -- CORRECTION: La colonne peut être NULL si l'arène est supprimée
+    arena_id INT NULL,
     start_time TIMESTAMP NOT NULL,
     end_time TIMESTAMP,
     winning_team_id INT,
