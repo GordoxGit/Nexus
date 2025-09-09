@@ -6,6 +6,7 @@ import dev.triumphteam.gui.guis.GuiItem;
 import fr.heneria.nexus.arena.manager.ArenaManager;
 import fr.heneria.nexus.arena.model.Arena;
 import fr.heneria.nexus.admin.conversation.AdminConversationManager;
+import fr.heneria.nexus.admin.placement.AdminPlacementManager;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Material;
@@ -20,10 +21,12 @@ public class ArenaListGui {
 
     private final ArenaManager arenaManager;
     private final AdminConversationManager adminConversationManager;
+    private final AdminPlacementManager adminPlacementManager;
 
-    public ArenaListGui(ArenaManager arenaManager, AdminConversationManager adminConversationManager) {
+    public ArenaListGui(ArenaManager arenaManager, AdminConversationManager adminConversationManager, AdminPlacementManager adminPlacementManager) {
         this.arenaManager = arenaManager;
         this.adminConversationManager = adminConversationManager;
+        this.adminPlacementManager = adminPlacementManager;
     }
 
     /**
@@ -51,7 +54,7 @@ public class ArenaListGui {
                     )
                     .asGuiItem(event -> {
                         event.setCancelled(true);
-                        new ArenaEditorGui(arenaManager, arena).open((Player) event.getWhoClicked());
+                        new ArenaEditorGui(arenaManager, arena, adminPlacementManager).open((Player) event.getWhoClicked());
                     });
             gui.addItem(item);
         }

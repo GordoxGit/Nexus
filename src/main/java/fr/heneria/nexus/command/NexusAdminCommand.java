@@ -1,9 +1,9 @@
 package fr.heneria.nexus.command;
 
 import fr.heneria.nexus.arena.manager.ArenaManager;
-import fr.heneria.nexus.arena.model.Arena;
 import fr.heneria.nexus.gui.admin.AdminMenuGui;
-import org.bukkit.Location;
+import fr.heneria.nexus.admin.placement.AdminPlacementManager;
+import fr.heneria.nexus.arena.model.Arena;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
@@ -38,48 +38,18 @@ public class NexusAdminCommand implements CommandExecutor {
                 sender.sendMessage("Vous n'avez pas la permission nécessaire.");
                 return true;
             }
-            new AdminMenuGui(arenaManager).open((Player) sender);
-            return true;
-        }
-
-        if ("setspawn".equalsIgnoreCase(args[0])) {
-            if (!(sender instanceof Player)) {
-                sender.sendMessage("Cette commande doit être exécutée par un joueur.");
-                return true;
-            }
-            if (args.length < 3) {
-                sender.sendMessage("Usage: /" + label + " setspawn <équipe> <numéroSpawn>");
-                return true;
-            }
-            int teamId;
-            int spawnNumber;
-            try {
-                teamId = Integer.parseInt(args[1]);
-                spawnNumber = Integer.parseInt(args[2]);
-            } catch (NumberFormatException e) {
-                sender.sendMessage("Équipe et numéro de spawn doivent être des nombres.");
-                return true;
-            }
-            Player player = (Player) sender;
-            Arena arena = arenaManager.getEditingArena(player.getUniqueId());
-            if (arena == null) {
-                sender.sendMessage("Aucune arène en cours d'édition.");
-                return true;
-            }
-            Location loc = player.getLocation();
-            arena.setSpawn(teamId, spawnNumber, loc);
-            sender.sendMessage("Spawn défini pour l'arène " + arena.getName() + ".");
+            new AdminMenuGui(arenaManager, AdminPlacementManager.getInstance()).open((Player) sender);
             return true;
         }
 
         // Anciennes sous-commandes pour la gestion des arènes
         if (!"arena".equalsIgnoreCase(args[0])) {
-            sender.sendMessage("Usage: /" + label + " arena <list|save> | /" + label + " setspawn <équipe> <numéroSpawn>");
+            sender.sendMessage("Usage: /" + label + " arena <list|save>");
             return true;
         }
 
         if (args.length < 2) {
-            sender.sendMessage("Usage: /" + label + " arena <list|save> | /" + label + " setspawn <équipe> <numéroSpawn>");
+            sender.sendMessage("Usage: /" + label + " arena <list|save>");
             return true;
         }
 

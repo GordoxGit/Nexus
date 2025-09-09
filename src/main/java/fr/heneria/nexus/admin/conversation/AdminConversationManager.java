@@ -2,6 +2,7 @@ package fr.heneria.nexus.admin.conversation;
 
 import fr.heneria.nexus.arena.manager.ArenaManager;
 import fr.heneria.nexus.gui.admin.ArenaListGui;
+import fr.heneria.nexus.admin.placement.AdminPlacementManager;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -52,7 +53,7 @@ public class AdminConversationManager {
             if (conversations.containsKey(id)) {
                 admin.sendMessage("Création d'arène annulée (timeout).");
                 cancelConversation(admin);
-                new ArenaListGui(arenaManager, this).open(admin);
+                new ArenaListGui(arenaManager, this, AdminPlacementManager.getInstance()).open(admin);
             }
         }, 5 * 60 * 20L); // 5 minutes
     }
@@ -70,7 +71,7 @@ public class AdminConversationManager {
         if ("annuler".equalsIgnoreCase(message)) {
             admin.sendMessage("Création d'arène annulée.");
             cancelConversation(admin);
-            new ArenaListGui(arenaManager, this).open(admin);
+            new ArenaListGui(arenaManager, this, AdminPlacementManager.getInstance()).open(admin);
             return;
         }
 
@@ -100,7 +101,7 @@ public class AdminConversationManager {
                 arenaManager.createArena(conversation.getArenaName(), conversation.getMaxPlayers());
                 admin.sendMessage("Arène créée avec succès.");
                 cancelConversation(admin);
-                new ArenaListGui(arenaManager, this).open(admin);
+                new ArenaListGui(arenaManager, this, AdminPlacementManager.getInstance()).open(admin);
                 break;
         }
     }

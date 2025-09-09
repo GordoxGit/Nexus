@@ -2,6 +2,7 @@ package fr.heneria.nexus.listener;
 
 import fr.heneria.nexus.player.manager.PlayerManager;
 import fr.heneria.nexus.arena.manager.ArenaManager;
+import fr.heneria.nexus.admin.placement.AdminPlacementManager;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.AsyncPlayerPreLoginEvent;
@@ -13,11 +14,13 @@ public class PlayerConnectionListener implements Listener {
     private final PlayerManager playerManager;
     private final ArenaManager arenaManager;
     private final JavaPlugin plugin; // CORRECTION: Ajout du champ pour le plugin
+    private final AdminPlacementManager adminPlacementManager;
 
     // CORRECTION: Le constructeur accepte maintenant le plugin
-    public PlayerConnectionListener(PlayerManager playerManager, ArenaManager arenaManager, JavaPlugin plugin) {
+    public PlayerConnectionListener(PlayerManager playerManager, ArenaManager arenaManager, AdminPlacementManager adminPlacementManager, JavaPlugin plugin) {
         this.playerManager = playerManager;
         this.arenaManager = arenaManager;
+        this.adminPlacementManager = adminPlacementManager;
         this.plugin = plugin;
     }
 
@@ -32,5 +35,6 @@ public class PlayerConnectionListener implements Listener {
         plugin.getLogger().info("Sauvegarde du profil pour " + event.getPlayer().getName() + "...");
         playerManager.unloadPlayerProfile(event.getPlayer().getUniqueId());
         arenaManager.stopEditing(event.getPlayer().getUniqueId());
+        adminPlacementManager.endPlacementMode(event.getPlayer());
     }
 }
