@@ -3,12 +3,12 @@ package fr.heneria.nexus.gui.player;
 import dev.triumphteam.gui.builder.item.ItemBuilder;
 import dev.triumphteam.gui.guis.Gui;
 import dev.triumphteam.gui.guis.GuiItem;
-import fr.heneria.nexus.economy.manager.EconomyManager;
-import fr.heneria.nexus.economy.model.TransactionType;
 import fr.heneria.nexus.player.manager.PlayerManager;
 import fr.heneria.nexus.player.model.PlayerProfile;
 import fr.heneria.nexus.shop.manager.ShopManager;
 import fr.heneria.nexus.shop.model.ShopItem;
+import fr.heneria.nexus.game.model.Match;
+import fr.heneria.nexus.game.scoreboard.ScoreboardManager;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Bukkit;
@@ -25,17 +25,17 @@ import java.util.List;
 public class ShopCategoryViewGui {
 
     private final ShopManager shopManager;
-    private final EconomyManager economyManager;
     private final PlayerManager playerManager;
     private final JavaPlugin plugin;
+    private final Match match;
     private final String category;
 
-    public ShopCategoryViewGui(ShopManager shopManager, EconomyManager economyManager, PlayerManager playerManager,
-                               JavaPlugin plugin, String category) {
+    public ShopCategoryViewGui(ShopManager shopManager, PlayerManager playerManager,
+                               JavaPlugin plugin, Match match, String category) {
         this.shopManager = shopManager;
-        this.economyManager = economyManager;
         this.playerManager = playerManager;
         this.plugin = plugin;
+        this.match = match;
         this.category = category;
     }
 
@@ -62,20 +62,18 @@ public class ShopCategoryViewGui {
                         if (profile == null) {
                             return;
                         }
-                        if (!economyManager.hasEnoughPoints(p.getUniqueId(), item.getPrice())) {
+                        int points = match.getRoundPoints().getOrDefault(p.getUniqueId(), 0);
+                        if (points < item.getPrice()) {
                             p.playSound(p.getLocation(), Sound.ENTITY_VILLAGER_NO, 1f, 1f);
                             p.sendMessage("§cVous n'avez pas assez de points !");
                             return;
                         }
-                        economyManager.removePoints(p.getUniqueId(), item.getPrice(), TransactionType.SPEND_SHOP, "shop")
-                                .thenAccept(success -> {
-                                    if (success) {
-                                        Bukkit.getScheduler().runTask(plugin, () -> {
-                                            p.getInventory().addItem(new ItemStack(item.getMaterial()));
-                                            p.playSound(p.getLocation(), Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 1f, 1f);
-                                        });
-                                    }
-                                });
+                        match.getRoundPoints().put(p.getUniqueId(), points - item.getPrice());
+                        Bukkit.getScheduler().runTask(plugin, () -> {
+                            p.getInventory().addItem(new ItemStack(item.getMaterial()));
+                            p.playSound(p.getLocation(), Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 1f, 1f);
+                            ScoreboardManager.getInstance().updateScoreboard(match);
+                        });
                     });
             gui.addItem(guiItem);
         }
