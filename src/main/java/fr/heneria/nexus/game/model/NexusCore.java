@@ -1,6 +1,7 @@
 package fr.heneria.nexus.game.model;
 
 import org.bukkit.Location;
+import fr.heneria.nexus.game.GameConfig;
 
 /**
  * Représente l'état d'un Cœur Nexus dans une partie.
@@ -8,7 +9,7 @@ import org.bukkit.Location;
 public class NexusCore {
     private final Team team;
     private final Location location;
-    private final double maxHealth = 100.0;
+    private final double maxHealth = GameConfig.get().getNexusMaxHealth();
     private double health = maxHealth;
     private boolean vulnerable = false;
     private int surcharges = 0;
@@ -40,7 +41,7 @@ public class NexusCore {
 
     public void addSurcharge() {
         surcharges++;
-        if (surcharges >= 2) {
+        if (surcharges >= GameConfig.get().getNexusSurchargesToDestroy()) {
             vulnerable = true;
         }
     }

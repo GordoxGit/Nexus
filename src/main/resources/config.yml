@@ -44,6 +44,20 @@ game:
     victory-bonus: 200
     defeat-bonus: [100, 150]  # 1ère et 2ème défaite consécutive
 
+# Règles de jeu dynamiques
+game-rules:
+  rounds-to-win: 3
+  nexus-max-health: 100
+  nexus-surcharges-to-destroy: 2
+  energy-cell:
+    capture-radius: 5.0
+    capture-time-seconds: 30
+  economy:
+    starting-round-points: 100
+    kill-reward: 100
+    assist-reward: 50
+    round-win-bonus: 200
+
 # Système de classement
 ranking:
   elo:

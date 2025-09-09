@@ -16,6 +16,7 @@ import fr.heneria.nexus.gui.player.ShopGui;
 import fr.heneria.nexus.shop.manager.ShopManager;
 import fr.heneria.nexus.game.scoreboard.ScoreboardManager;
 import fr.heneria.nexus.economy.model.TransactionType;
+import fr.heneria.nexus.game.GameConfig;
 import fr.heneria.nexus.player.manager.PlayerManager;
 import fr.heneria.nexus.player.model.PlayerProfile;
 import fr.heneria.nexus.player.rank.PlayerRank;
@@ -143,7 +144,7 @@ public class GameManager {
                     player.setFoodLevel(20);
                     kitManager.applyKit(player, kit);
                     player.addPotionEffect(new PotionEffect(PotionEffectType.SLOW, 400, 255, false, false));
-                    match.getRoundPoints().put(playerId, 100);
+                    match.getRoundPoints().put(playerId, GameConfig.get().getStartingRoundPoints());
                     new ShopGui(shopManager, playerManager, plugin, match).open(player);
                 }
             }
@@ -195,7 +196,18 @@ public class GameManager {
                 p.sendTitle(title, subtitle, 10, 40, 10);
             }
         }
-        if (match.getTeamScores().getOrDefault(winningTeamId, 0) >= Match.ROUNDS_TO_WIN) {
+        if (winningTeam != null) {
+            int bonus = GameConfig.get().getRoundWinBonus();
+            for (UUID uuid : winningTeam.getPlayers()) {
+                match.getRoundPoints().merge(uuid, bonus, Integer::sum);
+                Player player = Bukkit.getPlayer(uuid);
+                if (player != null) {
+                    player.sendMessage("§6+" + bonus + " points (Manche gagnée)");
+                    ScoreboardManager.getInstance().updatePlayer(match, uuid);
+                }
+            }
+        }
+        if (match.getTeamScores().getOrDefault(winningTeamId, 0) >= GameConfig.get().getRoundsToWin()) {
             endGame(match, winningTeamId);
             return;
         }
@@ -224,7 +236,7 @@ public class GameManager {
                     if (spawn != null) {
                         player.teleport(spawn);
                     }
-                    match.getRoundPoints().put(playerId, 100);
+                    match.getRoundPoints().put(playerId, GameConfig.get().getStartingRoundPoints());
                     player.addPotionEffect(new PotionEffect(PotionEffectType.SLOW, 400, 255, false, false));
                     new ShopGui(shopManager, playerManager, plugin, match).open(player);
                 }

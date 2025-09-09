@@ -10,10 +10,12 @@ import fr.heneria.nexus.shop.model.ShopItem;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
+import fr.heneria.nexus.game.GameConfig;
 
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Consumer;
 
 /**
  * Gère les conversations de création d'arène pour les administrateurs.
@@ -36,6 +38,7 @@ public class AdminConversationManager {
     private final JavaPlugin plugin;
     private final Map<UUID, ArenaCreationConversation> conversations = new ConcurrentHashMap<>();
     private final Map<UUID, PriceUpdateConversation> priceConversations = new ConcurrentHashMap<>();
+    private final Map<UUID, GameRuleUpdateConversation> ruleConversations = new ConcurrentHashMap<>();
 
     private AdminConversationManager(ArenaManager arenaManager, ShopManager shopManager, ShopRepository shopRepository, JavaPlugin plugin) {
         this.arenaManager = arenaManager;
@@ -90,6 +93,28 @@ public class AdminConversationManager {
     }
 
     /**
+     * Démarre une conversation de mise à jour d'une règle de jeu.
+     */
+    public void startGameRuleConversation(Player admin, String key, boolean isDouble, Consumer<Player> reopen) {
+        UUID id = admin.getUniqueId();
+        if (isInConversation(admin)) {
+            admin.sendMessage("Une conversation est déjà en cours.");
+            return;
+        }
+        GameRuleUpdateConversation conv = new GameRuleUpdateConversation(id, key, isDouble, reopen);
+        ruleConversations.put(id, conv);
+        admin.sendMessage("Entrez la nouvelle valeur (ou 'annuler').");
+
+        Bukkit.getScheduler().runTaskLater(plugin, () -> {
+            if (ruleConversations.containsKey(id)) {
+                admin.sendMessage("Modification de valeur annulée (timeout).");
+                cancelConversation(admin);
+                reopen.accept(admin);
+            }
+        }, 5 * 60 * 20L);
+    }
+
+    /**
      * Traite une réponse envoyée par l'administrateur.
      */
     public void handleResponse(Player admin, String message) {
@@ -136,34 +161,58 @@ public class AdminConversationManager {
         }
 
         PriceUpdateConversation priceConv = priceConversations.get(id);
-        if (priceConv == null) {
+        GameRuleUpdateConversation ruleConv = ruleConversations.get(id);
+        if (priceConv == null && ruleConv == null) {
             return;
         }
 
-        if ("annuler".equalsIgnoreCase(message)) {
-            admin.sendMessage("Modification de prix annulée.");
+        if (priceConv != null) {
+            if ("annuler".equalsIgnoreCase(message)) {
+                admin.sendMessage("Modification de prix annulée.");
+                cancelConversation(admin);
+                new ShopCategoryGui(shopManager, priceConv.getItem().getCategory()).open(admin);
+                return;
+            }
+
+            int newPrice;
+            try {
+                newPrice = Integer.parseInt(message);
+                if (newPrice < 0) {
+                    admin.sendMessage("Le prix doit être un entier positif. Réessayez.");
+                    return;
+                }
+            } catch (NumberFormatException e) {
+                admin.sendMessage("Le prix doit être un entier positif. Réessayez.");
+                return;
+            }
+
+            shopManager.updateItemPrice(priceConv.getItem(), newPrice);
+            shopRepository.saveItem(priceConv.getItem());
+            admin.sendMessage("Prix mis à jour.");
             cancelConversation(admin);
             new ShopCategoryGui(shopManager, priceConv.getItem().getCategory()).open(admin);
             return;
         }
 
-        int newPrice;
-        try {
-            newPrice = Integer.parseInt(message);
-            if (newPrice < 0) {
-                admin.sendMessage("Le prix doit être un entier positif. Réessayez.");
+        if (ruleConv != null) {
+            if ("annuler".equalsIgnoreCase(message)) {
+                admin.sendMessage("Modification annulée.");
+                cancelConversation(admin);
+                ruleConv.getReopen().accept(admin);
                 return;
             }
-        } catch (NumberFormatException e) {
-            admin.sendMessage("Le prix doit être un entier positif. Réessayez.");
-            return;
+            double value;
+            try {
+                value = ruleConv.isDoubleValue() ? Double.parseDouble(message) : Integer.parseInt(message);
+            } catch (NumberFormatException e) {
+                admin.sendMessage("La valeur doit être un nombre. Réessayez.");
+                return;
+            }
+            GameConfig.get().setValue(ruleConv.getKey(), value);
+            admin.sendMessage("Valeur mise à jour.");
+            cancelConversation(admin);
+            ruleConv.getReopen().accept(admin);
         }
-
-        shopManager.updateItemPrice(priceConv.getItem(), newPrice);
-        shopRepository.saveItem(priceConv.getItem());
-        admin.sendMessage("Prix mis à jour.");
-        cancelConversation(admin);
-        new ShopCategoryGui(shopManager, priceConv.getItem().getCategory()).open(admin);
     }
 
     /**
@@ -173,6 +222,7 @@ public class AdminConversationManager {
         UUID id = admin.getUniqueId();
         conversations.remove(id);
         priceConversations.remove(id);
+        ruleConversations.remove(id);
     }
 
     /**
@@ -180,6 +230,6 @@ public class AdminConversationManager {
      */
     public boolean isInConversation(Player admin) {
         UUID id = admin.getUniqueId();
-        return conversations.containsKey(id) || priceConversations.containsKey(id);
+        return conversations.containsKey(id) || priceConversations.containsKey(id) || ruleConversations.containsKey(id);
     }
 }
