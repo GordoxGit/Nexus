@@ -42,14 +42,44 @@ public class NexusAdminCommand implements CommandExecutor {
             return true;
         }
 
+        if ("setspawn".equalsIgnoreCase(args[0])) {
+            if (!(sender instanceof Player)) {
+                sender.sendMessage("Cette commande doit être exécutée par un joueur.");
+                return true;
+            }
+            if (args.length < 3) {
+                sender.sendMessage("Usage: /" + label + " setspawn <équipe> <numéroSpawn>");
+                return true;
+            }
+            int teamId;
+            int spawnNumber;
+            try {
+                teamId = Integer.parseInt(args[1]);
+                spawnNumber = Integer.parseInt(args[2]);
+            } catch (NumberFormatException e) {
+                sender.sendMessage("Équipe et numéro de spawn doivent être des nombres.");
+                return true;
+            }
+            Player player = (Player) sender;
+            Arena arena = arenaManager.getEditingArena(player.getUniqueId());
+            if (arena == null) {
+                sender.sendMessage("Aucune arène en cours d'édition.");
+                return true;
+            }
+            Location loc = player.getLocation();
+            arena.setSpawn(teamId, spawnNumber, loc);
+            sender.sendMessage("Spawn défini pour l'arène " + arena.getName() + ".");
+            return true;
+        }
+
         // Anciennes sous-commandes pour la gestion des arènes
         if (!"arena".equalsIgnoreCase(args[0])) {
-            sender.sendMessage("Usage: /" + label + " arena <create|list|setspawn|save>");
+            sender.sendMessage("Usage: /" + label + " arena <create|list|save> | /" + label + " setspawn <équipe> <numéroSpawn>");
             return true;
         }
 
         if (args.length < 2) {
-            sender.sendMessage("Usage: /" + label + " arena <create|list|setspawn|save>");
+            sender.sendMessage("Usage: /" + label + " arena <create|list|save> | /" + label + " setspawn <équipe> <numéroSpawn>");
             return true;
         }
 
@@ -76,33 +106,6 @@ public class NexusAdminCommand implements CommandExecutor {
                         .map(Arena::getName)
                         .collect(Collectors.joining(", "));
                 sender.sendMessage("Arènes: " + arenas);
-                return true;
-            case "setspawn":
-                if (!(sender instanceof Player)) {
-                    sender.sendMessage("Cette commande doit être exécutée par un joueur.");
-                    return true;
-                }
-                if (args.length < 5) {
-                    sender.sendMessage("Usage: /" + label + " arena setspawn <nomArène> <équipe> <numéroSpawn>");
-                    return true;
-                }
-                Arena arena = arenaManager.getArena(args[2]);
-                if (arena == null) {
-                    sender.sendMessage("Arène introuvable.");
-                    return true;
-                }
-                int teamId;
-                int spawnNumber;
-                try {
-                    teamId = Integer.parseInt(args[3]);
-                    spawnNumber = Integer.parseInt(args[4]);
-                } catch (NumberFormatException e) {
-                    sender.sendMessage("Équipe et numéro de spawn doivent être des nombres.");
-                    return true;
-                }
-                Location loc = ((Player) sender).getLocation();
-                arena.setSpawn(teamId, spawnNumber, loc);
-                sender.sendMessage("Spawn défini pour l'arène " + arena.getName() + ".");
                 return true;
             case "save":
                 if (args.length < 3) {
