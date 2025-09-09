@@ -10,6 +10,9 @@ commands:
     description: Centre de contrôle de Nexus
     usage: /nx
     permission: nexus.admin
+  play:
+    description: Ouvre la sélection de mode de jeu
+    usage: /play
 permissions:
   nexus.admin:
     description: Accès à l'administration de Nexus

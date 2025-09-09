@@ -3,6 +3,7 @@ package fr.heneria.nexus.listener;
 import fr.heneria.nexus.game.manager.GameManager;
 import fr.heneria.nexus.game.model.Match;
 import fr.heneria.nexus.game.model.Team;
+import fr.heneria.nexus.game.queue.QueueManager;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.entity.Player;
@@ -19,15 +20,18 @@ public class GameListener implements Listener {
 
     private final GameManager gameManager;
     private final JavaPlugin plugin;
+    private final QueueManager queueManager;
 
-    public GameListener(GameManager gameManager, JavaPlugin plugin) {
+    public GameListener(GameManager gameManager, JavaPlugin plugin, QueueManager queueManager) {
         this.gameManager = gameManager;
         this.plugin = plugin;
+        this.queueManager = queueManager;
     }
 
     @EventHandler
     public void onQuit(PlayerQuitEvent event) {
         UUID uuid = event.getPlayer().getUniqueId();
+        queueManager.leaveQueue(event.getPlayer());
         Match match = gameManager.getPlayerMatch(uuid);
         if (match != null) {
             match.broadcastMessage(event.getPlayer().getName() + " a quitté la partie.");
