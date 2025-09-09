@@ -26,6 +26,10 @@ public class Match {
     private PhaseManager phaseManager;
     private final Map<Integer, NexusCore> nexusCores = new ConcurrentHashMap<>();
     private final Set<Integer> eliminatedTeamIds = new HashSet<>();
+    private int currentRound = 1;
+    private final Map<Integer, Integer> teamScores = new ConcurrentHashMap<>();
+    private final Map<UUID, Integer> roundPoints = new ConcurrentHashMap<>();
+    public static final int ROUNDS_TO_WIN = 3;
 
     public Match(UUID matchId, Arena arena) {
         this.matchId = matchId;
@@ -54,6 +58,7 @@ public class Match {
 
     public void addTeam(Team team) {
         teams.put(team.getTeamId(), team);
+        teamScores.put(team.getTeamId(), 0);
     }
 
     public BukkitTask getCountdownTask() {
@@ -172,5 +177,21 @@ public class Match {
 
     public Set<Integer> getEliminatedTeamIds() {
         return eliminatedTeamIds;
+    }
+
+    public int getCurrentRound() {
+        return currentRound;
+    }
+
+    public void setCurrentRound(int currentRound) {
+        this.currentRound = currentRound;
+    }
+
+    public Map<Integer, Integer> getTeamScores() {
+        return teamScores;
+    }
+
+    public Map<UUID, Integer> getRoundPoints() {
+        return roundPoints;
     }
 }

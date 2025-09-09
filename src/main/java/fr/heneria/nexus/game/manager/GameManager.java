@@ -13,6 +13,8 @@ import fr.heneria.nexus.game.phase.GamePhase;
 import fr.heneria.nexus.game.phase.PhaseManager;
 import fr.heneria.nexus.gui.player.ShopGui;
 import fr.heneria.nexus.shop.manager.ShopManager;
+import fr.heneria.nexus.game.scoreboard.ScoreboardManager;
+import fr.heneria.nexus.economy.model.TransactionType;
 import fr.heneria.nexus.player.manager.PlayerManager;
 import org.bukkit.Bukkit;
 import org.bukkit.GameMode;
@@ -121,10 +123,13 @@ public class GameManager {
                     player.setHealth(player.getMaxHealth());
                     player.setFoodLevel(20);
                     kitManager.applyKit(player, kit);
-                    new ShopGui(shopManager, economyManager, playerManager, plugin).open(player);
+                    match.getRoundPoints().put(playerId, 100);
+                    new ShopGui(shopManager, playerManager, plugin, match).open(player);
                 }
             }
         }
+
+        ScoreboardManager.getInstance().createMatchScoreboard(match);
 
         BukkitTask task = Bukkit.getScheduler().runTaskLater(plugin, () -> {
             for (UUID playerId : match.getPlayers()) {
@@ -141,23 +146,105 @@ public class GameManager {
         match.setShopPhaseTask(task);
     }
 
-    public void endMatch(Match match, int winningTeamId) {
+    public void endRound(Match match, int winningTeamId) {
+        match.setState(GameState.ROUND_ENDING);
+        match.getTeamScores().merge(winningTeamId, 1, Integer::sum);
+        ScoreboardManager.getInstance().updateScoreboard(match);
+        Team winningTeam = match.getTeams().get(winningTeamId);
+        String title = "Manche remportée";
+        String subtitle = winningTeam != null ? "Equipe " + winningTeamId + " gagne la manche" : "";
+        for (UUID playerId : match.getPlayers()) {
+            Player p = Bukkit.getPlayer(playerId);
+            if (p != null) {
+                p.sendTitle(title, subtitle, 10, 40, 10);
+            }
+        }
+        if (match.getTeamScores().getOrDefault(winningTeamId, 0) >= Match.ROUNDS_TO_WIN) {
+            endGame(match, winningTeamId);
+            return;
+        }
+        Bukkit.getScheduler().runTaskLater(plugin, () -> startNextRound(match), 200L);
+    }
+
+    public void startNextRound(Match match) {
+        match.setState(GameState.IN_PROGRESS);
+        match.setCurrentRound(match.getCurrentRound() + 1);
+        match.initNexusCores();
+        boolean teamMode = match.getTeams().values().stream().anyMatch(t -> t.getPlayers().size() > 1);
+        Kit kit = kitManager.getKit(teamMode ? "Equipe" : "Solo");
+        for (Team team : match.getTeams().values()) {
+            Map<Integer, Location> spawns = match.getArena().getSpawns().get(team.getTeamId());
+            Location spawn = null;
+            if (spawns != null && !spawns.isEmpty()) {
+                spawn = spawns.values().iterator().next();
+            }
+            for (UUID playerId : team.getPlayers()) {
+                Player player = Bukkit.getPlayer(playerId);
+                if (player != null) {
+                    player.setHealth(player.getMaxHealth());
+                    player.setFoodLevel(20);
+                    player.getInventory().clear();
+                    kitManager.applyKit(player, kit);
+                    if (spawn != null) {
+                        player.teleport(spawn);
+                    }
+                    match.getRoundPoints().put(playerId, 100);
+                    new ShopGui(shopManager, playerManager, plugin, match).open(player);
+                }
+            }
+        }
+        ScoreboardManager.getInstance().updateScoreboard(match);
+        if (match.getPhaseManager() != null) {
+            match.getPhaseManager().transitionTo(match, GamePhase.PREPARATION);
+        }
+        BukkitTask task = Bukkit.getScheduler().runTaskLater(plugin, () -> {
+            for (UUID playerId : match.getPlayers()) {
+                Player p = Bukkit.getPlayer(playerId);
+                if (p != null) {
+                    p.closeInventory();
+                    p.sendMessage("La phase d'achat est terminée !");
+                }
+            }
+            if (match.getPhaseManager() != null) {
+                match.getPhaseManager().transitionTo(match, GamePhase.CAPTURE);
+            }
+        }, 400L);
+        match.setShopPhaseTask(task);
+    }
+
+    public void endGame(Match match, int winningTeamId) {
         match.setState(GameState.ENDING);
         match.setEndTime(Instant.now());
         matchRepository.saveMatchResult(match, winningTeamId);
         matchRepository.saveMatchParticipants(match);
-        Location lobby = plugin.getServer().getWorlds().get(0).getSpawnLocation();
+        Team winningTeam = match.getTeams().get(winningTeamId);
+        if (winningTeam != null) {
+            for (UUID uuid : winningTeam.getPlayers()) {
+                economyManager.addPoints(uuid, 100, TransactionType.EARN_VICTORY, "match_win");
+            }
+        }
         for (UUID playerId : match.getPlayers()) {
             Player player = Bukkit.getPlayer(playerId);
             if (player != null) {
-                player.getInventory().clear();
-                if (lobby != null) {
-                    player.teleport(lobby);
-                }
+                player.sendTitle("§6Victoire !", "Equipe " + winningTeamId + " remporte la partie", 10, 60, 10);
             }
-            playerMatches.remove(playerId);
         }
-        matches.remove(match.getMatchId());
+        Bukkit.getScheduler().runTaskLater(plugin, () -> {
+            Location lobby = plugin.getServer().getWorlds().get(0).getSpawnLocation();
+            for (UUID playerId : match.getPlayers()) {
+                Player player = Bukkit.getPlayer(playerId);
+                if (player != null) {
+                    player.getInventory().clear();
+                    if (lobby != null) {
+                        player.teleport(lobby);
+                    }
+                    ScoreboardManager.getInstance().removeScoreboard(player);
+                    player.sendMessage("Retour au lobby...");
+                }
+                playerMatches.remove(playerId);
+            }
+            matches.remove(match.getMatchId());
+        }, 100L);
     }
 
     public Match getPlayerMatch(UUID playerId) {

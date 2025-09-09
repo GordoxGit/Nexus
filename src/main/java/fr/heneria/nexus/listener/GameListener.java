@@ -55,7 +55,7 @@ public class GameListener implements Listener {
                 int winningTeamId = match.getTeams().values().stream()
                         .filter(t -> !t.getPlayers().isEmpty())
                         .findFirst().map(Team::getTeamId).orElse(0);
-                gameManager.endMatch(match, winningTeamId);
+                gameManager.endRound(match, winningTeamId);
             }
         }
     }
@@ -177,7 +177,7 @@ public class GameListener implements Listener {
             }
         }
         if (aliveTeams <= 1 && lastTeamId != -1) {
-            gameManager.endMatch(match, lastTeamId);
+            gameManager.endRound(match, lastTeamId);
         }
     }
 

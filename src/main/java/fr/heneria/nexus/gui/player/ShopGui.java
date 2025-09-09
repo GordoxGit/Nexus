@@ -3,10 +3,10 @@ package fr.heneria.nexus.gui.player;
 import dev.triumphteam.gui.builder.item.ItemBuilder;
 import dev.triumphteam.gui.guis.Gui;
 import dev.triumphteam.gui.guis.GuiItem;
-import fr.heneria.nexus.economy.manager.EconomyManager;
 import fr.heneria.nexus.player.manager.PlayerManager;
 import fr.heneria.nexus.shop.manager.ShopManager;
 import fr.heneria.nexus.shop.model.ShopItem;
+import fr.heneria.nexus.game.model.Match;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Material;
@@ -22,15 +22,15 @@ import java.util.Set;
 public class ShopGui {
 
     private final ShopManager shopManager;
-    private final EconomyManager economyManager;
     private final PlayerManager playerManager;
     private final JavaPlugin plugin;
+    private final Match match;
 
-    public ShopGui(ShopManager shopManager, EconomyManager economyManager, PlayerManager playerManager, JavaPlugin plugin) {
+    public ShopGui(ShopManager shopManager, PlayerManager playerManager, JavaPlugin plugin, Match match) {
         this.shopManager = shopManager;
-        this.economyManager = economyManager;
         this.playerManager = playerManager;
         this.plugin = plugin;
+        this.match = match;
     }
 
     public void open(Player player) {
@@ -49,7 +49,7 @@ public class ShopGui {
                     .name(Component.text(category, NamedTextColor.GREEN))
                     .asGuiItem(event -> {
                         event.setCancelled(true);
-                        new ShopCategoryViewGui(shopManager, economyManager, playerManager, plugin, category)
+                        new ShopCategoryViewGui(shopManager, playerManager, plugin, match, category)
                                 .open((Player) event.getWhoClicked());
                     });
             gui.addItem(guiItem);
