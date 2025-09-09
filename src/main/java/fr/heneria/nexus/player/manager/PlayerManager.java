@@ -40,10 +40,14 @@ public class PlayerManager {
     public PlayerProfile getPlayerProfile(UUID uuid) {
         return profileCache.get(uuid);
     }
-    
+
     // CORRECTION: Ajout de la méthode pour sauvegarder tous les profils à la désactivation
     public void unloadAllProfiles() {
         profileCache.values().forEach(playerRepository::saveProfile);
         profileCache.clear();
+    }
+
+    public PlayerRepository getPlayerRepository() {
+        return playerRepository;
     }
 }
