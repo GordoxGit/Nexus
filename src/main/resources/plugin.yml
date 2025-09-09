@@ -7,5 +7,10 @@ description: Plugin principal pour le mode de jeu Nexus sur le serveur Heneria.
 softdepend: [PlaceholderAPI]
 commands:
   nx:
-    description: Commandes administratives de Nexus
-    usage: /nx arena <subcommand>
+    description: Centre de contrôle de Nexus
+    usage: /nx
+    permission: nexus.admin
+permissions:
+  nexus.admin:
+    description: Accès à l'administration de Nexus
+    default: op

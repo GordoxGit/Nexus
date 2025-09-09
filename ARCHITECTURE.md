@@ -61,7 +61,7 @@
 ```
 Presentation Layer/
 ├── commands/           # Commandes admin et joueur
-│   ├── ArenaCommand.java
+│   ├── NexusAdminCommand.java
 │   ├── GameCommand.java
 │   └── PlayerCommand.java
 ├── listeners/          # Event handlers Bukkit

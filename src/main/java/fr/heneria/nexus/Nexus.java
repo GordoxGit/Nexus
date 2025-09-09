@@ -3,7 +3,7 @@ package fr.heneria.nexus;
 import fr.heneria.nexus.arena.manager.ArenaManager;
 import fr.heneria.nexus.arena.repository.ArenaRepository;
 import fr.heneria.nexus.arena.repository.JdbcArenaRepository;
-import fr.heneria.nexus.command.ArenaCommand;
+import fr.heneria.nexus.command.NexusAdminCommand;
 import fr.heneria.nexus.db.HikariDataSourceProvider;
 import fr.heneria.nexus.listener.PlayerConnectionListener;
 import fr.heneria.nexus.player.manager.PlayerManager;
@@ -52,7 +52,7 @@ public final class Nexus extends JavaPlugin {
             this.arenaManager.loadArenas();
             getLogger().info(this.arenaManager.getAllArenas().size() + " arène(s) chargée(s).");
 
-            getCommand("nx").setExecutor(new ArenaCommand(this.arenaManager));
+            getCommand("nx").setExecutor(new NexusAdminCommand(this.arenaManager));
             // CORRECTION: L'instance du plugin (this) est maintenant passée au listener
             getServer().getPluginManager().registerEvents(new PlayerConnectionListener(this.playerManager, this), this);
 
