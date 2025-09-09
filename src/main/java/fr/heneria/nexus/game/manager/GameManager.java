@@ -16,6 +16,10 @@ import fr.heneria.nexus.shop.manager.ShopManager;
 import fr.heneria.nexus.game.scoreboard.ScoreboardManager;
 import fr.heneria.nexus.economy.model.TransactionType;
 import fr.heneria.nexus.player.manager.PlayerManager;
+import fr.heneria.nexus.player.model.PlayerProfile;
+import fr.heneria.nexus.player.rank.PlayerRank;
+import fr.heneria.nexus.ranking.EloCalculator;
+import fr.heneria.nexus.ranking.RankManager;
 import org.bukkit.Bukkit;
 import org.bukkit.GameMode;
 import org.bukkit.Location;
@@ -25,6 +29,7 @@ import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.scheduler.BukkitTask;
 
 import java.time.Instant;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -229,6 +234,72 @@ public class GameManager {
                 player.sendTitle("§6Victoire !", "Equipe " + winningTeamId + " remporte la partie", 10, 60, 10);
             }
         }
+        Map<UUID, String> summaries = new HashMap<>();
+        Map<Integer, Double> teamAverageElo = new HashMap<>();
+        for (Team team : match.getTeams().values()) {
+            int sum = 0;
+            int count = 0;
+            for (UUID uuid : team.getPlayers()) {
+                PlayerProfile profile = playerManager.getPlayerProfile(uuid);
+                if (profile != null) {
+                    sum += profile.getEloRating();
+                    count++;
+                }
+            }
+            double avg = count > 0 ? (double) sum / count : 0;
+            teamAverageElo.put(team.getTeamId(), avg);
+        }
+
+        EloCalculator eloCalculator = new EloCalculator();
+        RankManager rankManager = RankManager.getInstance();
+        int kFactor = plugin.getConfig().getInt("ranking.elo.k-factor", 32);
+
+        for (Team team : match.getTeams().values()) {
+            for (UUID uuid : team.getPlayers()) {
+                PlayerProfile profile = playerManager.getPlayerProfile(uuid);
+                if (profile == null) {
+                    continue;
+                }
+                double opponentAvg = teamAverageElo.entrySet().stream()
+                        .filter(e -> e.getKey() != team.getTeamId())
+                        .mapToDouble(Map.Entry::getValue)
+                        .average()
+                        .orElse(teamAverageElo.getOrDefault(team.getTeamId(), 0.0));
+                int opponentAverageElo = (int) Math.round(opponentAvg);
+                boolean playerWon = team.getTeamId() == winningTeamId;
+                int eloChange = eloCalculator.calculateEloChange(profile.getEloRating(), opponentAverageElo, playerWon, kFactor);
+                int oldElo = profile.getEloRating();
+                PlayerRank oldRank = profile.getRank();
+                int newElo = oldElo + eloChange;
+                profile.setEloRating(newElo);
+                PlayerRank newRank = rankManager.getRankFromElo(newElo);
+                profile.setRank(newRank);
+                playerManager.getPlayerRepository().saveProfile(profile);
+
+                StringBuilder sb = new StringBuilder();
+                sb.append("§m---------------------------------------------\n");
+                sb.append("§e§lRÉSUMÉ DE LA PARTIE\n\n");
+                sb.append(playerWon ? "§aVictoire !\n\n" : "§cDéfaite...\n\n");
+                sb.append("Classement Elo : §f").append(oldElo).append(" §a(")
+                        .append(eloChange >= 0 ? "+" : "").append(eloChange)
+                        .append(") §7-> §f").append(newElo).append("\n");
+                if (newRank.ordinal() > oldRank.ordinal()) {
+                    sb.append("\n§b§lPROMOTION ! Vous êtes maintenant rang ").append(newRank).append(" !\n");
+                } else if (newRank.ordinal() < oldRank.ordinal()) {
+                    sb.append("\n§c§lRELÉGATION ! Vous êtes maintenant rang ").append(newRank).append(".\n");
+                }
+                sb.append("§m---------------------------------------------");
+                summaries.put(uuid, sb.toString());
+            }
+        }
+
+        for (Map.Entry<UUID, String> entry : summaries.entrySet()) {
+            Player p = Bukkit.getPlayer(entry.getKey());
+            if (p != null) {
+                p.sendMessage(entry.getValue());
+            }
+        }
+
         Bukkit.getScheduler().runTaskLater(plugin, () -> {
             Location lobby = plugin.getServer().getWorlds().get(0).getSpawnLocation();
             for (UUID playerId : match.getPlayers()) {
