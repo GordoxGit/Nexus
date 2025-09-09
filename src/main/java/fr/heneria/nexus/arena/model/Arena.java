@@ -56,6 +56,16 @@ public class Arena {
                 .findFirst();
     }
 
+    /**
+     * Récupère le Cœur Nexus d'une équipe si configuré.
+     *
+     * @param teamId identifiant de l'équipe
+     * @return l'objet de jeu correspondant ou un {@link Optional} vide
+     */
+    public Optional<ArenaGameObject> getNexusCore(int teamId) {
+        return getGameObject("NEXUS_CORE", teamId);
+    }
+
     // Méthode pour ajouter/modifier un spawn
     public void setSpawn(int teamId, int spawnNumber, Location location) {
         spawns.computeIfAbsent(teamId, k -> new ConcurrentHashMap<>()).put(spawnNumber, location);
@@ -68,5 +78,15 @@ public class Arena {
             return newObj;
         });
         obj.setLocation(location);
+    }
+
+    /**
+     * Définit la position du Cœur Nexus d'une équipe.
+     *
+     * @param teamId   identifiant de l'équipe
+     * @param location position du Cœur Nexus
+     */
+    public void setNexusCoreLocation(int teamId, Location location) {
+        setGameObjectLocation("NEXUS_CORE", teamId, location);
     }
 }

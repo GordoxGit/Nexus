@@ -167,7 +167,12 @@ public class JdbcArenaRepository implements ArenaRepository {
                     if (arena != null) {
                         World world = Bukkit.getWorld(worldName);
                         if (world != null) {
-                            arena.setGameObjectLocation(type, index, new Location(world, x, y, z, yaw, pitch));
+                            Location loc = new Location(world, x, y, z, yaw, pitch);
+                            if ("NEXUS_CORE".equalsIgnoreCase(type)) {
+                                arena.setNexusCoreLocation(index, loc);
+                            } else {
+                                arena.setGameObjectLocation(type, index, loc);
+                            }
                         }
                     }
                 }
@@ -223,7 +228,12 @@ public class JdbcArenaRepository implements ArenaRepository {
                                 float pitch = objRs.getFloat("pitch");
                                 World world = Bukkit.getWorld(worldName);
                                 if (world != null) {
-                                    arena.setGameObjectLocation(type, index, new Location(world, x, y, z, yaw, pitch));
+                                    Location loc = new Location(world, x, y, z, yaw, pitch);
+                                    if ("NEXUS_CORE".equalsIgnoreCase(type)) {
+                                        arena.setNexusCoreLocation(index, loc);
+                                    } else {
+                                        arena.setGameObjectLocation(type, index, loc);
+                                    }
                                 }
                             }
                         }

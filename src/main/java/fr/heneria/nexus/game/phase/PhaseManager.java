@@ -1,6 +1,7 @@
 package fr.heneria.nexus.game.phase;
 
 import fr.heneria.nexus.game.model.Match;
+import fr.heneria.nexus.game.model.Team;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.util.EnumMap;
@@ -32,6 +33,25 @@ public class PhaseManager {
         }
         match.setCurrentPhase(nextPhase);
         IPhase nextImpl = phases.get(nextPhase);
+        if (nextImpl != null) {
+            nextImpl.onStart(match);
+        }
+    }
+
+    public void transitionTo(Match match, GamePhase nextPhase, Team capturingTeam) {
+        GamePhase current = match.getCurrentPhase();
+        IPhase currentImpl = phases.get(current);
+        if (currentImpl != null) {
+            currentImpl.onEnd(match);
+        }
+        match.setCurrentPhase(nextPhase);
+        IPhase nextImpl;
+        if (nextPhase == GamePhase.TRANSPORT) {
+            nextImpl = new TransportPhase(plugin, capturingTeam);
+            phases.put(GamePhase.TRANSPORT, nextImpl);
+        } else {
+            nextImpl = phases.get(nextPhase);
+        }
         if (nextImpl != null) {
             nextImpl.onStart(match);
         }

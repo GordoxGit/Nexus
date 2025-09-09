@@ -94,9 +94,13 @@ public class CapturePhase implements IPhase {
         double progress = energyCell.getCaptureProgress().merge(winningTeamId, 1D, Double::sum);
         energyCell.getBossBar().setColor(BarColor.GREEN);
         energyCell.getBossBar().setTitle("Équipe " + winningTeamId + " - " + (int) progress + "s");
-        energyCell.getBossBar().setProgress(Math.min(progress, 60.0) / 60.0);
-        if (progress >= 60) {
-            match.broadcastMessage("§aL'équipe " + winningTeamId + " a capturé la Cellule d'Énergie !");
+       energyCell.getBossBar().setProgress(Math.min(progress, 60.0) / 60.0);
+       if (progress >= 60) {
+           match.broadcastMessage("§aL'équipe " + winningTeamId + " a capturé la Cellule d'Énergie !");
+            Team team = match.getTeams().get(winningTeamId);
+            if (team != null) {
+                match.getPhaseManager().transitionTo(match, GamePhase.TRANSPORT, team);
+            }
         }
     }
 }
