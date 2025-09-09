@@ -1,9 +1,7 @@
 package fr.heneria.nexus.listener;
 
-import fr.heneria.nexus.admin.placement.AdminPlacementManager;
-import fr.heneria.nexus.admin.placement.SpawnPlacementContext;
-import fr.heneria.nexus.gui.admin.ArenaSpawnManagerGui;
-import fr.heneria.nexus.arena.manager.ArenaManager;
+import fr.heneria.nexus.admin.placement.*;
+import fr.heneria.nexus.gui.admin.*;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.block.Block;
@@ -36,24 +34,44 @@ public class AdminPlacementListener implements Listener {
             return;
         }
         event.setCancelled(true);
-        SpawnPlacementContext context = placementManager.getPlacementContext(player);
+        PlacementContext context = placementManager.getPlacementContext(player);
         Action action = event.getAction();
-        if (action == Action.LEFT_CLICK_BLOCK && event.getClickedBlock() != null) {
-            Block block = event.getClickedBlock();
-            Location loc = block.getLocation().add(0.5, 1, 0.5);
-            Location playerLoc = player.getLocation();
-            loc.setYaw(playerLoc.getYaw());
-            loc.setPitch(playerLoc.getPitch());
-            context.arena().setSpawn(context.teamId(), context.spawnNumber(), loc);
-            player.sendMessage("§aSpawn défini pour l'équipe §e" + context.teamId() + " §a, spawn §e" + context.spawnNumber() + "§a.");
-            placementManager.endPlacementMode(player);
-            Bukkit.getScheduler().runTask(plugin, () ->
-                    new ArenaSpawnManagerGui(arenaManager, context.arena(), placementManager).open(player));
-        } else if (action == Action.RIGHT_CLICK_AIR || action == Action.RIGHT_CLICK_BLOCK) {
-            player.sendMessage("§cPlacement du spawn annulé.");
-            placementManager.endPlacementMode(player);
-            Bukkit.getScheduler().runTask(plugin, () ->
-                    new ArenaSpawnManagerGui(arenaManager, context.arena(), placementManager).open(player));
+        if (context instanceof SpawnPlacementContext spawnCtx) {
+            if (action == Action.LEFT_CLICK_BLOCK && event.getClickedBlock() != null) {
+                Block block = event.getClickedBlock();
+                Location loc = block.getLocation().add(0.5, 1, 0.5);
+                Location playerLoc = player.getLocation();
+                loc.setYaw(playerLoc.getYaw());
+                loc.setPitch(playerLoc.getPitch());
+                spawnCtx.arena().setSpawn(spawnCtx.teamId(), spawnCtx.spawnNumber(), loc);
+                player.sendMessage("§aSpawn défini pour l'équipe §e" + spawnCtx.teamId() + " §a, spawn §e" + spawnCtx.spawnNumber() + "§a.");
+                placementManager.endPlacementMode(player);
+                Bukkit.getScheduler().runTask(plugin, () ->
+                        new ArenaSpawnManagerGui(arenaManager, spawnCtx.arena(), placementManager).open(player));
+            } else if (action == Action.RIGHT_CLICK_AIR || action == Action.RIGHT_CLICK_BLOCK) {
+                player.sendMessage("§cPlacement du spawn annulé.");
+                placementManager.endPlacementMode(player);
+                Bukkit.getScheduler().runTask(plugin, () ->
+                        new ArenaSpawnManagerGui(arenaManager, spawnCtx.arena(), placementManager).open(player));
+            }
+        } else if (context instanceof GameObjectPlacementContext objCtx) {
+            if (action == Action.LEFT_CLICK_BLOCK && event.getClickedBlock() != null) {
+                Block block = event.getClickedBlock();
+                Location loc = block.getLocation().add(0.5, 1, 0.5);
+                Location playerLoc = player.getLocation();
+                loc.setYaw(playerLoc.getYaw());
+                loc.setPitch(playerLoc.getPitch());
+                objCtx.gameObject().setLocation(loc);
+                player.sendMessage("§aEmplacement défini pour " + objCtx.gameObject().getObjectType() + " "+ objCtx.gameObject().getObjectIndex() +".");
+                placementManager.endPlacementMode(player);
+                Bukkit.getScheduler().runTask(plugin, () ->
+                        new ArenaGameObjectGui(arenaManager, objCtx.arena(), placementManager).open(player));
+            } else if (action == Action.RIGHT_CLICK_AIR || action == Action.RIGHT_CLICK_BLOCK) {
+                player.sendMessage("§cPlacement annulé.");
+                placementManager.endPlacementMode(player);
+                Bukkit.getScheduler().runTask(plugin, () ->
+                        new ArenaGameObjectGui(arenaManager, objCtx.arena(), placementManager).open(player));
+            }
         }
     }
 }

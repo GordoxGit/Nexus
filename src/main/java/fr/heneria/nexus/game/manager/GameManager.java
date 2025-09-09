@@ -9,6 +9,8 @@ import fr.heneria.nexus.game.model.GameState;
 import fr.heneria.nexus.game.model.Match;
 import fr.heneria.nexus.game.model.Team;
 import fr.heneria.nexus.game.repository.MatchRepository;
+import fr.heneria.nexus.game.phase.GamePhase;
+import fr.heneria.nexus.game.phase.PhaseManager;
 import fr.heneria.nexus.gui.player.ShopGui;
 import fr.heneria.nexus.shop.manager.ShopManager;
 import fr.heneria.nexus.player.manager.PlayerManager;
@@ -63,6 +65,7 @@ public class GameManager {
     public Match createMatch(Arena arena, List<List<UUID>> playerTeams) {
         UUID matchId = UUID.randomUUID();
         Match match = new Match(matchId, arena);
+        match.setPhaseManager(new PhaseManager(plugin));
         for (int i = 0; i < playerTeams.size(); i++) {
             Team team = new Team(i + 1);
             for (UUID uuid : playerTeams.get(i)) {
@@ -128,6 +131,9 @@ public class GameManager {
                     p.closeInventory();
                     p.sendMessage("La phase d'achat est terminée !");
                 }
+            }
+            if (match.getPhaseManager() != null) {
+                match.getPhaseManager().transitionTo(match, GamePhase.CAPTURE);
             }
         }, 400L);
         match.setShopPhaseTask(task);

@@ -7,6 +7,7 @@ import fr.heneria.nexus.arena.manager.ArenaManager;
 import fr.heneria.nexus.arena.model.Arena;
 import fr.heneria.nexus.admin.conversation.AdminConversationManager;
 import fr.heneria.nexus.admin.placement.AdminPlacementManager;
+import fr.heneria.nexus.gui.admin.ArenaGameObjectGui;
 import org.bukkit.Location;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
@@ -65,6 +66,15 @@ public class ArenaEditorGui {
                     new ArenaSpawnManagerGui(arenaManager, arena, adminPlacementManager).open(p);
                 });
 
+        GuiItem manageObjects = ItemBuilder.from(Material.BEACON)
+                .name(Component.text("§6Gérer les Objets de Jeu"))
+                .asGuiItem(event -> {
+                    event.setCancelled(true);
+                    Player p = (Player) event.getWhoClicked();
+                    gui.setCloseGuiAction(closeEvent -> {});
+                    new ArenaGameObjectGui(arenaManager, arena, adminPlacementManager).open(p);
+                });
+
         GuiItem save = ItemBuilder.from(Material.ANVIL)
                 .name(Component.text("Sauvegarder l'arène", NamedTextColor.DARK_GREEN))
                 .asGuiItem(event -> {
@@ -111,8 +121,9 @@ public class ArenaEditorGui {
                 });
 
         gui.setItem(13, info);
-        gui.setItem(11, setSpawns);
-        gui.setItem(15, save);
+        gui.setItem(10, setSpawns);
+        gui.setItem(12, manageObjects);
+        gui.setItem(14, save);
         gui.setItem(20, teleport);
         gui.setItem(24, delete);
         gui.setItem(26, back);

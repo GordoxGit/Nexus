@@ -10,6 +10,8 @@ public interface ArenaRepository {
     void saveArena(Arena arena);
     // Sauvegarde uniquement les spawns d'une arène existante.
     void saveSpawns(Arena arena);
+    // Sauvegarde les objets de jeu d'une arène.
+    void saveGameObjects(Arena arena);
     // Charge toutes les arènes et leurs spawns.
     Map<Integer, Arena> loadAllArenas();
     // Trouve une arène par son nom.
