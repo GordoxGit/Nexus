@@ -200,4 +200,12 @@ public class Match {
     public Map<UUID, Integer> getRoundPoints() {
         return roundPoints;
     }
+
+    public NexusCore addSurcharge(int teamId) {
+        NexusCore core = nexusCores.get(teamId);
+        if (core != null) {
+            core.addSurcharge();
+        }
+        return core;
+    }
 }

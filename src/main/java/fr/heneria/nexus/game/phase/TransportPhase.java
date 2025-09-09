@@ -1,6 +1,5 @@
 package fr.heneria.nexus.game.phase;
 
-import fr.heneria.nexus.arena.model.ArenaGameObject;
 import fr.heneria.nexus.game.model.Match;
 import fr.heneria.nexus.game.model.Team;
 import fr.heneria.nexus.game.model.NexusCore;
@@ -95,34 +94,37 @@ public class TransportPhase implements IPhase {
             return;
         }
         Location carrierLoc = carrier.getLocation();
-        for (ArenaGameObject obj : match.getArena().getGameObjects()) {
-            if (!"NEXUS_CORE".equalsIgnoreCase(obj.getObjectType())) {
+        double nearest = Double.MAX_VALUE;
+        for (NexusCore core : match.getNexusCores().values()) {
+            if (core.getTeam().getTeamId() == capturingTeam.getTeamId()) {
                 continue;
             }
-            if (obj.getObjectIndex() == capturingTeam.getTeamId()) {
-                continue;
-            }
-            Location coreLoc = obj.getLocation();
+            Location coreLoc = core.getLocation();
             if (coreLoc == null || !coreLoc.getWorld().equals(carrierLoc.getWorld())) {
                 continue;
             }
-            if (carrierLoc.distance(coreLoc) < 3) {
+            double distance = carrierLoc.distance(coreLoc);
+            if (distance < nearest) {
+                nearest = distance;
+            }
+            if (distance < 3) {
                 carrier.removePotionEffect(PotionEffectType.GLOWING);
-                int targetTeamId = obj.getObjectIndex();
-                NexusCore nexusCore = match.getNexusCore(targetTeamId);
-                if (nexusCore != null) {
-                    nexusCore.addSurcharge();
-                    match.broadcastMessage("§aLe Cœur Nexus de l'équipe " + targetTeamId + " a été surchargé !");
-                    carrierId = null;
-                    if (nexusCore.isVulnerable()) {
-                        Team targetTeam = match.getTeams().get(targetTeamId);
-                        match.getPhaseManager().transitionTo(match, GamePhase.DESTRUCTION, targetTeam);
-                    } else {
-                        match.getPhaseManager().transitionTo(match, GamePhase.CAPTURE);
-                    }
+                int targetTeamId = core.getTeam().getTeamId();
+                NexusCore nexusCore = match.addSurcharge(targetTeamId);
+                match.broadcastMessage("§aLe Cœur Nexus de l'équipe " + targetTeamId + " a été surchargé !");
+                carrierId = null;
+                if (nexusCore != null && nexusCore.isVulnerable()) {
+                    Team targetTeam = match.getTeams().get(targetTeamId);
+                    match.getPhaseManager().transitionTo(match, GamePhase.DESTRUCTION, targetTeam);
+                } else {
+                    match.getPhaseManager().transitionTo(match, GamePhase.CAPTURE);
                 }
                 break;
             }
+        }
+        if (nearest != Double.MAX_VALUE) {
+            int dist = (int) Math.ceil(nearest);
+            carrier.sendActionBar("§aNexus ennemi à §e" + dist + " blocs");
         }
     }
 }

@@ -30,7 +30,8 @@ public class DestructionPhase implements IPhase {
 
     @Override
     public void onStart(Match match) {
-        bossBar = Bukkit.createBossBar("Vie du Nexus " + vulnerableTeam.getTeamId() + ": 100 / 100", BarColor.RED, BarStyle.SOLID);
+        bossBar = Bukkit.createBossBar("§c§lNEXUS VULNÉRABLE", BarColor.RED, BarStyle.SOLID);
+        bossBar.setProgress(1.0);
         for (UUID playerId : match.getPlayers()) {
             Player p = Bukkit.getPlayer(playerId);
             if (p != null) {
@@ -58,8 +59,7 @@ public class DestructionPhase implements IPhase {
         if (core == null || bossBar == null) {
             return;
         }
-        bossBar.setTitle("Vie du Nexus " + vulnerableTeam.getTeamId() + ": " + (int) core.getHealth() + " / 100");
-        bossBar.setProgress(Math.max(0, core.getHealth()) / 100.0);
+        bossBar.setProgress(Math.max(0, core.getHealth()) / core.getMaxHealth());
     }
 }
 
