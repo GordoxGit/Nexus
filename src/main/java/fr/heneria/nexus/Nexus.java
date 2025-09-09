@@ -19,6 +19,7 @@ import fr.heneria.nexus.admin.placement.AdminPlacementManager;
 import fr.heneria.nexus.shop.manager.ShopManager;
 import fr.heneria.nexus.shop.repository.JdbcShopRepository;
 import fr.heneria.nexus.shop.repository.ShopRepository;
+import fr.heneria.nexus.game.kit.manager.KitManager;
 import fr.heneria.nexus.game.manager.GameManager;
 import fr.heneria.nexus.game.repository.MatchRepository;
 import fr.heneria.nexus.game.repository.JdbcMatchRepository;
@@ -39,6 +40,7 @@ public final class Nexus extends JavaPlugin {
     private PlayerManager playerManager;
     private EconomyManager economyManager;
     private ShopManager shopManager;
+    private KitManager kitManager;
     private GameManager gameManager;
     private QueueManager queueManager;
 
@@ -67,7 +69,9 @@ public final class Nexus extends JavaPlugin {
             this.playerManager = new PlayerManager(playerRepository);
             this.economyManager = new EconomyManager(this.playerManager, this.dataSourceProvider.getDataSource());
             this.shopManager = new ShopManager(shopRepository);
-            GameManager.init(this, this.arenaManager, this.playerManager, matchRepository);
+            this.kitManager = KitManager.getInstance();
+            this.kitManager.loadKits();
+            GameManager.init(this, this.arenaManager, this.playerManager, matchRepository, this.kitManager, this.shopManager, this.economyManager);
             this.gameManager = GameManager.getInstance();
             QueueManager.init(this.gameManager, this.arenaManager);
             this.queueManager = QueueManager.getInstance();
