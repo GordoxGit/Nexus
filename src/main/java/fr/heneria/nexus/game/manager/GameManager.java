@@ -135,4 +135,14 @@ public class GameManager {
             }
         }
     }
+
+    /**
+     * Vérifie si une arène est actuellement utilisée par une partie en cours.
+     *
+     * @param arena arène à vérifier
+     * @return {@code true} si l'arène est occupée, sinon {@code false}
+     */
+    public boolean isArenaInUse(Arena arena) {
+        return matches.values().stream().anyMatch(match -> match.getArena().equals(arena));
+    }
 }
