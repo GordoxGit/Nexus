@@ -2,6 +2,7 @@ package fr.heneria.nexus.command;
 
 import fr.heneria.nexus.arena.manager.ArenaManager;
 import fr.heneria.nexus.arena.model.Arena;
+import fr.heneria.nexus.gui.admin.AdminMenuGui;
 import org.bukkit.Location;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
@@ -10,17 +11,39 @@ import org.bukkit.entity.Player;
 
 import java.util.stream.Collectors;
 
-public class ArenaCommand implements CommandExecutor {
+/**
+ * Commande principale d'administration de Nexus.
+ * <p>
+ * /nx ou /nx admin ouvre le centre de contrôle si le joueur a la permission
+ * "nexus.admin". Les anciennes sous-commandes /nx arena sont conservées pour
+ * le moment.
+ */
+public class NexusAdminCommand implements CommandExecutor {
 
     private final ArenaManager arenaManager;
 
-    public ArenaCommand(ArenaManager arenaManager) {
+    public NexusAdminCommand(ArenaManager arenaManager) {
         this.arenaManager = arenaManager;
     }
 
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
-        if (args.length == 0 || !"arena".equalsIgnoreCase(args[0])) {
+        // Ouvre le GUI principal pour /nx ou /nx admin
+        if (args.length == 0 || "admin".equalsIgnoreCase(args[0])) {
+            if (!(sender instanceof Player)) {
+                sender.sendMessage("Cette commande doit être exécutée par un joueur.");
+                return true;
+            }
+            if (!sender.hasPermission("nexus.admin")) {
+                sender.sendMessage("Vous n'avez pas la permission nécessaire.");
+                return true;
+            }
+            new AdminMenuGui(arenaManager).open((Player) sender);
+            return true;
+        }
+
+        // Anciennes sous-commandes pour la gestion des arènes
+        if (!"arena".equalsIgnoreCase(args[0])) {
             sender.sendMessage("Usage: /" + label + " arena <create|list|setspawn|save>");
             return true;
         }

@@ -229,7 +229,7 @@ src/main/java/fr/heneria/nexus/
 ├── db/                         # Couche base de données
 │   └── HikariDataSourceProvider.java
 └── command/                    # Commandes administratives
-    └── ArenaCommand.java
+    └── NexusAdminCommand.java
 ```
 
 ### 📈 Pipeline CI/CD
