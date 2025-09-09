@@ -4,6 +4,7 @@ import fr.heneria.nexus.arena.manager.ArenaManager;
 import fr.heneria.nexus.gui.admin.AdminMenuGui;
 import fr.heneria.nexus.admin.placement.AdminPlacementManager;
 import fr.heneria.nexus.arena.model.Arena;
+import fr.heneria.nexus.shop.manager.ShopManager;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
@@ -21,9 +22,11 @@ import java.util.stream.Collectors;
 public class NexusAdminCommand implements CommandExecutor {
 
     private final ArenaManager arenaManager;
+    private final ShopManager shopManager;
 
-    public NexusAdminCommand(ArenaManager arenaManager) {
+    public NexusAdminCommand(ArenaManager arenaManager, ShopManager shopManager) {
         this.arenaManager = arenaManager;
+        this.shopManager = shopManager;
     }
 
     @Override
@@ -38,7 +41,7 @@ public class NexusAdminCommand implements CommandExecutor {
                 sender.sendMessage("Vous n'avez pas la permission nécessaire.");
                 return true;
             }
-            new AdminMenuGui(arenaManager, AdminPlacementManager.getInstance()).open((Player) sender);
+            new AdminMenuGui(arenaManager, AdminPlacementManager.getInstance(), shopManager).open((Player) sender);
             return true;
         }
 

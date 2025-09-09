@@ -14,6 +14,9 @@ import fr.heneria.nexus.player.repository.PlayerRepository;
 import fr.heneria.nexus.economy.manager.EconomyManager;
 import fr.heneria.nexus.admin.conversation.AdminConversationManager;
 import fr.heneria.nexus.admin.placement.AdminPlacementManager;
+import fr.heneria.nexus.shop.manager.ShopManager;
+import fr.heneria.nexus.shop.repository.JdbcShopRepository;
+import fr.heneria.nexus.shop.repository.ShopRepository;
 import liquibase.Liquibase;
 import liquibase.database.Database;
 import liquibase.database.DatabaseFactory;
@@ -29,6 +32,7 @@ public final class Nexus extends JavaPlugin {
     private ArenaManager arenaManager;
     private PlayerManager playerManager;
     private EconomyManager economyManager;
+    private ShopManager shopManager;
 
     @Override
     public void onEnable() {
@@ -48,17 +52,20 @@ public final class Nexus extends JavaPlugin {
 
             // CORRECTION: L'instance du plugin n'est plus passée ici
             PlayerRepository playerRepository = new JdbcPlayerRepository(this.dataSourceProvider.getDataSource());
+            ShopRepository shopRepository = new JdbcShopRepository(this.dataSourceProvider.getDataSource());
 
             this.arenaManager = new ArenaManager(new JdbcArenaRepository(this.dataSourceProvider.getDataSource()));
             this.playerManager = new PlayerManager(playerRepository);
             this.economyManager = new EconomyManager(this.playerManager, this.dataSourceProvider.getDataSource());
+            this.shopManager = new ShopManager(shopRepository);
 
-            AdminConversationManager.init(this.arenaManager, this);
+            AdminConversationManager.init(this.arenaManager, this.shopManager, shopRepository, this);
             AdminPlacementManager.init();
             this.arenaManager.loadArenas();
+            this.shopManager.loadItems();
             getLogger().info(this.arenaManager.getAllArenas().size() + " arène(s) chargée(s).");
 
-            getCommand("nx").setExecutor(new NexusAdminCommand(this.arenaManager));
+            getCommand("nx").setExecutor(new NexusAdminCommand(this.arenaManager, this.shopManager));
             // CORRECTION: L'instance du plugin (this) est maintenant passée au listener
             getServer().getPluginManager().registerEvents(new PlayerConnectionListener(this.playerManager, this.arenaManager, AdminPlacementManager.getInstance(), this), this);
             getServer().getPluginManager().registerEvents(new AdminConversationListener(AdminConversationManager.getInstance(), this), this);

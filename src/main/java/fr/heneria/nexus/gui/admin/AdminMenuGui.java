@@ -10,6 +10,8 @@ import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import fr.heneria.nexus.admin.conversation.AdminConversationManager;
 import fr.heneria.nexus.admin.placement.AdminPlacementManager;
+import fr.heneria.nexus.shop.manager.ShopManager;
+import fr.heneria.nexus.gui.admin.shop.ShopAdminGui;
 
 /**
  * Menu principal du centre de contrôle Nexus.
@@ -18,10 +20,12 @@ public class AdminMenuGui {
 
     private final ArenaManager arenaManager;
     private final AdminPlacementManager adminPlacementManager;
+    private final ShopManager shopManager;
 
-    public AdminMenuGui(ArenaManager arenaManager, AdminPlacementManager adminPlacementManager) {
+    public AdminMenuGui(ArenaManager arenaManager, AdminPlacementManager adminPlacementManager, ShopManager shopManager) {
         this.arenaManager = arenaManager;
         this.adminPlacementManager = adminPlacementManager;
+        this.shopManager = shopManager;
     }
 
     /**
@@ -48,6 +52,15 @@ public class AdminMenuGui {
 
         // Place l'item au centre
         gui.setItem(13, arenaManagement);
+
+        GuiItem shopManagement = ItemBuilder.from(Material.CHEST)
+                .name(Component.text("Gestion de la Boutique", NamedTextColor.GREEN))
+                .lore(Component.text("Configurer la boutique en jeu"))
+                .asGuiItem(event -> {
+                    event.setCancelled(true);
+                    new ShopAdminGui(shopManager).open((Player) event.getWhoClicked());
+                });
+        gui.setItem(15, shopManagement);
         gui.open(player);
     }
 }
