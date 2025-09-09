@@ -8,7 +8,8 @@ import org.bukkit.Location;
 public class NexusCore {
     private final Team team;
     private final Location location;
-    private double health = 100.0;
+    private final double maxHealth = 100.0;
+    private double health = maxHealth;
     private boolean vulnerable = false;
     private int surcharges = 0;
 
@@ -27,6 +28,10 @@ public class NexusCore {
 
     public double getHealth() {
         return health;
+    }
+
+    public double getMaxHealth() {
+        return maxHealth;
     }
 
     public boolean isVulnerable() {
