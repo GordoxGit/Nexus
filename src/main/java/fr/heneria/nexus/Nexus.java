@@ -47,7 +47,7 @@ public final class Nexus extends JavaPlugin {
 
             this.arenaManager = new ArenaManager(new JdbcArenaRepository(this.dataSourceProvider.getDataSource()));
             this.playerManager = new PlayerManager(playerRepository);
-            this.economyManager = new EconomyManager(this.playerManager);
+            this.economyManager = new EconomyManager(this.playerManager, this.dataSourceProvider.getDataSource());
 
             this.arenaManager.loadArenas();
             getLogger().info(this.arenaManager.getAllArenas().size() + " arène(s) chargée(s).");
