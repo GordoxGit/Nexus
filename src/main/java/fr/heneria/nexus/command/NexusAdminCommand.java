@@ -7,6 +7,7 @@ import fr.heneria.nexus.arena.model.Arena;
 import fr.heneria.nexus.shop.manager.ShopManager;
 import fr.heneria.nexus.game.manager.GameManager;
 import fr.heneria.nexus.game.model.Match;
+import fr.heneria.nexus.game.model.MatchType;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
@@ -51,7 +52,7 @@ public class NexusAdminCommand implements CommandExecutor {
                     team2.add(p.getUniqueId());
                 }
             }
-            Match match = GameManager.getInstance().createMatch(arena, Arrays.asList(team1, team2));
+            Match match = GameManager.getInstance().createMatch(arena, Arrays.asList(team1, team2), MatchType.NORMAL);
             GameManager.getInstance().startMatchCountdown(match);
             sender.sendMessage("Match de test lancé.");
             return true;

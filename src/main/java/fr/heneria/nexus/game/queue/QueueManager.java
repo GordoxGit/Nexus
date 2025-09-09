@@ -4,6 +4,7 @@ import fr.heneria.nexus.arena.manager.ArenaManager;
 import fr.heneria.nexus.arena.model.Arena;
 import fr.heneria.nexus.game.manager.GameManager;
 import fr.heneria.nexus.game.model.Match;
+import fr.heneria.nexus.game.model.MatchType;
 import org.bukkit.entity.Player;
 
 import java.util.*;
@@ -18,14 +19,18 @@ public class QueueManager {
 
     private final GameManager gameManager;
     private final ArenaManager arenaManager;
-    private final Map<GameMode, MatchmakingQueue> queues = new ConcurrentHashMap<>();
-    private final Map<UUID, GameMode> playerQueues = new ConcurrentHashMap<>();
+    private final Map<MatchType, Map<GameMode, MatchmakingQueue>> queues = new EnumMap<>(MatchType.class);
+    private final Map<UUID, QueueEntry> playerQueues = new ConcurrentHashMap<>();
 
     private QueueManager(GameManager gameManager, ArenaManager arenaManager) {
         this.gameManager = gameManager;
         this.arenaManager = arenaManager;
-        for (GameMode mode : GameMode.values()) {
-            queues.put(mode, new MatchmakingQueue(mode));
+        for (MatchType type : MatchType.values()) {
+            Map<GameMode, MatchmakingQueue> map = new EnumMap<>(GameMode.class);
+            for (GameMode mode : GameMode.values()) {
+                map.put(mode, new MatchmakingQueue(mode));
+            }
+            queues.put(type, map);
         }
     }
 
@@ -37,39 +42,39 @@ public class QueueManager {
         return instance;
     }
 
-    public void joinQueue(Player player, GameMode mode) {
-        GameMode current = playerQueues.get(player.getUniqueId());
-        if (current == mode) {
-            // déjà dans cette file, quitter
+    public void joinQueue(Player player, MatchType type, GameMode mode) {
+        QueueEntry current = playerQueues.get(player.getUniqueId());
+        if (current != null && current.type == type && current.mode == mode) {
             leaveQueue(player);
             return;
         }
         if (current != null) {
-            queues.get(current).removePlayer(player.getUniqueId());
+            queues.get(current.type).get(current.mode).removePlayer(player.getUniqueId());
         }
-        MatchmakingQueue queue = queues.get(mode);
+        MatchmakingQueue queue = queues.get(type).get(mode);
         queue.addPlayer(player.getUniqueId());
-        playerQueues.put(player.getUniqueId(), mode);
-        player.sendMessage("\u00a7aVous avez rejoint la file " + mode.name());
+        playerQueues.put(player.getUniqueId(), new QueueEntry(type, mode));
+        player.sendMessage("\u00a7aVous avez rejoint la file " + type.name() + " " + mode.name());
         if (queue.isFull()) {
             tryStartMatch(queue);
         }
     }
 
     public void leaveQueue(Player player) {
-        GameMode mode = playerQueues.remove(player.getUniqueId());
-        if (mode != null) {
-            queues.get(mode).removePlayer(player.getUniqueId());
-            player.sendMessage("\u00a7cVous avez quitté la file " + mode.name());
+        QueueEntry entry = playerQueues.remove(player.getUniqueId());
+        if (entry != null) {
+            queues.get(entry.type).get(entry.mode).removePlayer(player.getUniqueId());
+            player.sendMessage("\u00a7cVous avez quitté la file " + entry.type.name() + " " + entry.mode.name());
         }
     }
 
-    public GameMode getPlayerQueue(UUID playerId) {
+    public QueueEntry getPlayerQueue(UUID playerId) {
         return playerQueues.get(playerId);
     }
 
-    public int getQueueSize(GameMode mode) {
-        MatchmakingQueue queue = queues.get(mode);
+    public int getQueueSize(MatchType type, GameMode mode) {
+        Map<GameMode, MatchmakingQueue> map = queues.get(type);
+        MatchmakingQueue queue = map == null ? null : map.get(mode);
         return queue == null ? 0 : queue.getPlayers().size();
     }
 
@@ -99,7 +104,14 @@ public class QueueManager {
         List<List<UUID>> teams = new ArrayList<>();
         teams.add(new ArrayList<>(players.subList(0, teamSize)));
         teams.add(new ArrayList<>(players.subList(teamSize, players.size())));
-        Match match = gameManager.createMatch(arena, teams);
+        MatchType type = queues.entrySet().stream()
+                .filter(e -> e.getValue().containsValue(queue))
+                .map(Map.Entry::getKey)
+                .findFirst()
+                .orElse(MatchType.NORMAL);
+        Match match = gameManager.createMatch(arena, teams, type);
         gameManager.startMatchCountdown(match);
     }
+
+    public record QueueEntry(MatchType type, GameMode mode) {}
 }
