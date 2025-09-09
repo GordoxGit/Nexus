@@ -3,6 +3,7 @@ package fr.heneria.nexus.gui.player;
 import dev.triumphteam.gui.builder.item.ItemBuilder;
 import dev.triumphteam.gui.guis.Gui;
 import dev.triumphteam.gui.guis.GuiItem;
+import fr.heneria.nexus.game.model.MatchType;
 import fr.heneria.nexus.game.queue.GameMode;
 import fr.heneria.nexus.game.queue.QueueManager;
 import net.kyori.adventure.text.Component;
@@ -26,18 +27,36 @@ public class GameModeSelectorGui {
 
     public void open(Player player) {
         Gui gui = Gui.gui()
-                .title(Component.text("Sélection du mode"))
+                .title(Component.text("Choisissez votre expérience"))
+                .rows(1)
+                .create();
+        gui.setDefaultClickAction(event -> event.setCancelled(true));
+
+        gui.addItem(ItemBuilder.from(Material.IRON_SWORD)
+                .name(Component.text("Partie Normale"))
+                .asGuiItem(e -> openModeMenu((Player) e.getWhoClicked(), MatchType.NORMAL)));
+
+        gui.addItem(ItemBuilder.from(Material.DIAMOND_SWORD)
+                .name(Component.text("Partie Classée"))
+                .asGuiItem(e -> openModeMenu((Player) e.getWhoClicked(), MatchType.RANKED)));
+
+        gui.open(player);
+    }
+
+    private void openModeMenu(Player player, MatchType type) {
+        Gui gui = Gui.gui()
+                .title(Component.text(type == MatchType.NORMAL ? "Partie Normale" : "Partie Classée"))
                 .rows(1)
                 .create();
         gui.setDefaultClickAction(event -> event.setCancelled(true));
 
         for (GameMode mode : GameMode.values()) {
-            gui.addItem(createItem(mode));
+            gui.addItem(createItem(type, mode));
         }
 
         BukkitTask task = plugin.getServer().getScheduler().runTaskTimer(plugin, () -> {
             for (GameMode mode : GameMode.values()) {
-                gui.updateItem(mode.ordinal(), createItem(mode));
+                gui.updateItem(mode.ordinal(), createItem(type, mode));
             }
         }, 20L, 40L);
 
@@ -45,7 +64,7 @@ public class GameModeSelectorGui {
         gui.open(player);
     }
 
-    private GuiItem createItem(GameMode mode) {
+    private GuiItem createItem(MatchType type, GameMode mode) {
         Material material;
         switch (mode) {
             case TEAM_2V2:
@@ -56,16 +75,17 @@ public class GameModeSelectorGui {
                 material = Material.IRON_SWORD;
                 break;
         }
-        int size = queueManager.getQueueSize(mode);
+        int size = queueManager.getQueueSize(type, mode);
         return ItemBuilder.from(material)
                 .name(Component.text(mode.name()))
                 .lore(Component.text(size + "/" + mode.getRequiredPlayers() + " joueurs"))
                 .asGuiItem(event -> {
                     Player p = (Player) event.getWhoClicked();
-                    if (queueManager.getPlayerQueue(p.getUniqueId()) == mode) {
+                    QueueManager.QueueEntry entry = queueManager.getPlayerQueue(p.getUniqueId());
+                    if (entry != null && entry.type() == type && entry.mode() == mode) {
                         queueManager.leaveQueue(p);
                     } else {
-                        queueManager.joinQueue(p, mode);
+                        queueManager.joinQueue(p, type, mode);
                     }
                 });
     }

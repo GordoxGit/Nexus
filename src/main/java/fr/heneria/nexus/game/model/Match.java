@@ -14,6 +14,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public class Match {
     private final UUID matchId;
     private final Arena arena;
+    private final MatchType matchType;
     private GameState state = GameState.WAITING;
     private final Map<Integer, Team> teams = new ConcurrentHashMap<>();
     private BukkitTask countdownTask;
@@ -31,9 +32,10 @@ public class Match {
     private final Map<UUID, Integer> roundPoints = new ConcurrentHashMap<>();
     public static final int ROUNDS_TO_WIN = 3;
 
-    public Match(UUID matchId, Arena arena) {
+    public Match(UUID matchId, Arena arena, MatchType matchType) {
         this.matchId = matchId;
         this.arena = arena;
+        this.matchType = matchType;
     }
 
     public UUID getMatchId() {
@@ -42,6 +44,10 @@ public class Match {
 
     public Arena getArena() {
         return arena;
+    }
+
+    public MatchType getMatchType() {
+        return matchType;
     }
 
     public GameState getState() {

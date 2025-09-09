@@ -199,7 +199,7 @@ public record ArenaConfig(
 ```java
 // GameEngine - Moteur principal
 public interface GameEngine {
-    Match createMatch(Arena arena, List<Team> teams);
+    Match createMatch(Arena arena, List<Team> teams, MatchType type);
     [cite_start]void startMatch(Match match); [cite: 170]
     void endMatch(Match match, MatchResult result);
     void pauseMatch(Match match);

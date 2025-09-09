@@ -7,6 +7,7 @@ import fr.heneria.nexus.game.kit.manager.KitManager;
 import fr.heneria.nexus.game.kit.model.Kit;
 import fr.heneria.nexus.game.model.GameState;
 import fr.heneria.nexus.game.model.Match;
+import fr.heneria.nexus.game.model.MatchType;
 import fr.heneria.nexus.game.model.Team;
 import fr.heneria.nexus.game.repository.MatchRepository;
 import fr.heneria.nexus.game.phase.GamePhase;
@@ -69,9 +70,9 @@ public class GameManager {
         return instance;
     }
 
-    public Match createMatch(Arena arena, List<List<UUID>> playerTeams) {
+    public Match createMatch(Arena arena, List<List<UUID>> playerTeams, MatchType type) {
         UUID matchId = UUID.randomUUID();
-        Match match = new Match(matchId, arena);
+        Match match = new Match(matchId, arena, type);
         match.setPhaseManager(new PhaseManager(plugin));
         for (int i = 0; i < playerTeams.size(); i++) {
             Team team = new Team(i + 1);
@@ -234,69 +235,71 @@ public class GameManager {
                 player.sendTitle("§6Victoire !", "Equipe " + winningTeamId + " remporte la partie", 10, 60, 10);
             }
         }
-        Map<UUID, String> summaries = new HashMap<>();
-        Map<Integer, Double> teamAverageElo = new HashMap<>();
-        for (Team team : match.getTeams().values()) {
-            int sum = 0;
-            int count = 0;
-            for (UUID uuid : team.getPlayers()) {
-                PlayerProfile profile = playerManager.getPlayerProfile(uuid);
-                if (profile != null) {
-                    sum += profile.getEloRating();
-                    count++;
+        if (match.getMatchType() == MatchType.RANKED) {
+            Map<UUID, String> summaries = new HashMap<>();
+            Map<Integer, Double> teamAverageElo = new HashMap<>();
+            for (Team team : match.getTeams().values()) {
+                int sum = 0;
+                int count = 0;
+                for (UUID uuid : team.getPlayers()) {
+                    PlayerProfile profile = playerManager.getPlayerProfile(uuid);
+                    if (profile != null) {
+                        sum += profile.getEloRating();
+                        count++;
+                    }
+                }
+                double avg = count > 0 ? (double) sum / count : 0;
+                teamAverageElo.put(team.getTeamId(), avg);
+            }
+
+            EloCalculator eloCalculator = new EloCalculator();
+            RankManager rankManager = RankManager.getInstance();
+            int kFactor = plugin.getConfig().getInt("ranking.elo.k-factor", 32);
+
+            for (Team team : match.getTeams().values()) {
+                for (UUID uuid : team.getPlayers()) {
+                    PlayerProfile profile = playerManager.getPlayerProfile(uuid);
+                    if (profile == null) {
+                        continue;
+                    }
+                    double opponentAvg = teamAverageElo.entrySet().stream()
+                            .filter(e -> e.getKey() != team.getTeamId())
+                            .mapToDouble(Map.Entry::getValue)
+                            .average()
+                            .orElse(teamAverageElo.getOrDefault(team.getTeamId(), 0.0));
+                    int opponentAverageElo = (int) Math.round(opponentAvg);
+                    boolean playerWon = team.getTeamId() == winningTeamId;
+                    int eloChange = eloCalculator.calculateEloChange(profile.getEloRating(), opponentAverageElo, playerWon, kFactor);
+                    int oldElo = profile.getEloRating();
+                    PlayerRank oldRank = profile.getRank();
+                    int newElo = oldElo + eloChange;
+                    profile.setEloRating(newElo);
+                    PlayerRank newRank = rankManager.getRankFromElo(newElo);
+                    profile.setRank(newRank);
+                    playerManager.getPlayerRepository().saveProfile(profile);
+
+                    StringBuilder sb = new StringBuilder();
+                    sb.append("§m---------------------------------------------\n");
+                    sb.append("§e§lRÉSUMÉ DE LA PARTIE\n\n");
+                    sb.append(playerWon ? "§aVictoire !\n\n" : "§cDéfaite...\n\n");
+                    sb.append("Classement Elo : §f").append(oldElo).append(" §a(")
+                            .append(eloChange >= 0 ? "+" : "").append(eloChange)
+                            .append(") §7-> §f").append(newElo).append("\n");
+                    if (newRank.ordinal() > oldRank.ordinal()) {
+                        sb.append("\n§b§lPROMOTION ! Vous êtes maintenant rang ").append(newRank).append(" !\n");
+                    } else if (newRank.ordinal() < oldRank.ordinal()) {
+                        sb.append("\n§c§lRELÉGATION ! Vous êtes maintenant rang ").append(newRank).append(".\n");
+                    }
+                    sb.append("§m---------------------------------------------");
+                    summaries.put(uuid, sb.toString());
                 }
             }
-            double avg = count > 0 ? (double) sum / count : 0;
-            teamAverageElo.put(team.getTeamId(), avg);
-        }
 
-        EloCalculator eloCalculator = new EloCalculator();
-        RankManager rankManager = RankManager.getInstance();
-        int kFactor = plugin.getConfig().getInt("ranking.elo.k-factor", 32);
-
-        for (Team team : match.getTeams().values()) {
-            for (UUID uuid : team.getPlayers()) {
-                PlayerProfile profile = playerManager.getPlayerProfile(uuid);
-                if (profile == null) {
-                    continue;
+            for (Map.Entry<UUID, String> entry : summaries.entrySet()) {
+                Player p = Bukkit.getPlayer(entry.getKey());
+                if (p != null) {
+                    p.sendMessage(entry.getValue());
                 }
-                double opponentAvg = teamAverageElo.entrySet().stream()
-                        .filter(e -> e.getKey() != team.getTeamId())
-                        .mapToDouble(Map.Entry::getValue)
-                        .average()
-                        .orElse(teamAverageElo.getOrDefault(team.getTeamId(), 0.0));
-                int opponentAverageElo = (int) Math.round(opponentAvg);
-                boolean playerWon = team.getTeamId() == winningTeamId;
-                int eloChange = eloCalculator.calculateEloChange(profile.getEloRating(), opponentAverageElo, playerWon, kFactor);
-                int oldElo = profile.getEloRating();
-                PlayerRank oldRank = profile.getRank();
-                int newElo = oldElo + eloChange;
-                profile.setEloRating(newElo);
-                PlayerRank newRank = rankManager.getRankFromElo(newElo);
-                profile.setRank(newRank);
-                playerManager.getPlayerRepository().saveProfile(profile);
-
-                StringBuilder sb = new StringBuilder();
-                sb.append("§m---------------------------------------------\n");
-                sb.append("§e§lRÉSUMÉ DE LA PARTIE\n\n");
-                sb.append(playerWon ? "§aVictoire !\n\n" : "§cDéfaite...\n\n");
-                sb.append("Classement Elo : §f").append(oldElo).append(" §a(")
-                        .append(eloChange >= 0 ? "+" : "").append(eloChange)
-                        .append(") §7-> §f").append(newElo).append("\n");
-                if (newRank.ordinal() > oldRank.ordinal()) {
-                    sb.append("\n§b§lPROMOTION ! Vous êtes maintenant rang ").append(newRank).append(" !\n");
-                } else if (newRank.ordinal() < oldRank.ordinal()) {
-                    sb.append("\n§c§lRELÉGATION ! Vous êtes maintenant rang ").append(newRank).append(".\n");
-                }
-                sb.append("§m---------------------------------------------");
-                summaries.put(uuid, sb.toString());
-            }
-        }
-
-        for (Map.Entry<UUID, String> entry : summaries.entrySet()) {
-            Player p = Bukkit.getPlayer(entry.getKey());
-            if (p != null) {
-                p.sendMessage(entry.getValue());
             }
         }
 

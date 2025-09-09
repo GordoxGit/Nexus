@@ -245,7 +245,7 @@ public interface GameEngine {
      * @return Match créé
      * @throws ArenaNotAvailableException si l'arène n'est pas disponible
      */
-    [cite_start]Match createMatch(Arena arena, List<Team> teams) throws ArenaNotAvailableException; [cite: 589]
+    [cite_start]Match createMatch(Arena arena, List<Team> teams, MatchType type) throws ArenaNotAvailableException; [cite: 589]
     /**
      * Démarre un match.
      * @param match match à démarrer
