@@ -63,6 +63,25 @@ public class ArenaGameObjectGui {
                 });
 
         gui.setItem(0, energyCellItem);
+
+        for (int i = 1; i <= arena.getMaxPlayers() && i < 8; i++) {
+            final int teamId = i;
+            ArenaGameObject core = arena.getGameObject("NEXUS_CORE", teamId).orElseGet(() -> {
+                ArenaGameObject obj = new ArenaGameObject("NEXUS_CORE", teamId);
+                arena.getGameObjects().add(obj);
+                return obj;
+            });
+            GuiItem coreItem = ItemBuilder.from(Material.END_CRYSTAL)
+                    .name(Component.text("Cœur Nexus - Équipe " + teamId, NamedTextColor.LIGHT_PURPLE))
+                    .asGuiItem(event -> {
+                        event.setCancelled(true);
+                        Player p = (Player) event.getWhoClicked();
+                        p.closeInventory();
+                        adminPlacementManager.startPlacementMode(p, new GameObjectPlacementContext(arena, core));
+                    });
+            gui.setItem(i, coreItem);
+        }
+
         gui.setItem(8, back);
 
         gui.open(player);

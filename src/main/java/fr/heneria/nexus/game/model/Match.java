@@ -24,6 +24,7 @@ public class Match {
     private final Map<UUID, Integer> deaths = new ConcurrentHashMap<>();
     private GamePhase currentPhase = GamePhase.PREPARATION;
     private PhaseManager phaseManager;
+    private final Map<Integer, Integer> nexusSurcharges = new ConcurrentHashMap<>();
 
     public Match(UUID matchId, Arena arena) {
         this.matchId = matchId;
@@ -150,5 +151,13 @@ public class Match {
 
     public void setPhaseManager(PhaseManager phaseManager) {
         this.phaseManager = phaseManager;
+    }
+
+    public void addSurcharge(int teamId) {
+        nexusSurcharges.merge(teamId, 1, Integer::sum);
+    }
+
+    public int getSurchargeCount(int teamId) {
+        return nexusSurcharges.getOrDefault(teamId, 0);
     }
 }
