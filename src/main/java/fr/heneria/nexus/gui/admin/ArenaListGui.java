@@ -5,6 +5,7 @@ import dev.triumphteam.gui.guis.Gui;
 import dev.triumphteam.gui.guis.GuiItem;
 import fr.heneria.nexus.arena.manager.ArenaManager;
 import fr.heneria.nexus.arena.model.Arena;
+import fr.heneria.nexus.admin.conversation.AdminConversationManager;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Material;
@@ -18,9 +19,11 @@ import java.util.Map;
 public class ArenaListGui {
 
     private final ArenaManager arenaManager;
+    private final AdminConversationManager adminConversationManager;
 
-    public ArenaListGui(ArenaManager arenaManager) {
+    public ArenaListGui(ArenaManager arenaManager, AdminConversationManager adminConversationManager) {
         this.arenaManager = arenaManager;
+        this.adminConversationManager = adminConversationManager;
     }
 
     /**
@@ -55,10 +58,12 @@ public class ArenaListGui {
 
         GuiItem create = ItemBuilder.from(Material.NETHER_STAR)
                 .name(Component.text("Créer une nouvelle arène", NamedTextColor.AQUA))
-                .lore(Component.text("Fonctionnalité à venir"))
+                .lore(Component.text("Démarre une conversation"))
                 .asGuiItem(event -> {
                     event.setCancelled(true);
-                    ((Player) event.getWhoClicked()).sendMessage("Utilisez /nx arena create <nom> <joueurs>");
+                    Player p = (Player) event.getWhoClicked();
+                    p.closeInventory();
+                    adminConversationManager.startConversation(p);
                 });
         gui.addItem(create);
 

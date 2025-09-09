@@ -6,10 +6,12 @@ import fr.heneria.nexus.arena.repository.JdbcArenaRepository;
 import fr.heneria.nexus.command.NexusAdminCommand;
 import fr.heneria.nexus.db.HikariDataSourceProvider;
 import fr.heneria.nexus.listener.PlayerConnectionListener;
+import fr.heneria.nexus.listener.AdminConversationListener;
 import fr.heneria.nexus.player.manager.PlayerManager;
 import fr.heneria.nexus.player.repository.JdbcPlayerRepository;
 import fr.heneria.nexus.player.repository.PlayerRepository;
 import fr.heneria.nexus.economy.manager.EconomyManager;
+import fr.heneria.nexus.admin.conversation.AdminConversationManager;
 import liquibase.Liquibase;
 import liquibase.database.Database;
 import liquibase.database.DatabaseFactory;
@@ -49,12 +51,14 @@ public final class Nexus extends JavaPlugin {
             this.playerManager = new PlayerManager(playerRepository);
             this.economyManager = new EconomyManager(this.playerManager, this.dataSourceProvider.getDataSource());
 
+            AdminConversationManager.init(this.arenaManager, this);
             this.arenaManager.loadArenas();
             getLogger().info(this.arenaManager.getAllArenas().size() + " arène(s) chargée(s).");
 
             getCommand("nx").setExecutor(new NexusAdminCommand(this.arenaManager));
             // CORRECTION: L'instance du plugin (this) est maintenant passée au listener
             getServer().getPluginManager().registerEvents(new PlayerConnectionListener(this.playerManager, this.arenaManager, this), this);
+            getServer().getPluginManager().registerEvents(new AdminConversationListener(AdminConversationManager.getInstance(), this), this);
 
             getLogger().info("✅ Le plugin Nexus a été activé avec succès !");
 

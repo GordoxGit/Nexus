@@ -5,6 +5,7 @@ import dev.triumphteam.gui.guis.Gui;
 import dev.triumphteam.gui.guis.GuiItem;
 import fr.heneria.nexus.arena.manager.ArenaManager;
 import fr.heneria.nexus.arena.model.Arena;
+import fr.heneria.nexus.admin.conversation.AdminConversationManager;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Material;
@@ -73,7 +74,7 @@ public class ArenaEditorGui {
                 .name(Component.text("Retour", NamedTextColor.RED))
                 .asGuiItem(event -> {
                     event.setCancelled(true);
-                    new ArenaListGui(arenaManager).open((Player) event.getWhoClicked());
+                    new ArenaListGui(arenaManager, AdminConversationManager.getInstance()).open((Player) event.getWhoClicked());
                 });
 
         gui.setItem(13, info);
