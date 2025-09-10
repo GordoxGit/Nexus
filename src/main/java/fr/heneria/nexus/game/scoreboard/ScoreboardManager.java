@@ -1,5 +1,6 @@
 package fr.heneria.nexus.game.scoreboard;
 
+import fr.heneria.nexus.game.GameConfig;
 import fr.heneria.nexus.game.model.Match;
 import fr.heneria.nexus.game.model.Team;
 import fr.heneria.nexus.game.model.TeamColor;
@@ -80,7 +81,8 @@ public class ScoreboardManager {
             board.resetScores(entry);
         }
         int line = 15;
-        obj.getScore("Manche: §a" + match.getCurrentRound() + "/5").setScore(line--);
+        int roundsToWin = GameConfig.get().getRoundsToWin();
+        obj.getScore("Manche: §a" + match.getCurrentRound() + "/" + roundsToWin).setScore(line--);
         obj.getScore(" ").setScore(line--);
         for (Team team : match.getTeams().values()) {
             int teamScore = match.getTeamScores().getOrDefault(team.getTeamId(), 0);
