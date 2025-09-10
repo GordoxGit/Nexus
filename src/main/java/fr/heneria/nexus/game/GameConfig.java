@@ -20,6 +20,7 @@ public class GameConfig {
     private int killReward;
     private int assistReward;
     private int roundWinBonus;
+    private int killAttributionTimeSeconds;
 
     private GameConfig(JavaPlugin plugin) {
         this.plugin = plugin;
@@ -45,6 +46,7 @@ public class GameConfig {
         killReward = config.getInt("game-rules.economy.kill-reward", 100);
         assistReward = config.getInt("game-rules.economy.assist-reward", 50);
         roundWinBonus = config.getInt("game-rules.economy.round-win-bonus", 200);
+        killAttributionTimeSeconds = config.getInt("game-rules.kill-attribution-time-seconds", 10);
     }
 
     public int getRoundsToWin() {
@@ -128,6 +130,15 @@ public class GameConfig {
         save("game-rules.economy.round-win-bonus", value);
     }
 
+    public int getKillAttributionTimeSeconds() {
+        return killAttributionTimeSeconds;
+    }
+
+    public void setKillAttributionTimeSeconds(int value) {
+        killAttributionTimeSeconds = value;
+        save("game-rules.kill-attribution-time-seconds", value);
+    }
+
     /**
      * Met à jour une valeur à partir de sa clé relative dans game-rules.
      */
@@ -142,6 +153,7 @@ public class GameConfig {
             case "economy.kill-reward" -> setKillReward((int) value);
             case "economy.assist-reward" -> setAssistReward((int) value);
             case "economy.round-win-bonus" -> setRoundWinBonus((int) value);
+            case "kill-attribution-time-seconds" -> setKillAttributionTimeSeconds((int) value);
             default -> {
             }
         }

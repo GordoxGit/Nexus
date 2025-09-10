@@ -57,6 +57,7 @@ game-rules:
     kill-reward: 100
     assist-reward: 50
     round-win-bonus: 200
+  kill-attribution-time-seconds: 10
 
 # Système de classement
 ranking:

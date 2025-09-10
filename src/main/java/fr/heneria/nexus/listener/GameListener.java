@@ -2,6 +2,7 @@ package fr.heneria.nexus.listener;
 
 import fr.heneria.nexus.arena.model.ArenaGameObject;
 import fr.heneria.nexus.game.manager.GameManager;
+import fr.heneria.nexus.game.manager.DamageTrackerManager;
 import fr.heneria.nexus.game.model.Match;
 import fr.heneria.nexus.game.model.Team;
 import fr.heneria.nexus.game.model.NexusCore;
@@ -68,6 +69,7 @@ public class GameListener implements Listener {
                 gameManager.endRound(match, winningTeamId);
             }
         }
+        DamageTrackerManager.getInstance().clear(event.getPlayer());
     }
 
     @EventHandler
@@ -88,13 +90,18 @@ public class GameListener implements Listener {
 
         match.incrementDeath(uuid);
         Player killer = player.getKiller();
+        if (killer == null) {
+            killer = DamageTrackerManager.getInstance().getKiller(player).orElse(null);
+        }
         if (killer != null) {
             match.incrementKill(killer.getUniqueId());
             int reward = GameConfig.get().getKillReward();
             match.getRoundPoints().merge(killer.getUniqueId(), reward, Integer::sum);
             killer.sendMessage("§6+" + reward + " points (Élimination)");
             ScoreboardManager.getInstance().updatePlayer(match, killer.getUniqueId());
+            match.broadcastMessage("§c" + player.getName() + " a été tué par " + killer.getName() + ".");
         }
+        DamageTrackerManager.getInstance().clear(player);
 
         Location spawn = null;
         if (team != null) {
@@ -128,6 +135,22 @@ public class GameListener implements Listener {
         }
 
         Bukkit.getScheduler().runTaskLater(plugin, () -> checkEndConditions(match), 5L);
+    }
+
+    @EventHandler
+    public void onPlayerDamageByEntity(EntityDamageByEntityEvent event) {
+        if (!(event.getEntity() instanceof Player victim)) {
+            return;
+        }
+        if (!(event.getDamager() instanceof Player attacker)) {
+            return;
+        }
+        Match attackerMatch = gameManager.getPlayerMatch(attacker.getUniqueId());
+        Match victimMatch = gameManager.getPlayerMatch(victim.getUniqueId());
+        if (attackerMatch == null || attackerMatch != victimMatch) {
+            return;
+        }
+        DamageTrackerManager.getInstance().recordDamage(victim, attacker);
     }
 
     @EventHandler
