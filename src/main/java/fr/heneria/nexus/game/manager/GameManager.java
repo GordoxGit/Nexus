@@ -143,7 +143,7 @@ public class GameManager {
                     player.setHealth(player.getMaxHealth());
                     player.setFoodLevel(20);
                     kitManager.applyKit(player, kit);
-                    player.addPotionEffect(new PotionEffect(PotionEffectType.SLOW, 400, 255, false, false));
+                    player.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, 400, 255, false, false));
                     match.getRoundPoints().put(playerId, GameConfig.get().getStartingRoundPoints());
                     new ShopGui(shopManager, playerManager, plugin, match).open(player);
                 }
@@ -162,7 +162,7 @@ public class GameManager {
                         if (p != null) {
                             p.closeInventory();
                             p.sendMessage("La phase d'achat est terminée !");
-                            p.removePotionEffect(PotionEffectType.SLOW);
+                            p.removePotionEffect(PotionEffectType.SLOWNESS);
                         }
                     }
                     if (match.getPhaseManager() != null) {
@@ -237,7 +237,7 @@ public class GameManager {
                         player.teleport(spawn);
                     }
                     match.getRoundPoints().put(playerId, GameConfig.get().getStartingRoundPoints());
-                    player.addPotionEffect(new PotionEffect(PotionEffectType.SLOW, 400, 255, false, false));
+                    player.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, 400, 255, false, false));
                     new ShopGui(shopManager, playerManager, plugin, match).open(player);
                 }
             }
@@ -256,7 +256,7 @@ public class GameManager {
                         if (p != null) {
                             p.closeInventory();
                             p.sendMessage("La phase d'achat est terminée !");
-                            p.removePotionEffect(PotionEffectType.SLOW);
+                            p.removePotionEffect(PotionEffectType.SLOWNESS);
                         }
                     }
                     if (match.getPhaseManager() != null) {
