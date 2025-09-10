@@ -46,6 +46,7 @@ public class AdminConversationManager {
     private final Map<UUID, PriceUpdateConversation> priceConversations = new ConcurrentHashMap<>();
     private final Map<UUID, GameRuleUpdateConversation> ruleConversations = new ConcurrentHashMap<>();
     private final Map<UUID, KitCreationConversation> kitConversations = new ConcurrentHashMap<>();
+    private final Map<UUID, NpcCreationConversation> npcConversations = new ConcurrentHashMap<>();
 
     private AdminConversationManager(ArenaManager arenaManager, ShopManager shopManager, ShopRepository shopRepository, KitManager kitManager, JavaPlugin plugin) {
         this.arenaManager = arenaManager;
@@ -97,6 +98,17 @@ public class AdminConversationManager {
                 new KitListGui(kitManager, this).open(admin);
             }
         }, 5 * 60 * 20L);
+    }
+
+    // NPC creation conversation
+    public void startNpcCreationConversation(Player admin, fr.heneria.nexus.gui.admin.npc.NpcListGui reopen, fr.heneria.nexus.npc.NpcManager npcManager) {
+        UUID id = admin.getUniqueId();
+        if (isInConversation(admin)) {
+            admin.sendMessage("Une conversation est déjà en cours.");
+            return;
+        }
+        npcConversations.put(id, new NpcCreationConversation(id, npcManager, reopen));
+        admin.sendMessage("Entrez le nom du PNJ (ou 'annuler').");
     }
 
     /**
@@ -192,7 +204,8 @@ public class AdminConversationManager {
         PriceUpdateConversation priceConv = priceConversations.get(id);
         GameRuleUpdateConversation ruleConv = ruleConversations.get(id);
         KitCreationConversation kitConv = kitConversations.get(id);
-        if (priceConv == null && ruleConv == null && kitConv == null) {
+        NpcCreationConversation npcConv = npcConversations.get(id);
+        if (priceConv == null && ruleConv == null && kitConv == null && npcConv == null) {
             return;
         }
 
@@ -260,6 +273,26 @@ public class AdminConversationManager {
             kitManager.saveKit(kit);
             cancelConversation(admin);
             new KitEditorGui(kitManager, kit).open(admin);
+            return;
+        }
+
+        if (npcConv != null) {
+            if ("annuler".equalsIgnoreCase(message)) {
+                admin.sendMessage("Création de PNJ annulée.");
+                cancelConversation(admin);
+                npcConv.getReopenGui().open(admin);
+                return;
+            }
+            if (npcConv.getStep() == NpcConversationStep.AWAITING_NAME) {
+                npcConv.setName(message);
+                npcConv.setStep(NpcConversationStep.AWAITING_COMMAND);
+                admin.sendMessage("Entrez la commande à exécuter (ou 'annuler').");
+            } else {
+                npcConv.getNpcManager().createNpc(npcConv.getName(), message);
+                admin.sendMessage("PNJ créé.");
+                cancelConversation(admin);
+                npcConv.getReopenGui().open(admin);
+            }
         }
     }
 
@@ -272,6 +305,7 @@ public class AdminConversationManager {
         priceConversations.remove(id);
         ruleConversations.remove(id);
         kitConversations.remove(id);
+        npcConversations.remove(id);
     }
 
     /**
@@ -279,6 +313,6 @@ public class AdminConversationManager {
      */
     public boolean isInConversation(Player admin) {
         UUID id = admin.getUniqueId();
-        return conversations.containsKey(id) || priceConversations.containsKey(id) || ruleConversations.containsKey(id) || kitConversations.containsKey(id);
+        return conversations.containsKey(id) || priceConversations.containsKey(id) || ruleConversations.containsKey(id) || kitConversations.containsKey(id) || npcConversations.containsKey(id);
     }
 }

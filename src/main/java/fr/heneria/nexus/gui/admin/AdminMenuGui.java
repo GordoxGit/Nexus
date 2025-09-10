@@ -14,6 +14,8 @@ import fr.heneria.nexus.shop.manager.ShopManager;
 import fr.heneria.nexus.game.kit.manager.KitManager;
 import fr.heneria.nexus.gui.admin.kit.KitListGui;
 import fr.heneria.nexus.gui.admin.shop.ShopAdminGui;
+import fr.heneria.nexus.gui.admin.npc.NpcListGui;
+import fr.heneria.nexus.npc.NpcManager;
 
 /**
  * Menu principal du centre de contrôle Nexus.
@@ -24,12 +26,14 @@ public class AdminMenuGui {
     private final AdminPlacementManager adminPlacementManager;
     private final ShopManager shopManager;
     private final KitManager kitManager;
+    private final NpcManager npcManager;
 
-    public AdminMenuGui(ArenaManager arenaManager, AdminPlacementManager adminPlacementManager, ShopManager shopManager, KitManager kitManager) {
+    public AdminMenuGui(ArenaManager arenaManager, AdminPlacementManager adminPlacementManager, ShopManager shopManager, KitManager kitManager, NpcManager npcManager) {
         this.arenaManager = arenaManager;
         this.adminPlacementManager = adminPlacementManager;
         this.shopManager = shopManager;
         this.kitManager = kitManager;
+        this.npcManager = npcManager;
     }
 
     /**
@@ -83,6 +87,15 @@ public class AdminMenuGui {
                     new KitListGui(kitManager, AdminConversationManager.getInstance()).open((Player) event.getWhoClicked());
                 });
         gui.setItem(17, kitManagement);
+
+        GuiItem npcManagement = ItemBuilder.from(Material.VILLAGER_SPAWN_EGG)
+                .name(Component.text("Gestion des PNJ", NamedTextColor.AQUA))
+                .lore(Component.text("Créer et placer des PNJ"))
+                .asGuiItem(event -> {
+                    event.setCancelled(true);
+                    new NpcListGui(npcManager, AdminConversationManager.getInstance()).open((Player) event.getWhoClicked());
+                });
+        gui.setItem(9, npcManagement);
         gui.open(player);
     }
 }

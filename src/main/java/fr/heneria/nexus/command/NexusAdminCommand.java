@@ -10,6 +10,7 @@ import fr.heneria.nexus.game.model.Match;
 import fr.heneria.nexus.game.model.MatchType;
 import fr.heneria.nexus.sanction.SanctionManager;
 import fr.heneria.nexus.game.kit.manager.KitManager;
+import fr.heneria.nexus.npc.NpcManager;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
@@ -32,12 +33,14 @@ public class NexusAdminCommand implements CommandExecutor {
     private final ShopManager shopManager;
     private final SanctionManager sanctionManager;
     private final KitManager kitManager;
+    private final NpcManager npcManager;
 
-    public NexusAdminCommand(ArenaManager arenaManager, ShopManager shopManager, SanctionManager sanctionManager, KitManager kitManager) {
+    public NexusAdminCommand(ArenaManager arenaManager, ShopManager shopManager, SanctionManager sanctionManager, KitManager kitManager, NpcManager npcManager) {
         this.arenaManager = arenaManager;
         this.shopManager = shopManager;
         this.sanctionManager = sanctionManager;
         this.kitManager = kitManager;
+        this.npcManager = npcManager;
     }
 
     @Override
@@ -99,7 +102,7 @@ public class NexusAdminCommand implements CommandExecutor {
                 sender.sendMessage("Vous n'avez pas la permission nécessaire.");
                 return true;
             }
-            new AdminMenuGui(arenaManager, AdminPlacementManager.getInstance(), shopManager, kitManager).open((Player) sender);
+            new AdminMenuGui(arenaManager, AdminPlacementManager.getInstance(), shopManager, kitManager, npcManager).open((Player) sender);
             return true;
         }
 
