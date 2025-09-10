@@ -17,6 +17,7 @@ import fr.heneria.nexus.gui.admin.shop.ShopAdminGui;
 import fr.heneria.nexus.gui.admin.npc.NpcListGui;
 import fr.heneria.nexus.gui.admin.sanction.SanctionSearchGui;
 import fr.heneria.nexus.npc.NpcManager;
+import fr.heneria.nexus.utils.Theme;
 
 /**
  * Menu principal du centre de contrôle Nexus.
@@ -44,7 +45,7 @@ public class AdminMenuGui {
      */
     public void open(Player player) {
         Gui gui = Gui.gui()
-                .title(Component.text("Centre de Contrôle Nexus"))
+                .title(Component.text("Centre de Contrôle Nexus", Theme.COLOR_PRIMARY))
                 .rows(3)
                 .create();
 
@@ -52,7 +53,7 @@ public class AdminMenuGui {
         gui.setDefaultClickAction(event -> event.setCancelled(true));
 
         GuiItem arenaManagement = ItemBuilder.from(Material.GRASS_BLOCK)
-                .name(Component.text("Gestion des Arènes", NamedTextColor.GREEN))
+                .name(Component.text("Gestion des Arènes", Theme.COLOR_SUCCESS))
                 .lore(Component.text("Configurer et gérer les arènes"))
                 .asGuiItem(event -> {
                     event.setCancelled(true);
@@ -72,7 +73,7 @@ public class AdminMenuGui {
         gui.setItem(11, rulesManagement);
 
         GuiItem shopManagement = ItemBuilder.from(Material.CHEST)
-                .name(Component.text("Gestion de la Boutique", NamedTextColor.GREEN))
+                .name(Component.text("Gestion de la Boutique", Theme.COLOR_SUCCESS))
                 .lore(Component.text("Configurer la boutique en jeu"))
                 .asGuiItem(event -> {
                     event.setCancelled(true);
@@ -99,13 +100,23 @@ public class AdminMenuGui {
         gui.setItem(9, npcManagement);
 
         GuiItem sanctionManagement = ItemBuilder.from(Material.BARRIER)
-                .name(Component.text("Gestion des Sanctions", NamedTextColor.RED))
+                .name(Component.text("Gestion des Sanctions", Theme.COLOR_ERROR))
                 .lore(Component.text("Voir et pardonner les sanctions"))
                 .asGuiItem(event -> {
                     event.setCancelled(true);
                     new SanctionSearchGui().open((Player) event.getWhoClicked());
                 });
         gui.setItem(22, sanctionManagement);
+
+        GuiItem close = ItemBuilder.from(Material.BARRIER)
+                .name(Component.text("Fermer", Theme.COLOR_ERROR))
+                .asGuiItem(event -> event.getWhoClicked().closeInventory());
+        gui.setItem(26, close);
+
+        gui.getFiller().fill(ItemBuilder.from(Material.GRAY_STAINED_GLASS_PANE)
+                .name(Component.text(" "))
+                .asGuiItem());
+
         gui.open(player);
     }
 }

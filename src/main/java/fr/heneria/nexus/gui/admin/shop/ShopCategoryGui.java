@@ -10,6 +10,7 @@ import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.entity.Player;
 import org.bukkit.Material;
+import fr.heneria.nexus.utils.Theme;
 
 import java.util.List;
 
@@ -31,7 +32,7 @@ public class ShopCategoryGui {
         int rows = Math.min(6, Math.max(1, (int) Math.ceil(items.size() / 9.0)));
 
         Gui gui = Gui.gui()
-                .title(Component.text("Boutique - " + category))
+                .title(Component.text("Boutique - " + category, Theme.COLOR_PRIMARY))
                 .rows(rows)
                 .create();
         gui.setDefaultClickAction(event -> event.setCancelled(true));
@@ -50,7 +51,7 @@ public class ShopCategoryGui {
         }
 
         GuiItem back = ItemBuilder.from(Material.BARRIER)
-                .name(Component.text("Retour", NamedTextColor.RED))
+                .name(Component.text("Retour", Theme.COLOR_ERROR))
                 .asGuiItem(event -> {
                     event.setCancelled(true);
                     new ShopAdminGui(shopManager).open((Player) event.getWhoClicked());

@@ -11,6 +11,7 @@ import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
+import fr.heneria.nexus.utils.Theme;
 
 /**
  * GUI de confirmation de suppression d'une arène.
@@ -41,7 +42,7 @@ public class ConfirmDeleteGui {
         gui.setCloseGuiAction(event -> {});
 
         GuiItem yes = ItemBuilder.from(Material.LIME_CONCRETE)
-                .name(Component.text("OUI, SUPPRIMER", NamedTextColor.GREEN))
+                .name(Component.text("OUI, SUPPRIMER", Theme.COLOR_SUCCESS))
                 .asGuiItem(event -> {
                     event.setCancelled(true);
                     Player p = (Player) event.getWhoClicked();
@@ -51,7 +52,7 @@ public class ConfirmDeleteGui {
                 });
 
         GuiItem no = ItemBuilder.from(Material.RED_CONCRETE)
-                .name(Component.text("NON, ANNULER", NamedTextColor.RED))
+                .name(Component.text("NON, ANNULER", Theme.COLOR_ERROR))
                 .asGuiItem(event -> {
                     event.setCancelled(true);
                     new ArenaEditorGui(arenaManager, arena, adminPlacementManager).open((Player) event.getWhoClicked());
@@ -59,6 +60,10 @@ public class ConfirmDeleteGui {
 
         gui.setItem(12, yes);
         gui.setItem(14, no);
+
+        gui.getFiller().fill(ItemBuilder.from(Material.GRAY_STAINED_GLASS_PANE)
+                .name(Component.text(" "))
+                .asGuiItem());
 
         gui.open(player);
     }
