@@ -51,27 +51,29 @@ public class KitManager {
 
     private void createDefaultKits() {
         ItemStack[] solo = new ItemStack[41];
-        solo[36] = enchant(new ItemStack(Material.LEATHER_HELMET), Enchantment.PROTECTION_ENVIRONMENTAL, 2);
-        solo[37] = enchant(new ItemStack(Material.IRON_CHESTPLATE), Enchantment.PROTECTION_ENVIRONMENTAL, 2);
-        solo[38] = enchant(new ItemStack(Material.IRON_LEGGINGS), Enchantment.PROTECTION_ENVIRONMENTAL, 2);
-        solo[39] = enchant(new ItemStack(Material.LEATHER_BOOTS), Enchantment.PROTECTION_ENVIRONMENTAL, 2);
-        solo[0] = enchant(new ItemStack(Material.STONE_SWORD), Enchantment.DAMAGE_ALL, 2);
+        solo[36] = enchant(new ItemStack(Material.LEATHER_HELMET), Enchantment.PROTECTION, 2);
+        solo[37] = enchant(new ItemStack(Material.IRON_CHESTPLATE), Enchantment.PROTECTION, 2);
+        solo[38] = enchant(new ItemStack(Material.IRON_LEGGINGS), Enchantment.PROTECTION, 2);
+        solo[39] = enchant(new ItemStack(Material.LEATHER_BOOTS), Enchantment.PROTECTION, 2);
+        solo[0] = enchant(new ItemStack(Material.STONE_SWORD), Enchantment.SHARPNESS, 2);
         solo[1] = new ItemStack(Material.BOW);
         saveKit(new Kit("Solo", solo));
 
         ItemStack[] team = new ItemStack[41];
-        team[36] = enchant(new ItemStack(Material.LEATHER_HELMET), Enchantment.PROTECTION_ENVIRONMENTAL, 2);
-        team[37] = enchant(new ItemStack(Material.LEATHER_CHESTPLATE), Enchantment.PROTECTION_ENVIRONMENTAL, 2);
-        team[38] = enchant(new ItemStack(Material.LEATHER_LEGGINGS), Enchantment.PROTECTION_ENVIRONMENTAL, 2);
-        team[39] = enchant(new ItemStack(Material.LEATHER_BOOTS), Enchantment.PROTECTION_ENVIRONMENTAL, 2);
-        team[0] = enchant(new ItemStack(Material.WOODEN_SWORD), Enchantment.DAMAGE_ALL, 2);
+        team[36] = enchant(new ItemStack(Material.LEATHER_HELMET), Enchantment.PROTECTION, 2);
+        team[37] = enchant(new ItemStack(Material.LEATHER_CHESTPLATE), Enchantment.PROTECTION, 2);
+        team[38] = enchant(new ItemStack(Material.LEATHER_LEGGINGS), Enchantment.PROTECTION, 2);
+        team[39] = enchant(new ItemStack(Material.LEATHER_BOOTS), Enchantment.PROTECTION, 2);
+        team[0] = enchant(new ItemStack(Material.WOODEN_SWORD), Enchantment.SHARPNESS, 2);
         saveKit(new Kit("Equipe", team));
     }
 
     private ItemStack enchant(ItemStack item, Enchantment enchantment, int level) {
         ItemMeta meta = item.getItemMeta();
-        meta.addEnchant(enchantment, level, true);
-        item.setItemMeta(meta);
+        if (meta != null) {
+            meta.addEnchant(enchantment, level, true);
+            item.setItemMeta(meta);
+        }
         return item;
     }
 
