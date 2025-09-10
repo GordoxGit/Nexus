@@ -11,6 +11,7 @@ import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
+import fr.heneria.nexus.utils.Theme;
 
 import java.util.Map;
 
@@ -39,7 +40,7 @@ public class ArenaListGui {
         int rows = Math.min(6, Math.max(1, (int) Math.ceil((arenaCount + 1) / 9.0)));
 
         Gui gui = Gui.gui()
-                .title(Component.text("Gestion des Arènes"))
+                .title(Component.text("Gestion des Arènes", Theme.COLOR_PRIMARY))
                 .rows(rows)
                 .create();
         gui.setDefaultClickAction(event -> event.setCancelled(true));
@@ -60,7 +61,7 @@ public class ArenaListGui {
         }
 
         GuiItem create = ItemBuilder.from(Material.NETHER_STAR)
-                .name(Component.text("Créer une nouvelle arène", NamedTextColor.AQUA))
+                .name(Component.text("Créer une nouvelle arène", Theme.COLOR_PRIMARY))
                 .lore(Component.text("Démarre une conversation"))
                 .asGuiItem(event -> {
                     event.setCancelled(true);
@@ -71,7 +72,7 @@ public class ArenaListGui {
         gui.addItem(create);
 
         GuiItem back = ItemBuilder.from(Material.BARRIER)
-                .name(Component.text("Retour", NamedTextColor.RED))
+                .name(Component.text("Retour", Theme.COLOR_ERROR))
                 .asGuiItem(event -> {
                     event.setCancelled(true);
                     ((Player) event.getWhoClicked()).performCommand("nx admin");

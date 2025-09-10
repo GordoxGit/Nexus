@@ -17,6 +17,11 @@ import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.bukkit.Bukkit;
 
+import fr.heneria.nexus.utils.Theme;
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.format.NamedTextColor;
+import net.kyori.adventure.text.format.TextDecoration;
+
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -48,7 +53,7 @@ public class NexusAdminCommand implements CommandExecutor {
         if (args.length > 0 && "starttest".equalsIgnoreCase(args[0])) {
             Arena arena = arenaManager.getAllArenas().stream().findFirst().orElse(null);
             if (arena == null) {
-                sender.sendMessage("Aucune arène disponible.");
+                sender.sendMessage(Theme.PREFIX_MAIN.append(Component.text("Aucune arène disponible.", Theme.COLOR_ERROR)));
                 return true;
             }
             List<UUID> team1 = new ArrayList<>();
@@ -63,43 +68,49 @@ public class NexusAdminCommand implements CommandExecutor {
             }
             Match match = GameManager.getInstance().createMatch(arena, Arrays.asList(team1, team2), MatchType.NORMAL);
             GameManager.getInstance().startMatchCountdown(match);
-            sender.sendMessage("Match de test lancé.");
+            sender.sendMessage(Theme.PREFIX_MAIN.append(Component.text("Match de test lancé.", Theme.COLOR_SUCCESS)));
             return true;
         }
 
         if (args.length >= 3 && "sanction".equalsIgnoreCase(args[0]) && "pardon".equalsIgnoreCase(args[1])) {
             if (!sender.hasPermission("nexus.admin.sanction")) {
-                sender.sendMessage("Vous n'avez pas la permission nécessaire.");
+                sender.sendMessage(Theme.PREFIX_MAIN.append(Component.text("Vous n'avez pas la permission nécessaire.", Theme.COLOR_ERROR)));
                 return true;
             }
             Player target = Bukkit.getPlayer(args[2]);
             if (target == null) {
-                sender.sendMessage("Joueur introuvable.");
+                sender.sendMessage(Theme.PREFIX_MAIN.append(Component.text("Joueur introuvable.", Theme.COLOR_ERROR)));
                 return true;
             }
             sanctionManager.pardonLastPenalty(target.getUniqueId());
-            sender.sendMessage("Sanction levée pour " + target.getName());
+            sender.sendMessage(Theme.PREFIX_MAIN.append(Component.text("Sanction levée pour ")
+                    .append(Component.text(target.getName(), Theme.COLOR_SUCCESS))));
             return true;
         }
 
         // Affiche l'aide si aucune sous-commande ou demande d'aide
         if (args.length == 0 || "help".equalsIgnoreCase(args[0])) {
-            sender.sendMessage("§6Commandes Nexus :");
-            sender.sendMessage("§e/nx admin §7- ouvre le centre de contrôle Nexus");
-            sender.sendMessage("§e/nx arena list §7- liste les arènes chargées");
-            sender.sendMessage("§e/nx arena save <nom> §7- sauvegarde l'arène spécifiée");
-            sender.sendMessage("§e/nx sanction pardon <joueur> §7- annule la dernière sanction du joueur");
+            Component line = Component.text("---------------------------------------------", NamedTextColor.GRAY, TextDecoration.STRIKETHROUGH);
+            sender.sendMessage(line);
+            sender.sendMessage(Component.text("Nexus Admin Help", Theme.COLOR_PRIMARY, TextDecoration.BOLD));
+            sender.sendMessage(Component.text(""));
+            sender.sendMessage(Component.text("/nx admin ", NamedTextColor.WHITE)
+                    .append(Component.text("- Ouvre le Centre de Contrôle principal.", NamedTextColor.GRAY)));
+            sender.sendMessage(Component.text("/nx sanction pardon <joueur> ", NamedTextColor.WHITE)
+                    .append(Component.text("- Pardonne la dernière sanction.", NamedTextColor.GRAY)));
+            sender.sendMessage(Component.text(""));
+            sender.sendMessage(line);
             return true;
         }
 
         // Ouvre le GUI principal pour /nx admin
         if ("admin".equalsIgnoreCase(args[0])) {
             if (!(sender instanceof Player)) {
-                sender.sendMessage("Cette commande doit être exécutée par un joueur.");
+                sender.sendMessage(Theme.PREFIX_MAIN.append(Component.text("Cette commande doit être exécutée par un joueur.", Theme.COLOR_ERROR)));
                 return true;
             }
             if (!sender.hasPermission("nexus.admin")) {
-                sender.sendMessage("Vous n'avez pas la permission nécessaire.");
+                sender.sendMessage(Theme.PREFIX_MAIN.append(Component.text("Vous n'avez pas la permission nécessaire.", Theme.COLOR_ERROR)));
                 return true;
             }
             new AdminMenuGui(arenaManager, AdminPlacementManager.getInstance(), shopManager, kitManager, npcManager).open((Player) sender);
@@ -108,12 +119,12 @@ public class NexusAdminCommand implements CommandExecutor {
 
         // Anciennes sous-commandes pour la gestion des arènes
         if (!"arena".equalsIgnoreCase(args[0])) {
-            sender.sendMessage("Usage: /" + label + " arena <list|save>");
+            sender.sendMessage(Theme.PREFIX_MAIN.append(Component.text("Usage: /" + label + " arena <list|save>", Theme.COLOR_ERROR)));
             return true;
         }
 
         if (args.length < 2) {
-            sender.sendMessage("Usage: /" + label + " arena <list|save>");
+            sender.sendMessage(Theme.PREFIX_MAIN.append(Component.text("Usage: /" + label + " arena <list|save>", Theme.COLOR_ERROR)));
             return true;
         }
 
@@ -123,23 +134,23 @@ public class NexusAdminCommand implements CommandExecutor {
                 String arenas = arenaManager.getAllArenas().stream()
                         .map(Arena::getName)
                         .collect(Collectors.joining(", "));
-                sender.sendMessage("Arènes: " + arenas);
+                sender.sendMessage(Theme.PREFIX_MAIN.append(Component.text("Arènes: " + arenas, Theme.COLOR_PRIMARY)));
                 return true;
             case "save":
                 if (args.length < 3) {
-                    sender.sendMessage("Usage: /" + label + " arena save <nomArène>");
+                    sender.sendMessage(Theme.PREFIX_MAIN.append(Component.text("Usage: /" + label + " arena save <nomArène>", Theme.COLOR_ERROR)));
                     return true;
                 }
                 Arena toSave = arenaManager.getArena(args[2]);
                 if (toSave == null) {
-                    sender.sendMessage("Arène introuvable.");
+                    sender.sendMessage(Theme.PREFIX_MAIN.append(Component.text("Arène introuvable.", Theme.COLOR_ERROR)));
                     return true;
                 }
                 arenaManager.saveArena(toSave);
-                sender.sendMessage("Arène sauvegardée.");
+                sender.sendMessage(Theme.PREFIX_MAIN.append(Component.text("Arène sauvegardée.", Theme.COLOR_SUCCESS)));
                 return true;
             default:
-                sender.sendMessage("Sous-commande inconnue.");
+                sender.sendMessage(Theme.PREFIX_MAIN.append(Component.text("Sous-commande inconnue.", Theme.COLOR_ERROR)));
                 return true;
         }
     }

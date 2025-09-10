@@ -8,6 +8,7 @@ import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
+import fr.heneria.nexus.utils.Theme;
 
 /**
  * Interface d'administration de la boutique.
@@ -22,32 +23,32 @@ public class ShopAdminGui {
 
     public void open(Player player) {
         Gui gui = Gui.gui()
-                .title(Component.text("Gestion de la Boutique"))
+                .title(Component.text("Gestion de la Boutique", Theme.COLOR_PRIMARY))
                 .rows(3)
                 .create();
         gui.setDefaultClickAction(event -> event.setCancelled(true));
 
         GuiItem armes = ItemBuilder.from(Material.DIAMOND_SWORD)
-                .name(Component.text("Armes", NamedTextColor.GREEN))
+                .name(Component.text("Armes", Theme.COLOR_SUCCESS))
                 .asGuiItem(event -> {
                     event.setCancelled(true);
                     new ShopCategoryGui(shopManager, "Armes").open((Player) event.getWhoClicked());
                 });
         GuiItem armures = ItemBuilder.from(Material.DIAMOND_CHESTPLATE)
-                .name(Component.text("Armures", NamedTextColor.GREEN))
+                .name(Component.text("Armures", Theme.COLOR_SUCCESS))
                 .asGuiItem(event -> {
                     event.setCancelled(true);
                     new ShopCategoryGui(shopManager, "Armures").open((Player) event.getWhoClicked());
                 });
         GuiItem utilitaires = ItemBuilder.from(Material.POTION)
-                .name(Component.text("Utilitaires", NamedTextColor.GREEN))
+                .name(Component.text("Utilitaires", Theme.COLOR_SUCCESS))
                 .asGuiItem(event -> {
                     event.setCancelled(true);
                     new ShopCategoryGui(shopManager, "Utilitaires").open((Player) event.getWhoClicked());
                 });
 
         GuiItem back = ItemBuilder.from(Material.BARRIER)
-                .name(Component.text("Retour", NamedTextColor.RED))
+                .name(Component.text("Retour", Theme.COLOR_ERROR))
                 .asGuiItem(event -> {
                     event.setCancelled(true);
                     ((Player) event.getWhoClicked()).performCommand("nx admin");
