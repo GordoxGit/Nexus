@@ -15,6 +15,7 @@ import fr.heneria.nexus.game.kit.manager.KitManager;
 import fr.heneria.nexus.gui.admin.kit.KitListGui;
 import fr.heneria.nexus.gui.admin.shop.ShopAdminGui;
 import fr.heneria.nexus.gui.admin.npc.NpcListGui;
+import fr.heneria.nexus.gui.admin.sanction.SanctionSearchGui;
 import fr.heneria.nexus.npc.NpcManager;
 
 /**
@@ -96,6 +97,15 @@ public class AdminMenuGui {
                     new NpcListGui(npcManager, AdminConversationManager.getInstance()).open((Player) event.getWhoClicked());
                 });
         gui.setItem(9, npcManagement);
+
+        GuiItem sanctionManagement = ItemBuilder.from(Material.BARRIER)
+                .name(Component.text("Gestion des Sanctions", NamedTextColor.RED))
+                .lore(Component.text("Voir et pardonner les sanctions"))
+                .asGuiItem(event -> {
+                    event.setCancelled(true);
+                    new SanctionSearchGui().open((Player) event.getWhoClicked());
+                });
+        gui.setItem(22, sanctionManagement);
         gui.open(player);
     }
 }
