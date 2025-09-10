@@ -13,5 +13,6 @@
     <include file="db/changelog/006_create_arena_objects_table.sql"/>
     <include file="db/changelog/007_create_sanctions_table.sql"/>
     <include file="db/changelog/008_create_kits_table.sql"/>
+    <include file="db/changelog/009_create_npcs_table.sql"/>
 
 </databaseChangeLog>
