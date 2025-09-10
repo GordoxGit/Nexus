@@ -11,6 +11,8 @@ import fr.heneria.nexus.game.kit.manager.KitManager;
 import fr.heneria.nexus.game.kit.model.Kit;
 import fr.heneria.nexus.gui.admin.kit.KitEditorGui;
 import fr.heneria.nexus.gui.admin.kit.KitListGui;
+import fr.heneria.nexus.gui.admin.sanction.SanctionListGui;
+import fr.heneria.nexus.db.HikariDataSourceProvider;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
@@ -21,6 +23,10 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 
 /**
  * Gère les conversations de création d'arène pour les administrateurs.
@@ -47,6 +53,7 @@ public class AdminConversationManager {
     private final Map<UUID, GameRuleUpdateConversation> ruleConversations = new ConcurrentHashMap<>();
     private final Map<UUID, KitCreationConversation> kitConversations = new ConcurrentHashMap<>();
     private final Map<UUID, NpcCreationConversation> npcConversations = new ConcurrentHashMap<>();
+    private final Map<UUID, SanctionSearchConversation> sanctionConversations = new ConcurrentHashMap<>();
 
     private AdminConversationManager(ArenaManager arenaManager, ShopManager shopManager, ShopRepository shopRepository, KitManager kitManager, JavaPlugin plugin) {
         this.arenaManager = arenaManager;
@@ -109,6 +116,16 @@ public class AdminConversationManager {
         }
         npcConversations.put(id, new NpcCreationConversation(id, npcManager, reopen));
         admin.sendMessage("Entrez le nom du PNJ (ou 'annuler').");
+    }
+
+    public void startSanctionSearchConversation(Player admin) {
+        UUID id = admin.getUniqueId();
+        if (isInConversation(admin)) {
+            admin.sendMessage("Une conversation est déjà en cours.");
+            return;
+        }
+        sanctionConversations.put(id, new SanctionSearchConversation(id));
+        admin.sendMessage("Entrez le nom du joueur à rechercher (ou 'annuler').");
     }
 
     /**
@@ -205,7 +222,8 @@ public class AdminConversationManager {
         GameRuleUpdateConversation ruleConv = ruleConversations.get(id);
         KitCreationConversation kitConv = kitConversations.get(id);
         NpcCreationConversation npcConv = npcConversations.get(id);
-        if (priceConv == null && ruleConv == null && kitConv == null && npcConv == null) {
+        SanctionSearchConversation sanctionConv = sanctionConversations.get(id);
+        if (priceConv == null && ruleConv == null && kitConv == null && npcConv == null && sanctionConv == null) {
             return;
         }
 
@@ -276,6 +294,41 @@ public class AdminConversationManager {
             return;
         }
 
+        if (sanctionConv != null) {
+            if ("annuler".equalsIgnoreCase(message)) {
+                admin.sendMessage("Recherche annulée.");
+                cancelConversation(admin);
+                return;
+            }
+
+            UUID targetUuid = null;
+            Player target = Bukkit.getPlayerExact(message);
+            if (target != null) {
+                targetUuid = target.getUniqueId();
+            } else {
+                try (Connection connection = HikariDataSourceProvider.getInstance().getDataSource().getConnection();
+                     PreparedStatement stmt = connection.prepareStatement("SELECT player_uuid FROM player_profiles WHERE player_name = ?")) {
+                    stmt.setString(1, message);
+                    try (ResultSet rs = stmt.executeQuery()) {
+                        if (rs.next()) {
+                            targetUuid = UUID.fromString(rs.getString("player_uuid"));
+                        }
+                    }
+                } catch (SQLException e) {
+                    admin.sendMessage("Erreur lors de la recherche du joueur.");
+                }
+            }
+
+            if (targetUuid != null) {
+                cancelConversation(admin);
+                new SanctionListGui(targetUuid, message).open(admin);
+            } else {
+                admin.sendMessage("Joueur introuvable.");
+                cancelConversation(admin);
+            }
+            return;
+        }
+
         if (npcConv != null) {
             if ("annuler".equalsIgnoreCase(message)) {
                 admin.sendMessage("Création de PNJ annulée.");
@@ -306,6 +359,7 @@ public class AdminConversationManager {
         ruleConversations.remove(id);
         kitConversations.remove(id);
         npcConversations.remove(id);
+        sanctionConversations.remove(id);
     }
 
     /**
@@ -313,6 +367,6 @@ public class AdminConversationManager {
      */
     public boolean isInConversation(Player admin) {
         UUID id = admin.getUniqueId();
-        return conversations.containsKey(id) || priceConversations.containsKey(id) || ruleConversations.containsKey(id) || kitConversations.containsKey(id) || npcConversations.containsKey(id);
+        return conversations.containsKey(id) || priceConversations.containsKey(id) || ruleConversations.containsKey(id) || kitConversations.containsKey(id) || npcConversations.containsKey(id) || sanctionConversations.containsKey(id);
     }
 }

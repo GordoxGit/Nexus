@@ -11,6 +11,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.List;
 
 public class SanctionManager {
 
@@ -65,5 +66,9 @@ public class SanctionManager {
 
     public void pardonLastPenalty(UUID playerId) {
         sanctionRepository.deactivateLastSanction(playerId);
+    }
+
+    public List<Sanction> getSanctions(UUID playerId) {
+        return sanctionRepository.findSanctionsByUuid(playerId);
     }
 }
