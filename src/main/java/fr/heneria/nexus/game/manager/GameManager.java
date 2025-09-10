@@ -11,6 +11,7 @@ import fr.heneria.nexus.game.model.MatchType;
 import fr.heneria.nexus.game.model.Team;
 import fr.heneria.nexus.game.repository.MatchRepository;
 import fr.heneria.nexus.game.phase.GamePhase;
+import fr.heneria.nexus.game.phase.IPhase;
 import fr.heneria.nexus.game.phase.PhaseManager;
 import fr.heneria.nexus.gui.player.ShopGui;
 import fr.heneria.nexus.shop.manager.ShopManager;
@@ -367,6 +368,19 @@ public class GameManager {
                 if (p != null) {
                     p.sendMessage(entry.getValue());
                 }
+            }
+        }
+        // Annuler toutes les tâches actives pour ce match
+        if (match.getCountdownTask() != null && !match.getCountdownTask().isCancelled()) {
+            match.getCountdownTask().cancel();
+        }
+        if (match.getShopPhaseTask() != null && !match.getShopPhaseTask().isCancelled()) {
+            match.getShopPhaseTask().cancel();
+        }
+        if (match.getPhaseManager() != null) {
+            IPhase currentPhase = match.getPhaseManager().getPhase(match.getCurrentPhase());
+            if (currentPhase != null) {
+                currentPhase.onEnd(match);
             }
         }
 
