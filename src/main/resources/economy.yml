@@ -1,0 +1,10 @@
+# =============================================
+#  Placeholder économie — sera rempli ultérieurement
+# =============================================
+
+economy:
+  # currency: "NEX"
+  # starting-balance: 1000
+  # taxes:
+  #   enabled: false
+  #   rate: 0.05
