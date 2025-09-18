@@ -1,0 +1,62 @@
+# =============================================
+#  Configuration principale du plugin Nexus
+#  PaperMC 1.21.x — Java 21
+# =============================================
+
+server:
+  # Mode logique de ce serveur (utile pour les environnements multi-nœuds)
+  mode: "nexus"
+  # Langue des messages par défaut (BCP 47)
+  language: "fr"
+  # Fuseau horaire utilisé pour les horodatages et les dumps
+  timezone: "Europe/Paris"
+
+perf:
+  # Taux de rafraîchissement des HUD (5 Hz par défaut => toutes les 4 ticks)
+  hud_hz: 5
+  # Taux de rafraîchissement des scoreboards (3 Hz par défaut)
+  scoreboard_hz: 3
+  # Budget particules pour les effets « doux » (peut être dépassé ponctuellement)
+  particles_soft_cap: 1200
+  # Limite stricte d'émission de particules (les tâches au-delà sont coupées)
+  particles_hard_cap: 2000
+
+threads:
+  # Pool I/O pour la base de données et les accès disque. Pas d'I/O sur le main thread !
+  io_pool: 3
+  # Pool de calcul léger (préparation de données, parsings, etc.)
+  compute_pool: 1
+
+database:
+  # Active ou non la persistance MariaDB. Si désactivé, Nexus fonctionne en mode dégradé.
+  enabled: true
+  # URL JDBC MariaDB. Adapter l'hôte/port/nom de base.
+  jdbc: "jdbc:mariadb://127.0.0.1:3306/nexus"
+  # Identifiants du compte SQL dédié.
+  user: "nexus"
+  password: "change_me"
+  pool:
+    # Taille maximale du pool HikariCP (adapter à la charge attendue).
+    maxSize: 10
+    # Nombre minimal de connexions maintenues au chaud.
+    minIdle: 2
+    # Timeout de connexion en millisecondes (fail-fast conseillé < 5s).
+    connTimeoutMs: 3000
+
+# ================== PLACEHOLDERS ==================
+# Les sections suivantes seront alimentées par les tickets
+# ultérieurs (T-0xx). Elles sont laissées ici pour la lisibilité.
+
+economy:
+  # currency: "NEX"
+  # starting-balance: 1000
+  # taxes:
+  #   enabled: false
+  #   rate: 0.05
+
+maps:
+  # default-map: "vallon"
+  # rotation:
+  #   - "vallon"
+  #   - "caverne"
+  #   - "tournoi"

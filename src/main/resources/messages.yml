@@ -1,0 +1,22 @@
+meta:
+  locale: "fr-FR"
+
+commands:
+  help:
+    header: "<gold>Commandes Nexus disponibles :</gold>"
+    help: "<gray>/nexus help</gray> <dark_gray>-</dark_gray> <yellow>Affiche cette aide.</yellow>"
+    reload: "<gray>/nexus reload</gray> <dark_gray>-</dark_gray> <yellow>Recharge les configurations et messages.</yellow>"
+    dump: "<gray>/nexus dump</gray> <dark_gray>-</dark_gray> <yellow>Affiche l'état courant (threads, DB, scheduler).</yellow>"
+  reload:
+    start: "<yellow>Rechargement en cours...</yellow>"
+    success: "<green>Configuration Nexus rechargée.</green>"
+    failure: "<red>Échec du rechargement, voir console.</red>"
+  dump:
+    header: "<gold>Dump Nexus</gold>"
+    success: "<green>Dump généré.</green>"
+  errors:
+    no-permission: "<red>Vous n'avez pas la permission requise.</red>"
+    invalid-config: "<red>La configuration contient des erreurs :</red>"
+status:
+  database:
+    degraded: "<red>Mode dégradé : persistance indisponible.</red>"

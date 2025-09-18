@@ -1,0 +1,29 @@
+name: Nexus
+version: ${project.version}
+main: com.heneria.nexus.NexusPlugin
+description: Plugin noyau Nexus pour PaperMC.
+authors: [Heneria]
+api-version: '1.21'
+load: POSTWORLD
+commands:
+  nexus:
+    description: Commande principale du plugin Nexus.
+    usage: /<command> help|reload|dump
+    permission: nexus.use
+    aliases: [nx]
+permissions:
+  nexus.use:
+    description: Accéder aux commandes publiques de Nexus.
+    default: true
+  nexus.admin.reload:
+    description: Recharger la configuration Nexus.
+    default: op
+  nexus.admin.dump:
+    description: Afficher un dump d'état Nexus.
+    default: op
+  nexus.admin.*:
+    description: Accès complet aux commandes d'administration Nexus.
+    default: op
+    children:
+      nexus.admin.reload: true
+      nexus.admin.dump: true
