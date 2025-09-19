@@ -1,0 +1,227 @@
+package com.heneria.nexus.service.core;
+
+import com.heneria.nexus.config.NexusConfig;
+import com.heneria.nexus.db.DbProvider;
+import com.heneria.nexus.service.ExecutorPools;
+import com.heneria.nexus.service.api.EconomyException;
+import com.heneria.nexus.service.api.EconomyService;
+import com.heneria.nexus.service.api.EconomyTransaction;
+import com.heneria.nexus.service.api.EconomyTransferResult;
+import com.heneria.nexus.util.NexusLogger;
+import java.time.Instant;
+import java.util.Map;
+import java.util.Objects;
+import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.CompletionStage;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
+
+/**
+ * Default implementation storing balances in memory with write-behind hooks.
+ */
+public final class EconomyServiceImpl implements EconomyService {
+
+    private final NexusLogger logger;
+    private final DbProvider dbProvider;
+    private final ExecutorService ioExecutor;
+    private final ConcurrentHashMap<UUID, BalanceEntry> balances = new ConcurrentHashMap<>();
+    private final AtomicBoolean degraded = new AtomicBoolean();
+    private final AtomicReference<NexusConfig.DegradedModeSettings> degradedSettings = new AtomicReference<>();
+
+    public EconomyServiceImpl(NexusLogger logger, DbProvider dbProvider, ExecutorPools executorPools, NexusConfig config) {
+        this.logger = Objects.requireNonNull(logger, "logger");
+        this.dbProvider = Objects.requireNonNull(dbProvider, "dbProvider");
+        this.ioExecutor = Objects.requireNonNull(executorPools, "executorPools").ioExecutor();
+        this.degradedSettings.set(config.degradedModeSettings());
+    }
+
+    @Override
+    public CompletableFuture<Void> start() {
+        return CompletableFuture.runAsync(this::refreshDegradedState, ioExecutor);
+    }
+
+    @Override
+    public CompletionStage<Long> getBalance(UUID accountId) {
+        Objects.requireNonNull(accountId, "accountId");
+        return CompletableFuture.supplyAsync(() -> {
+            refreshDegradedState();
+            BalanceEntry entry = balances.get(accountId);
+            return entry != null ? entry.balance() : 0L;
+        }, ioExecutor);
+    }
+
+    @Override
+    public CompletionStage<Long> credit(UUID accountId, long amount, String reason) {
+        Objects.requireNonNull(accountId, "accountId");
+        if (amount < 0L) {
+            return CompletableFuture.failedFuture(new EconomyException("Montant négatif"));
+        }
+        return CompletableFuture.supplyAsync(() -> {
+            boolean fallback = refreshDegradedState();
+            BalanceEntry updated = balances.compute(accountId, (id, entry) -> {
+                long current = entry != null ? entry.balance() : 0L;
+                return new BalanceEntry(current + amount, Instant.now());
+            });
+            if (!fallback) {
+                logger.debug(() -> "Écriture async crédit " + amount + " pour " + accountId + " (" + reason + ")");
+            }
+            return updated.balance();
+        }, ioExecutor);
+    }
+
+    @Override
+    public CompletionStage<Long> debit(UUID accountId, long amount, String reason) {
+        Objects.requireNonNull(accountId, "accountId");
+        if (amount < 0L) {
+            return CompletableFuture.failedFuture(new EconomyException("Montant négatif"));
+        }
+        return CompletableFuture.supplyAsync(() -> {
+            boolean fallback = refreshDegradedState();
+            BalanceEntry updated = balances.compute(accountId, (id, entry) -> {
+                long current = entry != null ? entry.balance() : 0L;
+                long next = current - amount;
+                if (next < 0L) {
+                    throw new IllegalStateException("Solde insuffisant");
+                }
+                return new BalanceEntry(next, Instant.now());
+            });
+            if (!fallback) {
+                logger.debug(() -> "Écriture async débit " + amount + " pour " + accountId + " (" + reason + ")");
+            }
+            return updated.balance();
+        }, ioExecutor).exceptionallyCompose(throwable -> {
+            Throwable cause = throwable.getCause() != null ? throwable.getCause() : throwable;
+            if (cause instanceof IllegalStateException) {
+                return CompletableFuture.failedFuture(new EconomyException(cause.getMessage()));
+            }
+            return CompletableFuture.failedFuture(cause);
+        });
+    }
+
+    @Override
+    public CompletionStage<EconomyTransferResult> transfer(UUID from, UUID to, long amount, String reason) {
+        Objects.requireNonNull(from, "from");
+        Objects.requireNonNull(to, "to");
+        if (amount < 0L) {
+            return CompletableFuture.failedFuture(new EconomyException("Montant négatif"));
+        }
+        return CompletableFuture.supplyAsync(() -> {
+            boolean fallback = refreshDegradedState();
+            synchronized (balances) {
+                long fromBalance = balances.getOrDefault(from, new BalanceEntry(0L, Instant.now())).balance();
+                long toBalance = balances.getOrDefault(to, new BalanceEntry(0L, Instant.now())).balance();
+                if (fromBalance < amount) {
+                    throw new IllegalStateException("Solde insuffisant");
+                }
+                fromBalance -= amount;
+                toBalance += amount;
+                balances.put(from, new BalanceEntry(fromBalance, Instant.now()));
+                balances.put(to, new BalanceEntry(toBalance, Instant.now()));
+                if (!fallback) {
+                    logger.debug(() -> "Écriture async transfert " + amount + " de " + from + " vers " + to + " (" + reason + ")");
+                }
+                return new EconomyTransferResult(fromBalance, toBalance);
+            }
+        }, ioExecutor).exceptionallyCompose(throwable -> {
+            Throwable cause = throwable.getCause() != null ? throwable.getCause() : throwable;
+            if (cause instanceof IllegalStateException) {
+                return CompletableFuture.failedFuture(new EconomyException(cause.getMessage()));
+            }
+            return CompletableFuture.failedFuture(cause);
+        });
+    }
+
+    @Override
+    public EconomyTransaction beginTransaction() {
+        return new InMemoryTransaction();
+    }
+
+    @Override
+    public void applyDegradedModeSettings(NexusConfig.DegradedModeSettings settings) {
+        degradedSettings.set(Objects.requireNonNull(settings, "settings"));
+    }
+
+    @Override
+    public boolean isDegraded() {
+        return degraded.get();
+    }
+
+    private boolean refreshDegradedState() {
+        boolean fallback = dbProvider.isDegraded();
+        boolean previous = degraded.getAndSet(fallback);
+        if (fallback && !previous) {
+            NexusConfig.DegradedModeSettings settings = degradedSettings.get();
+            if (settings.banner()) {
+                logger.warn("Mode dégradé activé pour l'EconomyService : stockage en mémoire");
+            }
+        }
+        if (!fallback && previous) {
+            logger.info("EconomyService repassé en mode persistant");
+        }
+        return fallback;
+    }
+
+    private record BalanceEntry(long balance, Instant updatedAt) {
+    }
+
+    private final class InMemoryTransaction implements EconomyTransaction {
+
+        private final Map<UUID, Long> deltas = new ConcurrentHashMap<>();
+        private volatile boolean closed;
+
+        @Override
+        public void credit(UUID account, long amount, String reason) {
+            Objects.requireNonNull(account, "account");
+            if (amount < 0L) {
+                throw new IllegalArgumentException("Montant négatif");
+            }
+            deltas.merge(account, amount, Long::sum);
+        }
+
+        @Override
+        public void debit(UUID account, long amount, String reason) throws EconomyException {
+            Objects.requireNonNull(account, "account");
+            if (amount < 0L) {
+                throw new EconomyException("Montant négatif");
+            }
+            deltas.merge(account, -amount, Long::sum);
+        }
+
+        @Override
+        public CompletionStage<Void> commit() {
+            if (closed) {
+                return CompletableFuture.completedFuture(null);
+            }
+            closed = true;
+            return CompletableFuture.runAsync(() -> {
+                synchronized (balances) {
+                    for (Map.Entry<UUID, Long> entry : deltas.entrySet()) {
+                        UUID account = entry.getKey();
+                        long delta = entry.getValue();
+                        BalanceEntry current = balances.getOrDefault(account, new BalanceEntry(0L, Instant.now()));
+                        long next = current.balance() + delta;
+                        if (next < 0L) {
+                            throw new IllegalStateException("Solde insuffisant pour " + account);
+                        }
+                        balances.put(account, new BalanceEntry(next, Instant.now()));
+                    }
+                }
+            }, ioExecutor).exceptionallyCompose(throwable -> {
+                Throwable cause = throwable.getCause() != null ? throwable.getCause() : throwable;
+                if (cause instanceof IllegalStateException) {
+                    return CompletableFuture.failedFuture(new EconomyException(cause.getMessage()));
+                }
+                return CompletableFuture.failedFuture(cause);
+            });
+        }
+
+        @Override
+        public void rollback() {
+            closed = true;
+            deltas.clear();
+        }
+    }
+}

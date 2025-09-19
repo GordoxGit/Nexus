@@ -50,9 +50,9 @@ public final class RingScheduler implements LifecycleAware {
         profileIntervals.put(TaskProfile.SCOREBOARD, 7L);
     }
 
-    public void applyPerfSettings(NexusConfig.PerfSettings perfSettings) {
-        profileIntervals.put(TaskProfile.HUD, hzToTicks(perfSettings.hudHz()));
-        profileIntervals.put(TaskProfile.SCOREBOARD, hzToTicks(perfSettings.scoreboardHz()));
+    public void applyPerfSettings(NexusConfig.ArenaSettings arenaSettings) {
+        profileIntervals.put(TaskProfile.HUD, hzToTicks(arenaSettings.hudHz()));
+        profileIntervals.put(TaskProfile.SCOREBOARD, hzToTicks(arenaSettings.scoreboardHz()));
         tasks.values().forEach(task -> {
             if (task.id().startsWith("profile-")) {
                 TaskProfile profile = TaskProfile.valueOf(task.id().substring("profile-".length()).toUpperCase());

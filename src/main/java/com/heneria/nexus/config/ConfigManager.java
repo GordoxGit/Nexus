@@ -145,21 +145,30 @@ public final class ConfigManager {
             timezone = ZoneId.of(DEFAULT_TIMEZONE);
         }
 
-        int hudHz = yaml.getInt("perf.hud_hz", 5);
+        int hudHz = yaml.getInt("arena.hud_hz", yaml.getInt("perf.hud_hz", 5));
         if (hudHz <= 0) {
-            errors.add("perf.hud_hz doit être > 0");
+            errors.add("arena.hud_hz doit être > 0");
             hudHz = 5;
         }
-        int scoreboardHz = yaml.getInt("perf.scoreboard_hz", 3);
+        int scoreboardHz = yaml.getInt("arena.scoreboard_hz", yaml.getInt("perf.scoreboard_hz", 3));
         if (scoreboardHz <= 0) {
-            errors.add("perf.scoreboard_hz doit être > 0");
+            errors.add("arena.scoreboard_hz doit être > 0");
             scoreboardHz = 3;
         }
-        int particlesSoft = yaml.getInt("perf.particles_soft_cap", 1200);
-        int particlesHard = yaml.getInt("perf.particles_hard_cap", 2000);
+        int particlesSoft = yaml.getInt("arena.particles.soft_cap", yaml.getInt("perf.particles_soft_cap", 1200));
+        int particlesHard = yaml.getInt("arena.particles.hard_cap", yaml.getInt("perf.particles_hard_cap", 2000));
         if (particlesHard < particlesSoft) {
-            errors.add("perf.particles_hard_cap doit être >= perf.particles_soft_cap");
+            errors.add("arena.particles.hard_cap doit être >= arena.particles.soft_cap");
             particlesHard = particlesSoft;
+        }
+        int maxEntities = yaml.getInt("arena.budget.max_entities", 200);
+        int maxItems = yaml.getInt("arena.budget.max_items", 128);
+        int maxProjectiles = yaml.getInt("arena.budget.max_projectiles", 64);
+        if (maxEntities < 0 || maxItems < 0 || maxProjectiles < 0) {
+            errors.add("arena.budget doit contenir des valeurs >= 0");
+            maxEntities = Math.max(0, maxEntities);
+            maxItems = Math.max(0, maxItems);
+            maxProjectiles = Math.max(0, maxProjectiles);
         }
 
         int ioPool = yaml.getInt("threads.io_pool", 3);
@@ -204,14 +213,39 @@ public final class ConfigManager {
             timeoutMs = 3000L;
         }
 
-        NexusConfig.PerfSettings perfSettings;
+        boolean exposeServices = yaml.getBoolean("services.expose-bukkit-services", false);
+        long startTimeoutMs = yaml.getLong("timeouts.startMs", 5000L);
+        if (startTimeoutMs <= 0L) {
+            errors.add("timeouts.startMs doit être > 0");
+            startTimeoutMs = 5000L;
+        }
+        long stopTimeoutMs = yaml.getLong("timeouts.stopMs", 3000L);
+        if (stopTimeoutMs <= 0L) {
+            errors.add("timeouts.stopMs doit être > 0");
+            stopTimeoutMs = 3000L;
+        }
+        boolean degradedEnabled = yaml.getBoolean("degraded-mode.enabled", true);
+        boolean degradedBanner = yaml.getBoolean("degraded-mode.banner", true);
+        int queueTick = yaml.getInt("queue.tick_hz", 5);
+        if (queueTick <= 0) {
+            errors.add("queue.tick_hz doit être > 0");
+            queueTick = 5;
+        }
+        int vipWeight = yaml.getInt("queue.vip_weight", 0);
+        if (vipWeight < 0) {
+            errors.add("queue.vip_weight doit être >= 0");
+            vipWeight = 0;
+        }
+
+        NexusConfig.ArenaSettings arenaSettings;
         NexusConfig.ThreadSettings threadSettings;
         NexusConfig.PoolSettings poolSettings;
         try {
-            perfSettings = new NexusConfig.PerfSettings(hudHz, scoreboardHz, particlesSoft, particlesHard);
+            arenaSettings = new NexusConfig.ArenaSettings(hudHz, scoreboardHz, particlesSoft, particlesHard,
+                    maxEntities, maxItems, maxProjectiles);
         } catch (IllegalArgumentException exception) {
-            errors.add("perf: " + exception.getMessage());
-            perfSettings = new NexusConfig.PerfSettings(5, 3, particlesSoft, particlesHard);
+            errors.add("arena: " + exception.getMessage());
+            arenaSettings = new NexusConfig.ArenaSettings(5, 3, particlesSoft, particlesHard, maxEntities, maxItems, maxProjectiles);
         }
         try {
             threadSettings = new NexusConfig.ThreadSettings(ioPool, computePool);
@@ -227,8 +261,13 @@ public final class ConfigManager {
         }
         NexusConfig.DatabaseSettings databaseSettings =
                 new NexusConfig.DatabaseSettings(dbEnabled, jdbcUrl, username, password, poolSettings);
+        NexusConfig.ServiceSettings serviceSettings = new NexusConfig.ServiceSettings(exposeServices);
+        NexusConfig.TimeoutSettings timeoutSettings = new NexusConfig.TimeoutSettings(startTimeoutMs, stopTimeoutMs);
+        NexusConfig.DegradedModeSettings degradedModeSettings = new NexusConfig.DegradedModeSettings(degradedEnabled, degradedBanner);
+        NexusConfig.QueueSettings queueSettings = new NexusConfig.QueueSettings(queueTick, vipWeight);
 
-        return new NexusConfig(serverMode, language, timezone, perfSettings, threadSettings, databaseSettings);
+        return new NexusConfig(serverMode, language, timezone, arenaSettings, threadSettings, databaseSettings,
+                serviceSettings, timeoutSettings, degradedModeSettings, queueSettings);
     }
 
     private MessageBundle parseMessages(FileConfiguration yaml, Locale locale, List<String> errors) {
