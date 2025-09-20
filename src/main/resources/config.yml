@@ -53,3 +53,28 @@ degraded-mode:
 queue:
   tick_hz: 5
   vip_weight: 1
+
+ui:
+  minimessage:
+    strict: true
+  title:
+    times:
+      short:
+        fadeIn: 5
+        stay: 40
+        fadeOut: 10
+      normal:
+        fadeIn: 10
+        stay: 60
+        fadeOut: 20
+      long:
+        fadeIn: 20
+        stay: 100
+        fadeOut: 40
+  bossbar:
+    defaults:
+      color: PURPLE
+      overlay: NOTCHED_20
+      flags:
+        - DARKEN_SCREEN
+      updateEveryTicks: 10

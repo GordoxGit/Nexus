@@ -3,12 +3,16 @@ package com.heneria.nexus.config;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.util.ArrayList;
+import java.util.EnumSet;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import net.kyori.adventure.bossbar.BossBar;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.minimessage.MiniMessage;
 import org.bukkit.configuration.ConfigurationSection;
@@ -83,6 +87,56 @@ public final class ConfigValidator {
         boolean degradedBanner = yaml.getBoolean("degraded-mode.banner", true);
         int queueHz = positiveInt(yaml, "queue.tick_hz", 5, issues, true);
         int queueVip = nonNegativeInt(yaml, "queue.vip_weight", 0, issues);
+        boolean strictMiniMessage = yaml.getBoolean("ui.minimessage.strict", true);
+
+        Map<String, CoreConfig.TitleTimesProfile> titleProfiles = new LinkedHashMap<>();
+        ConfigurationSection timesSection = yaml.getConfigurationSection("ui.title.times");
+        if (timesSection != null) {
+            for (String key : timesSection.getKeys(false)) {
+                ConfigurationSection profileSection = timesSection.getConfigurationSection(key);
+                if (profileSection == null) {
+                    issues.error("ui.title.times." + key, "Profil de titre invalide");
+                    continue;
+                }
+                String basePath = "ui.title.times." + key;
+                int fadeIn = readNonNegative(profileSection, "fadeIn", basePath + ".fadeIn", 5, issues);
+                int stay = readPositive(profileSection, "stay", basePath + ".stay", 40, issues);
+                int fadeOut = readNonNegative(profileSection, "fadeOut", basePath + ".fadeOut", 10, issues);
+                try {
+                    titleProfiles.put(key, new CoreConfig.TitleTimesProfile(fadeIn, stay, fadeOut));
+                } catch (IllegalArgumentException exception) {
+                    issues.error(basePath, exception.getMessage());
+                }
+            }
+        }
+        if (titleProfiles.isEmpty()) {
+            issues.warn("ui.title.times", "Aucun profil valide, utilisation des valeurs par défaut");
+            titleProfiles.put("short", new CoreConfig.TitleTimesProfile(5, 40, 10));
+            titleProfiles.put("normal", new CoreConfig.TitleTimesProfile(10, 60, 20));
+            titleProfiles.put("long", new CoreConfig.TitleTimesProfile(20, 100, 40));
+        }
+
+        ConfigurationSection bossBarSection = yaml.getConfigurationSection("ui.bossbar.defaults");
+        CoreConfig.BossBarDefaults bossBarDefaults;
+        if (bossBarSection != null) {
+            String colorRaw = readString(bossBarSection, "color", "PURPLE", "ui.bossbar.defaults.color", issues);
+            String overlayRaw = readString(bossBarSection, "overlay", "NOTCHED_20", "ui.bossbar.defaults.overlay", issues);
+            BossBar.Color color = parseBossBarColor(colorRaw, "ui.bossbar.defaults.color", issues);
+            BossBar.Overlay overlay = parseBossBarOverlay(overlayRaw, "ui.bossbar.defaults.overlay", issues);
+            int updateEveryTicks = readPositive(bossBarSection, "updateEveryTicks", "ui.bossbar.defaults.updateEveryTicks", 10, issues);
+            Set<BossBar.Flag> flags = parseBossBarFlags(bossBarSection, "ui.bossbar.defaults.flags", issues);
+            try {
+                bossBarDefaults = new CoreConfig.BossBarDefaults(color, overlay, flags, updateEveryTicks);
+            } catch (IllegalArgumentException exception) {
+                issues.error("ui.bossbar.defaults", exception.getMessage());
+                bossBarDefaults = new CoreConfig.BossBarDefaults(BossBar.Color.PURPLE, BossBar.Overlay.NOTCHED_20, Set.of(), 10);
+            }
+        } else {
+            issues.warn("ui.bossbar.defaults", "Section manquante, utilisation des valeurs par défaut");
+            bossBarDefaults = new CoreConfig.BossBarDefaults(BossBar.Color.PURPLE, BossBar.Overlay.NOTCHED_20, Set.of(), 10);
+        }
+
+        CoreConfig.UiSettings uiSettings = new CoreConfig.UiSettings(strictMiniMessage, titleProfiles, bossBarDefaults);
 
         CoreConfig.ArenaSettings arenaSettings;
         CoreConfig.ExecutorSettings executorSettings;
@@ -152,7 +206,7 @@ public final class ConfigValidator {
         }
 
         return new CoreConfig(mode, locale, zone, arenaSettings, executorSettings, databaseSettings,
-                serviceSettings, timeoutSettings, degradedModeSettings, queueSettings);
+                serviceSettings, timeoutSettings, degradedModeSettings, queueSettings, uiSettings);
     }
 
     public MessageBundle validateMessages(YamlConfiguration yaml, IssueCollector issues) {
@@ -432,6 +486,97 @@ public final class ConfigValidator {
             return Math.max(0, value);
         }
         return value;
+    }
+
+    private int readNonNegative(ConfigurationSection section, String key, String path, int def, IssueCollector issues) {
+        if (!section.isSet(key)) {
+            issues.warn(path, "Valeur manquante, utilisation de " + def);
+            return def;
+        }
+        int value = section.getInt(key, def);
+        if (value < 0) {
+            issues.error(path, "Doit être >= 0");
+            return Math.max(0, value);
+        }
+        return value;
+    }
+
+    private int readPositive(ConfigurationSection section, String key, String path, int def, IssueCollector issues) {
+        if (!section.isSet(key)) {
+            issues.warn(path, "Valeur manquante, utilisation de " + def);
+            return def;
+        }
+        int value = section.getInt(key, def);
+        if (value <= 0) {
+            issues.error(path, "Doit être > 0");
+            return Math.max(1, value);
+        }
+        return value;
+    }
+
+    private String readString(ConfigurationSection section, String key, String def, String path, IssueCollector issues) {
+        if (!section.isSet(key)) {
+            issues.warn(path, "Valeur manquante, utilisation de " + def);
+            return def;
+        }
+        String value = section.getString(key);
+        if (value == null || value.isBlank()) {
+            issues.warn(path, "Valeur vide, utilisation de " + def);
+            return def;
+        }
+        return value;
+    }
+
+    private BossBar.Color parseBossBarColor(String raw, String path, IssueCollector issues) {
+        if (raw == null || raw.isBlank()) {
+            issues.warn(path, "Valeur manquante, utilisation de PURPLE");
+            return BossBar.Color.PURPLE;
+        }
+        try {
+            return BossBar.Color.valueOf(raw.trim().toUpperCase(Locale.ROOT));
+        } catch (IllegalArgumentException exception) {
+            issues.error(path, "Couleur invalide: " + raw);
+            return BossBar.Color.PURPLE;
+        }
+    }
+
+    private BossBar.Overlay parseBossBarOverlay(String raw, String path, IssueCollector issues) {
+        if (raw == null || raw.isBlank()) {
+            issues.warn(path, "Valeur manquante, utilisation de NOTCHED_20");
+            return BossBar.Overlay.NOTCHED_20;
+        }
+        try {
+            return BossBar.Overlay.valueOf(raw.trim().toUpperCase(Locale.ROOT));
+        } catch (IllegalArgumentException exception) {
+            issues.error(path, "Overlay invalide: " + raw);
+            return BossBar.Overlay.NOTCHED_20;
+        }
+    }
+
+    private Set<BossBar.Flag> parseBossBarFlags(ConfigurationSection section, String path, IssueCollector issues) {
+        if (!section.isList("flags")) {
+            return Set.of();
+        }
+        List<String> entries = section.getStringList("flags");
+        if (entries.isEmpty()) {
+            return Set.of();
+        }
+        EnumSet<BossBar.Flag> flags = EnumSet.noneOf(BossBar.Flag.class);
+        int index = 0;
+        for (String entry : entries) {
+            if (entry == null || entry.isBlank()) {
+                index++;
+                continue;
+            }
+            String normalized = entry.trim().toUpperCase(Locale.ROOT);
+            try {
+                flags.add(BossBar.Flag.valueOf(normalized));
+            } catch (IllegalArgumentException exception) {
+                issues.warn(path + "[" + index + "]", "Flag inconnu: " + entry);
+            }
+            index++;
+        }
+        return Set.copyOf(flags);
     }
 
     private int parseInt(Object value, int def) {
