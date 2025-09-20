@@ -2,7 +2,7 @@ package com.heneria.nexus.service.core;
 
 import com.heneria.nexus.config.NexusConfig;
 import com.heneria.nexus.db.DbProvider;
-import com.heneria.nexus.service.ExecutorPools;
+import com.heneria.nexus.concurrent.ExecutorManager;
 import com.heneria.nexus.service.api.EconomyException;
 import com.heneria.nexus.service.api.EconomyService;
 import com.heneria.nexus.service.api.EconomyTransaction;
@@ -14,7 +14,6 @@ import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
@@ -26,31 +25,31 @@ public final class EconomyServiceImpl implements EconomyService {
 
     private final NexusLogger logger;
     private final DbProvider dbProvider;
-    private final ExecutorService ioExecutor;
+    private final ExecutorManager executorManager;
     private final ConcurrentHashMap<UUID, BalanceEntry> balances = new ConcurrentHashMap<>();
     private final AtomicBoolean degraded = new AtomicBoolean();
     private final AtomicReference<NexusConfig.DegradedModeSettings> degradedSettings = new AtomicReference<>();
 
-    public EconomyServiceImpl(NexusLogger logger, DbProvider dbProvider, ExecutorPools executorPools, NexusConfig config) {
+    public EconomyServiceImpl(NexusLogger logger, DbProvider dbProvider, ExecutorManager executorManager, NexusConfig config) {
         this.logger = Objects.requireNonNull(logger, "logger");
         this.dbProvider = Objects.requireNonNull(dbProvider, "dbProvider");
-        this.ioExecutor = Objects.requireNonNull(executorPools, "executorPools").ioExecutor();
+        this.executorManager = Objects.requireNonNull(executorManager, "executorManager");
         this.degradedSettings.set(config.degradedModeSettings());
     }
 
     @Override
     public CompletableFuture<Void> start() {
-        return CompletableFuture.runAsync(this::refreshDegradedState, ioExecutor);
+        return executorManager.runIo(() -> refreshDegradedState());
     }
 
     @Override
     public CompletionStage<Long> getBalance(UUID accountId) {
         Objects.requireNonNull(accountId, "accountId");
-        return CompletableFuture.supplyAsync(() -> {
+        return executorManager.supplyIo(() -> {
             refreshDegradedState();
             BalanceEntry entry = balances.get(accountId);
             return entry != null ? entry.balance() : 0L;
-        }, ioExecutor);
+        });
     }
 
     @Override
@@ -59,7 +58,7 @@ public final class EconomyServiceImpl implements EconomyService {
         if (amount < 0L) {
             return CompletableFuture.failedFuture(new EconomyException("Montant négatif"));
         }
-        return CompletableFuture.supplyAsync(() -> {
+        return executorManager.supplyIo(() -> {
             boolean fallback = refreshDegradedState();
             BalanceEntry updated = balances.compute(accountId, (id, entry) -> {
                 long current = entry != null ? entry.balance() : 0L;
@@ -69,7 +68,7 @@ public final class EconomyServiceImpl implements EconomyService {
                 logger.debug(() -> "Écriture async crédit " + amount + " pour " + accountId + " (" + reason + ")");
             }
             return updated.balance();
-        }, ioExecutor);
+        });
     }
 
     @Override
@@ -78,7 +77,7 @@ public final class EconomyServiceImpl implements EconomyService {
         if (amount < 0L) {
             return CompletableFuture.failedFuture(new EconomyException("Montant négatif"));
         }
-        return CompletableFuture.supplyAsync(() -> {
+        return executorManager.supplyIo(() -> {
             boolean fallback = refreshDegradedState();
             BalanceEntry updated = balances.compute(accountId, (id, entry) -> {
                 long current = entry != null ? entry.balance() : 0L;
@@ -92,7 +91,7 @@ public final class EconomyServiceImpl implements EconomyService {
                 logger.debug(() -> "Écriture async débit " + amount + " pour " + accountId + " (" + reason + ")");
             }
             return updated.balance();
-        }, ioExecutor).exceptionallyCompose(throwable -> {
+        }).exceptionallyCompose(throwable -> {
             Throwable cause = throwable.getCause() != null ? throwable.getCause() : throwable;
             if (cause instanceof IllegalStateException) {
                 return CompletableFuture.failedFuture(new EconomyException(cause.getMessage()));
@@ -108,7 +107,7 @@ public final class EconomyServiceImpl implements EconomyService {
         if (amount < 0L) {
             return CompletableFuture.failedFuture(new EconomyException("Montant négatif"));
         }
-        return CompletableFuture.supplyAsync(() -> {
+        return executorManager.supplyIo(() -> {
             boolean fallback = refreshDegradedState();
             synchronized (balances) {
                 long fromBalance = balances.getOrDefault(from, new BalanceEntry(0L, Instant.now())).balance();
@@ -125,7 +124,7 @@ public final class EconomyServiceImpl implements EconomyService {
                 }
                 return new EconomyTransferResult(fromBalance, toBalance);
             }
-        }, ioExecutor).exceptionallyCompose(throwable -> {
+        }).exceptionallyCompose(throwable -> {
             Throwable cause = throwable.getCause() != null ? throwable.getCause() : throwable;
             if (cause instanceof IllegalStateException) {
                 return CompletableFuture.failedFuture(new EconomyException(cause.getMessage()));
@@ -196,7 +195,7 @@ public final class EconomyServiceImpl implements EconomyService {
                 return CompletableFuture.completedFuture(null);
             }
             closed = true;
-            return CompletableFuture.runAsync(() -> {
+            return executorManager.runIo(() -> {
                 synchronized (balances) {
                     for (Map.Entry<UUID, Long> entry : deltas.entrySet()) {
                         UUID account = entry.getKey();
@@ -209,7 +208,7 @@ public final class EconomyServiceImpl implements EconomyService {
                         balances.put(account, new BalanceEntry(next, Instant.now()));
                     }
                 }
-            }, ioExecutor).exceptionallyCompose(throwable -> {
+            }).exceptionallyCompose(throwable -> {
                 Throwable cause = throwable.getCause() != null ? throwable.getCause() : throwable;
                 if (cause instanceof IllegalStateException) {
                     return CompletableFuture.failedFuture(new EconomyException(cause.getMessage()));

@@ -1,6 +1,6 @@
 package com.heneria.nexus.service.core;
 
-import com.heneria.nexus.service.ExecutorPools;
+import com.heneria.nexus.concurrent.ExecutorManager;
 import com.heneria.nexus.service.api.MapDefinition;
 import com.heneria.nexus.service.api.MapLoadException;
 import com.heneria.nexus.service.api.MapQuery;
@@ -20,7 +20,6 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 import org.bukkit.configuration.ConfigurationSection;
@@ -35,25 +34,25 @@ public final class MapServiceImpl implements MapService {
 
     private final JavaPlugin plugin;
     private final NexusLogger logger;
-    private final ExecutorService computeExecutor;
+    private final ExecutorManager executorManager;
     private final AtomicReference<Map<String, MapDefinition>> catalog = new AtomicReference<>(Map.of());
     private final AtomicReference<ValidationReport> lastValidation = new AtomicReference<>();
 
-    public MapServiceImpl(JavaPlugin plugin, NexusLogger logger, ExecutorPools executorPools) {
+    public MapServiceImpl(JavaPlugin plugin, NexusLogger logger, ExecutorManager executorManager) {
         this.plugin = Objects.requireNonNull(plugin, "plugin");
         this.logger = Objects.requireNonNull(logger, "logger");
-        this.computeExecutor = Objects.requireNonNull(executorPools, "executorPools").computeExecutor();
+        this.executorManager = Objects.requireNonNull(executorManager, "executorManager");
     }
 
     @Override
     public CompletableFuture<Void> initialize() {
-        return CompletableFuture.runAsync(() -> {
+        return executorManager.runCompute(() -> {
             try {
                 loadCatalog();
             } catch (MapLoadException exception) {
                 throw new RuntimeException(exception);
             }
-        }, computeExecutor);
+        });
     }
 
     @Override

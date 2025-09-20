@@ -51,11 +51,25 @@ arena:
     # Nombre maximum de projectiles simultanés
     max_projectiles: 64
 
-threads:
-  # Pool I/O pour la base de données et les accès disque. Pas d'I/O sur le main thread !
-  io_pool: 3
-  # Pool de calcul léger (préparation de données, parsings, etc.)
-  compute_pool: 1
+executors:
+  io:
+    # Active les threads virtuels (Java 21+) pour les tâches fortement bloquantes.
+    virtual: false
+    # Taille maximale du pool I/O si les threads virtuels sont désactivés.
+    maxThreads: 12
+    # Temps d'inactivité avant recyclage des threads I/O (ms).
+    keepAliveMs: 30000
+  compute:
+    # Taille du pool CPU-bound (matchmaking, validations). Conseillé: max(2, min(cœurs, 4)).
+    size: 4
+  shutdown:
+    # Délai d'attente (secondes) pour terminer les tâches en cours lors du /stop.
+    awaitSeconds: 5
+    # Délai supplémentaire avant annulation forcée.
+    forceCancelSeconds: 3
+  scheduler:
+    # Intervalle de drainage des callbacks main thread (ticks).
+    main_check_interval_ticks: 1
 
 database:
   # Active ou non la persistance MariaDB. Si désactivé, Nexus fonctionne en mode dégradé.

@@ -8,7 +8,7 @@ import com.heneria.nexus.db.DbProvider;
 import com.heneria.nexus.scheduler.GamePhase;
 import com.heneria.nexus.scheduler.RingScheduler;
 import com.heneria.nexus.scheduler.RingScheduler.TaskProfile;
-import com.heneria.nexus.service.ExecutorPools;
+import com.heneria.nexus.concurrent.ExecutorManager;
 import com.heneria.nexus.service.ServiceRegistry;
 import com.heneria.nexus.service.api.ArenaService;
 import com.heneria.nexus.service.api.EconomyService;
@@ -28,8 +28,7 @@ import java.util.EnumSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.CompletionStage;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.command.CommandSender;
@@ -50,7 +49,7 @@ public final class NexusPlugin extends JavaPlugin {
     private ConfigBundle bundle;
     private MessageFacade messageFacade;
     private ServiceRegistry serviceRegistry;
-    private ExecutorPools executorPools;
+    private ExecutorManager executorManager;
     private RingScheduler ringScheduler;
     private DbProvider dbProvider;
     private boolean bootstrapFailed;
@@ -68,7 +67,7 @@ public final class NexusPlugin extends JavaPlugin {
         }
         this.bundle = loadResult.bundle();
         this.messageFacade = new MessageFacade(bundle.messages(), logger);
-        this.executorPools = new ExecutorPools(logger, bundle.config().threadSettings());
+        this.executorManager = new ExecutorManager(this, logger, bundle.config().executorSettings());
         this.serviceRegistry = new ServiceRegistry(logger);
         registerSingletons();
         registerServices();
@@ -121,20 +120,28 @@ public final class NexusPlugin extends JavaPlugin {
         if (serviceRegistry != null) {
             serviceRegistry.stopAll(Duration.ofMillis(bundle != null ? bundle.config().timeoutSettings().stopMs() : 3000L));
         }
-        if (executorPools != null) {
-            executorPools.close();
+        if (executorManager != null) {
+            long await = bundle != null ? bundle.config().executorSettings().shutdown().awaitSeconds() : 5L;
+            long force = bundle != null ? bundle.config().executorSettings().shutdown().forceCancelSeconds() : 3L;
+            executorManager.shutdownGracefully(Duration.ofSeconds(await + force));
         }
         logger.info("Nexus désactivé proprement");
     }
 
     private void configureDatabase(NexusConfig.DatabaseSettings settings) {
-        ExecutorService ioExecutor = executorPools.ioExecutor();
-        CompletableFuture<Boolean> future = dbProvider.applyConfiguration(settings, ioExecutor);
+        CompletionStage<Boolean> future = executorManager.withTimeout(
+                dbProvider.applyConfiguration(settings, executorManager.io()),
+                Duration.ofMillis(bundle.config().timeoutSettings().startMs()));
         try {
-            boolean success = future.orTimeout(bundle.config().timeoutSettings().startMs(), TimeUnit.MILLISECONDS).join();
-            if (!success && bundle.config().degradedModeSettings().enabled()) {
-                logger.warn("Mode dégradé activé : MariaDB indisponible");
-            }
+            future.whenComplete((success, throwable) -> {
+                if (throwable != null) {
+                    logger.warn("Configuration MariaDB impossible", throwable);
+                    return;
+                }
+                if (!success && bundle.config().degradedModeSettings().enabled()) {
+                    logger.warn("Mode dégradé activé : MariaDB indisponible");
+                }
+            }).toCompletableFuture().join();
         } catch (Exception exception) {
             logger.warn("Configuration MariaDB impossible", exception);
         }
@@ -156,9 +163,11 @@ public final class NexusPlugin extends JavaPlugin {
                 bundle.config().arenaSettings().hudHz(),
                 bundle.config().arenaSettings().scoreboardHz()));
         logger.info("Matchmaking: %d Hz".formatted(bundle.config().queueSettings().tickHz()));
-        logger.info("Threads: io=%d compute=%d".formatted(
-                bundle.config().threadSettings().ioPool(),
-                bundle.config().threadSettings().computePool()));
+        NexusConfig.ExecutorSettings executorSettings = bundle.config().executorSettings();
+        String ioMode = executorSettings.io().virtual()
+                ? "threads virtuels"
+                : "%d threads".formatted(executorSettings.io().maxThreads());
+        logger.info("Exécuteurs: IO=%s, compute=%d".formatted(ioMode, executorSettings.compute().size()));
     }
 
     public void sendHelp(CommandSender sender) {
@@ -197,7 +206,7 @@ public final class NexusPlugin extends JavaPlugin {
     }
 
     private synchronized void applyBundle(ConfigBundle newBundle) {
-        executorPools.reconfigure(newBundle.config().threadSettings());
+        executorManager.reconfigure(newBundle.config().executorSettings());
         ringScheduler.applyPerfSettings(newBundle.config().arenaSettings());
         messageFacade.update(newBundle.messages());
         this.bundle = newBundle;
@@ -223,7 +232,7 @@ public final class NexusPlugin extends JavaPlugin {
             return;
         }
         messageFacade.send(sender, "commands.dump.header");
-        List<Component> lines = DumpUtil.createDump(getServer(), bundle, executorPools, ringScheduler, dbProvider, serviceRegistry);
+        List<Component> lines = DumpUtil.createDump(getServer(), bundle, executorManager, ringScheduler, dbProvider, serviceRegistry);
         lines.forEach(sender::sendMessage);
         messageFacade.send(sender, "commands.dump.success");
     }
@@ -243,7 +252,7 @@ public final class NexusPlugin extends JavaPlugin {
         serviceRegistry.registerSingleton(ConfigManager.class, configManager);
         serviceRegistry.registerSingleton(ConfigBundle.class, bundle);
         serviceRegistry.registerSingleton(NexusConfig.class, bundle.config());
-        serviceRegistry.registerSingleton(ExecutorPools.class, executorPools);
+        serviceRegistry.registerSingleton(ExecutorManager.class, executorManager);
     }
 
     private void registerServices() {

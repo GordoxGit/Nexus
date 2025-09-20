@@ -1,7 +1,7 @@
 package com.heneria.nexus.service.core;
 
 import com.heneria.nexus.config.NexusConfig;
-import com.heneria.nexus.service.ExecutorPools;
+import com.heneria.nexus.concurrent.ExecutorManager;
 import com.heneria.nexus.service.api.ArenaMode;
 import com.heneria.nexus.service.api.MatchPlan;
 import com.heneria.nexus.service.api.QueueOptions;
@@ -25,7 +25,6 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import org.bukkit.scheduler.BukkitTask;
@@ -38,7 +37,7 @@ public final class QueueServiceImpl implements QueueService {
 
     private final JavaPlugin plugin;
     private final NexusLogger logger;
-    private final ExecutorService computeExecutor;
+    private final ExecutorManager executorManager;
     private final ProfileService profileService;
     private final Map<ArenaMode, ConcurrentLinkedQueue<QueueTicket>> queues = new EnumMap<>(ArenaMode.class);
     private final ConcurrentHashMap<UUID, QueueTicket> ticketsByPlayer = new ConcurrentHashMap<>();
@@ -49,12 +48,12 @@ public final class QueueServiceImpl implements QueueService {
 
     public QueueServiceImpl(JavaPlugin plugin,
                             NexusLogger logger,
-                            ExecutorPools executorPools,
+                            ExecutorManager executorManager,
                             ProfileService profileService,
                             NexusConfig config) {
         this.plugin = Objects.requireNonNull(plugin, "plugin");
         this.logger = Objects.requireNonNull(logger, "logger");
-        this.computeExecutor = Objects.requireNonNull(executorPools, "executorPools").computeExecutor();
+        this.executorManager = Objects.requireNonNull(executorManager, "executorManager");
         this.profileService = Objects.requireNonNull(profileService, "profileService");
         this.settingsRef = new AtomicReference<>(config.queueSettings());
         for (ArenaMode mode : ArenaMode.values()) {
@@ -64,14 +63,14 @@ public final class QueueServiceImpl implements QueueService {
 
     @Override
     public CompletableFuture<Void> start() {
-        return CompletableFuture.runAsync(this::scheduleTicker, computeExecutor);
+        return executorManager.runCompute(this::scheduleTicker);
     }
 
     private void scheduleTicker() {
         cancelTicker();
         long period = Math.max(1L, Math.round(20.0d / Math.max(1, settingsRef.get().tickHz())));
         tickerTask = plugin.getServer().getScheduler().runTaskTimerAsynchronously(plugin, () ->
-                computeExecutor.execute(this::matchAllModes), period, period);
+                executorManager.compute().execute(this::matchAllModes), period, period);
         logger.info("QueueService démarré (période=" + period + " ticks)");
     }
 
@@ -91,7 +90,7 @@ public final class QueueServiceImpl implements QueueService {
 
     @Override
     public CompletableFuture<Void> stop() {
-        return CompletableFuture.runAsync(this::cancelTicker, computeExecutor);
+        return executorManager.runCompute(this::cancelTicker);
     }
 
     @Override
