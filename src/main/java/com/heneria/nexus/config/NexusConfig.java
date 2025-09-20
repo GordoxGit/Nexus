@@ -13,7 +13,7 @@ public final class NexusConfig {
     private final Locale language;
     private final ZoneId timezone;
     private final ArenaSettings arenaSettings;
-    private final ThreadSettings threadSettings;
+    private final ExecutorSettings executorSettings;
     private final DatabaseSettings databaseSettings;
     private final ServiceSettings serviceSettings;
     private final TimeoutSettings timeoutSettings;
@@ -24,7 +24,7 @@ public final class NexusConfig {
                        Locale language,
                        ZoneId timezone,
                        ArenaSettings arenaSettings,
-                       ThreadSettings threadSettings,
+                       ExecutorSettings executorSettings,
                        DatabaseSettings databaseSettings,
                        ServiceSettings serviceSettings,
                        TimeoutSettings timeoutSettings,
@@ -34,7 +34,7 @@ public final class NexusConfig {
         this.language = Objects.requireNonNull(language, "language");
         this.timezone = Objects.requireNonNull(timezone, "timezone");
         this.arenaSettings = Objects.requireNonNull(arenaSettings, "arenaSettings");
-        this.threadSettings = Objects.requireNonNull(threadSettings, "threadSettings");
+        this.executorSettings = Objects.requireNonNull(executorSettings, "executorSettings");
         this.databaseSettings = Objects.requireNonNull(databaseSettings, "databaseSettings");
         this.serviceSettings = Objects.requireNonNull(serviceSettings, "serviceSettings");
         this.timeoutSettings = Objects.requireNonNull(timeoutSettings, "timeoutSettings");
@@ -58,8 +58,8 @@ public final class NexusConfig {
         return arenaSettings;
     }
 
-    public ThreadSettings threadSettings() {
-        return threadSettings;
+    public ExecutorSettings executorSettings() {
+        return executorSettings;
     }
 
     public DatabaseSettings databaseSettings() {
@@ -103,13 +103,52 @@ public final class NexusConfig {
         }
     }
 
-    public record ThreadSettings(int ioPool, int computePool) {
-        public ThreadSettings {
-            if (ioPool <= 0) {
-                throw new IllegalArgumentException("ioPool must be positive");
+    public record ExecutorSettings(IoSettings io,
+                                   ComputeSettings compute,
+                                   ShutdownSettings shutdown,
+                                   SchedulerSettings scheduler) {
+        public ExecutorSettings {
+            Objects.requireNonNull(io, "io");
+            Objects.requireNonNull(compute, "compute");
+            Objects.requireNonNull(shutdown, "shutdown");
+            Objects.requireNonNull(scheduler, "scheduler");
+        }
+
+        public record IoSettings(boolean virtual, int maxThreads, long keepAliveMs) {
+            public IoSettings {
+                if (maxThreads <= 0) {
+                    throw new IllegalArgumentException("maxThreads must be positive");
+                }
+                if (keepAliveMs < 0L) {
+                    throw new IllegalArgumentException("keepAliveMs must be >= 0");
+                }
             }
-            if (computePool <= 0) {
-                throw new IllegalArgumentException("computePool must be positive");
+        }
+
+        public record ComputeSettings(int size) {
+            public ComputeSettings {
+                if (size <= 0) {
+                    throw new IllegalArgumentException("size must be positive");
+                }
+            }
+        }
+
+        public record ShutdownSettings(long awaitSeconds, long forceCancelSeconds) {
+            public ShutdownSettings {
+                if (awaitSeconds < 0L) {
+                    throw new IllegalArgumentException("awaitSeconds must be >= 0");
+                }
+                if (forceCancelSeconds < 0L) {
+                    throw new IllegalArgumentException("forceCancelSeconds must be >= 0");
+                }
+            }
+        }
+
+        public record SchedulerSettings(int mainCheckIntervalTicks) {
+            public SchedulerSettings {
+                if (mainCheckIntervalTicks <= 0) {
+                    throw new IllegalArgumentException("mainCheckIntervalTicks must be > 0");
+                }
             }
         }
     }

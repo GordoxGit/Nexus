@@ -171,15 +171,38 @@ public final class ConfigManager {
             maxProjectiles = Math.max(0, maxProjectiles);
         }
 
-        int ioPool = yaml.getInt("threads.io_pool", 3);
-        if (ioPool <= 0) {
-            errors.add("threads.io_pool doit être > 0");
-            ioPool = 1;
+        boolean ioVirtual = yaml.getBoolean("executors.io.virtual", false);
+        int ioMaxThreads = yaml.getInt("executors.io.maxThreads", 12);
+        if (ioMaxThreads <= 0) {
+            errors.add("executors.io.maxThreads doit être > 0");
+            ioMaxThreads = 4;
         }
-        int computePool = yaml.getInt("threads.compute_pool", 1);
-        if (computePool <= 0) {
-            errors.add("threads.compute_pool doit être > 0");
-            computePool = 1;
+        long ioKeepAliveMs = yaml.getLong("executors.io.keepAliveMs", 30_000L);
+        if (ioKeepAliveMs < 0L) {
+            errors.add("executors.io.keepAliveMs doit être >= 0");
+            ioKeepAliveMs = 30_000L;
+        }
+        int availableCores = Math.max(1, Runtime.getRuntime().availableProcessors());
+        int defaultComputeSize = Math.max(2, Math.min(availableCores, 4));
+        int computeSize = yaml.getInt("executors.compute.size", defaultComputeSize);
+        if (computeSize <= 0) {
+            errors.add("executors.compute.size doit être > 0");
+            computeSize = defaultComputeSize;
+        }
+        long shutdownAwait = yaml.getLong("executors.shutdown.awaitSeconds", 5L);
+        if (shutdownAwait < 0L) {
+            errors.add("executors.shutdown.awaitSeconds doit être >= 0");
+            shutdownAwait = 5L;
+        }
+        long shutdownForce = yaml.getLong("executors.shutdown.forceCancelSeconds", 3L);
+        if (shutdownForce < 0L) {
+            errors.add("executors.shutdown.forceCancelSeconds doit être >= 0");
+            shutdownForce = 3L;
+        }
+        int mainCheckInterval = yaml.getInt("executors.scheduler.main_check_interval_ticks", 1);
+        if (mainCheckInterval <= 0) {
+            errors.add("executors.scheduler.main_check_interval_ticks doit être > 0");
+            mainCheckInterval = 1;
         }
 
         boolean dbEnabled = yaml.getBoolean("database.enabled", true);
@@ -238,7 +261,7 @@ public final class ConfigManager {
         }
 
         NexusConfig.ArenaSettings arenaSettings;
-        NexusConfig.ThreadSettings threadSettings;
+        NexusConfig.ExecutorSettings executorSettings;
         NexusConfig.PoolSettings poolSettings;
         try {
             arenaSettings = new NexusConfig.ArenaSettings(hudHz, scoreboardHz, particlesSoft, particlesHard,
@@ -247,12 +270,35 @@ public final class ConfigManager {
             errors.add("arena: " + exception.getMessage());
             arenaSettings = new NexusConfig.ArenaSettings(5, 3, particlesSoft, particlesHard, maxEntities, maxItems, maxProjectiles);
         }
+        NexusConfig.ExecutorSettings.IoSettings ioSettings;
+        NexusConfig.ExecutorSettings.ComputeSettings computeSettings;
+        NexusConfig.ExecutorSettings.ShutdownSettings shutdownSettings;
+        NexusConfig.ExecutorSettings.SchedulerSettings schedulerSettings;
         try {
-            threadSettings = new NexusConfig.ThreadSettings(ioPool, computePool);
+            ioSettings = new NexusConfig.ExecutorSettings.IoSettings(ioVirtual, ioMaxThreads, ioKeepAliveMs);
         } catch (IllegalArgumentException exception) {
-            errors.add("threads: " + exception.getMessage());
-            threadSettings = new NexusConfig.ThreadSettings(Math.max(1, ioPool), Math.max(1, computePool));
+            errors.add("executors.io: " + exception.getMessage());
+            ioSettings = new NexusConfig.ExecutorSettings.IoSettings(false, Math.max(2, ioMaxThreads), Math.max(0L, ioKeepAliveMs));
         }
+        try {
+            computeSettings = new NexusConfig.ExecutorSettings.ComputeSettings(computeSize);
+        } catch (IllegalArgumentException exception) {
+            errors.add("executors.compute: " + exception.getMessage());
+            computeSettings = new NexusConfig.ExecutorSettings.ComputeSettings(Math.max(1, computeSize));
+        }
+        try {
+            shutdownSettings = new NexusConfig.ExecutorSettings.ShutdownSettings(shutdownAwait, shutdownForce);
+        } catch (IllegalArgumentException exception) {
+            errors.add("executors.shutdown: " + exception.getMessage());
+            shutdownSettings = new NexusConfig.ExecutorSettings.ShutdownSettings(Math.max(0L, shutdownAwait), Math.max(0L, shutdownForce));
+        }
+        try {
+            schedulerSettings = new NexusConfig.ExecutorSettings.SchedulerSettings(mainCheckInterval);
+        } catch (IllegalArgumentException exception) {
+            errors.add("executors.scheduler: " + exception.getMessage());
+            schedulerSettings = new NexusConfig.ExecutorSettings.SchedulerSettings(Math.max(1, mainCheckInterval));
+        }
+        executorSettings = new NexusConfig.ExecutorSettings(ioSettings, computeSettings, shutdownSettings, schedulerSettings);
         try {
             poolSettings = new NexusConfig.PoolSettings(maxSize, minIdle, timeoutMs);
         } catch (IllegalArgumentException exception) {
@@ -266,7 +312,7 @@ public final class ConfigManager {
         NexusConfig.DegradedModeSettings degradedModeSettings = new NexusConfig.DegradedModeSettings(degradedEnabled, degradedBanner);
         NexusConfig.QueueSettings queueSettings = new NexusConfig.QueueSettings(queueTick, vipWeight);
 
-        return new NexusConfig(serverMode, language, timezone, arenaSettings, threadSettings, databaseSettings,
+        return new NexusConfig(serverMode, language, timezone, arenaSettings, executorSettings, databaseSettings,
                 serviceSettings, timeoutSettings, degradedModeSettings, queueSettings);
     }
 

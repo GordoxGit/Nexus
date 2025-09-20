@@ -2,7 +2,7 @@ package com.heneria.nexus.service.core;
 
 import com.heneria.nexus.config.NexusConfig;
 import com.heneria.nexus.db.DbProvider;
-import com.heneria.nexus.service.ExecutorPools;
+import com.heneria.nexus.concurrent.ExecutorManager;
 import com.heneria.nexus.service.api.PlayerProfile;
 import com.heneria.nexus.service.api.ProfileService;
 import com.heneria.nexus.util.NexusLogger;
@@ -13,7 +13,6 @@ import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -26,22 +25,22 @@ public final class ProfileServiceImpl implements ProfileService {
 
     private final NexusLogger logger;
     private final DbProvider dbProvider;
-    private final ExecutorService ioExecutor;
+    private final ExecutorManager executorManager;
     private final ConcurrentHashMap<UUID, CacheEntry> cache = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<UUID, PlayerProfile> persistentStore = new ConcurrentHashMap<>();
     private final AtomicBoolean degraded = new AtomicBoolean();
     private final AtomicReference<NexusConfig.DegradedModeSettings> degradedSettings = new AtomicReference<>();
 
-    public ProfileServiceImpl(NexusLogger logger, DbProvider dbProvider, ExecutorPools executorPools, NexusConfig config) {
+    public ProfileServiceImpl(NexusLogger logger, DbProvider dbProvider, ExecutorManager executorManager, NexusConfig config) {
         this.logger = Objects.requireNonNull(logger, "logger");
         this.dbProvider = Objects.requireNonNull(dbProvider, "dbProvider");
-        this.ioExecutor = Objects.requireNonNull(executorPools, "executorPools").ioExecutor();
+        this.executorManager = Objects.requireNonNull(executorManager, "executorManager");
         this.degradedSettings.set(config.degradedModeSettings());
     }
 
     @Override
     public CompletableFuture<Void> start() {
-        return CompletableFuture.runAsync(this::refreshDegradedState, ioExecutor);
+        return executorManager.runIo(() -> refreshDegradedState());
     }
 
     @Override
@@ -51,7 +50,7 @@ public final class ProfileServiceImpl implements ProfileService {
         if (cached != null && !cached.isExpired()) {
             return CompletableFuture.completedFuture(copyProfile(cached.profile()));
         }
-        return CompletableFuture.supplyAsync(() -> {
+        return executorManager.supplyIo(() -> {
             boolean fallback = refreshDegradedState();
             if (fallback) {
                 return cache.compute(playerId, (id, entry) -> {
@@ -63,17 +62,17 @@ public final class ProfileServiceImpl implements ProfileService {
             CacheEntry entry = new CacheEntry(copyProfile(stored), Instant.now());
             cache.put(playerId, entry);
             return copyProfile(entry.profile());
-        }, ioExecutor);
+        });
     }
 
     @Override
     public CompletableFuture<Void> saveAsync(PlayerProfile profile) {
         Objects.requireNonNull(profile, "profile");
         PlayerProfile copy = copyProfile(profile);
-        return CompletableFuture.runAsync(() -> {
+        return executorManager.runIo(() -> {
             persistentStore.put(profile.playerId(), copyProfile(copy));
             cache.put(profile.playerId(), new CacheEntry(copyProfile(copy), Instant.now()));
-        }, ioExecutor);
+        });
     }
 
     @Override

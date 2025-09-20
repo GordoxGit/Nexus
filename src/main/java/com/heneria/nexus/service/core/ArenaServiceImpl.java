@@ -1,7 +1,7 @@
 package com.heneria.nexus.service.core;
 
 import com.heneria.nexus.config.NexusConfig;
-import com.heneria.nexus.service.ExecutorPools;
+import com.heneria.nexus.concurrent.ExecutorManager;
 import com.heneria.nexus.service.api.ArenaBudget;
 import com.heneria.nexus.service.api.ArenaCreationException;
 import com.heneria.nexus.service.api.ArenaHandle;
@@ -23,7 +23,6 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicReference;
 import org.bukkit.plugin.java.JavaPlugin;
 
@@ -38,7 +37,7 @@ public final class ArenaServiceImpl implements ArenaService {
     private final QueueService queueService;
     private final Optional<ProfileService> profileService;
     private final EconomyService economyService;
-    private final ExecutorService computeExecutor;
+    private final ExecutorManager executorManager;
     private final ConcurrentHashMap<UUID, ArenaHandle> arenas = new ConcurrentHashMap<>();
     private final CopyOnWriteArrayList<ArenaListener> listeners = new CopyOnWriteArrayList<>();
     private final AtomicReference<NexusConfig.ArenaSettings> settingsRef;
@@ -49,7 +48,7 @@ public final class ArenaServiceImpl implements ArenaService {
                             QueueService queueService,
                             Optional<ProfileService> profileService,
                             EconomyService economyService,
-                            ExecutorPools executorPools,
+                            ExecutorManager executorManager,
                             NexusConfig config) {
         this.plugin = Objects.requireNonNull(plugin, "plugin");
         this.logger = Objects.requireNonNull(logger, "logger");
@@ -57,7 +56,7 @@ public final class ArenaServiceImpl implements ArenaService {
         this.queueService = Objects.requireNonNull(queueService, "queueService");
         this.profileService = Objects.requireNonNull(profileService, "profileService");
         this.economyService = Objects.requireNonNull(economyService, "economyService");
-        this.computeExecutor = Objects.requireNonNull(executorPools, "executorPools").computeExecutor();
+        this.executorManager = Objects.requireNonNull(executorManager, "executorManager");
         this.settingsRef = new AtomicReference<>(config.arenaSettings());
     }
 
@@ -101,7 +100,7 @@ public final class ArenaServiceImpl implements ArenaService {
         listeners.forEach(listener -> safe(() -> listener.onPhaseChange(handle, previous, nextPhase)));
         if (nextPhase == ArenaPhase.RESET) {
             listeners.forEach(listener -> safe(() -> listener.onResetStart(handle)));
-            computeExecutor.execute(() -> logger.debug(() -> "Préparation du reset pour " + handle.id()));
+            executorManager.compute().execute(() -> logger.debug(() -> "Préparation du reset pour " + handle.id()));
         } else if (previous == ArenaPhase.RESET && nextPhase != ArenaPhase.RESET) {
             listeners.forEach(listener -> safe(() -> listener.onResetEnd(handle)));
         } else if (nextPhase == ArenaPhase.SCORED) {
@@ -110,7 +109,7 @@ public final class ArenaServiceImpl implements ArenaService {
             }
         } else if (nextPhase == ArenaPhase.END) {
             arenas.remove(handle.id());
-            computeExecutor.execute(() -> queueService.tryMatch(handle.mode()).ifPresent(plan ->
+            executorManager.compute().execute(() -> queueService.tryMatch(handle.mode()).ifPresent(plan ->
                     logger.info("Match prêt après fin d'arène " + handle.id() + " -> " + plan.matchId())));
             profileService.ifPresent(service -> {
                 if (service.isDegraded()) {

@@ -13,7 +13,7 @@ import java.sql.SQLException;
 import java.time.Duration;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
@@ -35,7 +35,7 @@ public final class DbProvider implements LifecycleAware {
         this.logger = Objects.requireNonNull(logger, "logger");
     }
 
-    public CompletableFuture<Boolean> applyConfiguration(NexusConfig.DatabaseSettings settings, ExecutorService executor) {
+    public CompletableFuture<Boolean> applyConfiguration(NexusConfig.DatabaseSettings settings, Executor executor) {
         settingsRef.set(settings);
         if (!settings.enabled()) {
             logger.info("Persistance désactivée, fonctionnement en mémoire");
@@ -98,7 +98,7 @@ public final class DbProvider implements LifecycleAware {
         return degraded;
     }
 
-    public <T> CompletableFuture<T> execute(QueryTask<T> task, ExecutorService executor) {
+    public <T> CompletableFuture<T> execute(QueryTask<T> task, Executor executor) {
         HikariDataSource dataSource = dataSourceRef.get();
         if (dataSource == null) {
             return CompletableFuture.failedFuture(new IllegalStateException("Database not available"));

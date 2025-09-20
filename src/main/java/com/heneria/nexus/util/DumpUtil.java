@@ -1,9 +1,9 @@
 package com.heneria.nexus.util;
 
 import com.heneria.nexus.config.ConfigBundle;
+import com.heneria.nexus.concurrent.ExecutorManager;
 import com.heneria.nexus.db.DbProvider;
 import com.heneria.nexus.scheduler.RingScheduler;
-import com.heneria.nexus.service.ExecutorPools;
 import com.heneria.nexus.service.ServiceRegistry;
 import java.lang.management.ManagementFactory;
 import java.lang.management.ThreadMXBean;
@@ -26,7 +26,7 @@ public final class DumpUtil {
 
     public static List<Component> createDump(Server server,
                                              ConfigBundle bundle,
-                                             ExecutorPools executorPools,
+                                             ExecutorManager executorManager,
                                              RingScheduler scheduler,
                                              DbProvider dbProvider,
                                              ServiceRegistry serviceRegistry) {
@@ -37,11 +37,11 @@ public final class DumpUtil {
         lines.add(Component.text("Fuseau horaire : " + bundle.config().timezone(), NamedTextColor.YELLOW));
         lines.add(Component.text("Mode : " + bundle.config().serverMode(), NamedTextColor.YELLOW));
 
-        ExecutorPools.Diagnostics poolDiagnostics = executorPools.diagnostics();
+        ExecutorManager.PoolStats poolDiagnostics = executorManager.stats();
         lines.add(Component.empty());
         lines.add(Component.text("-- Threads --", NamedTextColor.AQUA));
-        appendPool(lines, "IO", poolDiagnostics.io());
-        appendPool(lines, "Compute", poolDiagnostics.compute());
+        appendPool(lines, poolDiagnostics.io());
+        appendPool(lines, poolDiagnostics.compute());
         ThreadMXBean threadBean = ManagementFactory.getThreadMXBean();
         lines.add(Component.text("Threads actifs : " + threadBean.getThreadCount(), NamedTextColor.GRAY));
         lines.add(Component.text("Pic threads : " + threadBean.getPeakThreadCount(), NamedTextColor.GRAY));
@@ -94,10 +94,14 @@ public final class DumpUtil {
         return lines;
     }
 
-    private static void appendPool(List<Component> lines, String name, ExecutorPools.PoolSnapshot snapshot) {
-        lines.add(Component.text(name + " -> core=" + snapshot.corePoolSize()
-                + " actifs=" + snapshot.activeCount()
+    private static void appendPool(List<Component> lines, ExecutorManager.PoolSnapshot snapshot) {
+        String mode = snapshot.virtual() ? "virtuel" : "%d threads".formatted(snapshot.configuredThreads());
+        lines.add(Component.text(snapshot.name().toUpperCase(Locale.ROOT) + " -> mode=" + mode
+                + " actifs=" + snapshot.activeTasks()
                 + " file=" + snapshot.queuedTasks()
-                + " complétés=" + snapshot.completedTasks(), NamedTextColor.GRAY));
+                + " soumis=" + snapshot.submittedTasks()
+                + " terminés=" + snapshot.completedTasks()
+                + " rejetés=" + snapshot.rejectedTasks()
+                + " avg=" + String.format(Locale.ROOT, "%.2fms", snapshot.averageExecutionMillis()), NamedTextColor.GRAY));
     }
 }
