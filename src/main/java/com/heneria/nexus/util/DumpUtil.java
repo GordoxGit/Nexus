@@ -4,6 +4,7 @@ import com.heneria.nexus.config.ConfigBundle;
 import com.heneria.nexus.db.DbProvider;
 import com.heneria.nexus.scheduler.RingScheduler;
 import com.heneria.nexus.service.ExecutorPools;
+import com.heneria.nexus.service.ServiceRegistry;
 import java.lang.management.ManagementFactory;
 import java.lang.management.ThreadMXBean;
 import java.time.format.DateTimeFormatter;
@@ -27,7 +28,8 @@ public final class DumpUtil {
                                              ConfigBundle bundle,
                                              ExecutorPools executorPools,
                                              RingScheduler scheduler,
-                                             DbProvider dbProvider) {
+                                             DbProvider dbProvider,
+                                             ServiceRegistry serviceRegistry) {
         List<Component> lines = new ArrayList<>();
         lines.add(Component.text("=== État Nexus ===", NamedTextColor.GOLD));
         lines.add(Component.text("Serveur : " + server.getVersion(), NamedTextColor.YELLOW));
@@ -65,6 +67,25 @@ public final class DumpUtil {
         lines.add(Component.text("Connexions totales : " + dbDiagnostics.totalConnections(), NamedTextColor.GRAY));
         lines.add(Component.text("Threads en attente : " + dbDiagnostics.awaitingThreads(), NamedTextColor.GRAY));
         lines.add(Component.text("Tentatives échouées : " + dbDiagnostics.failedAttempts(), NamedTextColor.GRAY));
+
+        lines.add(Component.empty());
+        lines.add(Component.text("-- Services --", NamedTextColor.AQUA));
+        serviceRegistry.snapshot().forEach(snapshot -> {
+            String deps = snapshot.dependencies().isEmpty()
+                    ? "—"
+                    : snapshot.dependencies().stream().map(Class::getSimpleName).reduce((l, r) -> l + ", " + r).orElse("—");
+            String state = "%s (healthy=%s, init=%dms, start=%dms, stop=%dms) deps=[%s]".formatted(
+                    snapshot.serviceType().getSimpleName(),
+                    snapshot.healthy(),
+                    snapshot.initializationDuration().toMillis(),
+                    snapshot.startDuration().toMillis(),
+                    snapshot.stopDuration().toMillis(),
+                    deps);
+            if (snapshot.lastError().isPresent()) {
+                state += " error=" + snapshot.lastError().get().getMessage();
+            }
+            lines.add(Component.text(state, NamedTextColor.GRAY));
+        });
 
         lines.add(Component.empty());
         lines.add(Component.text("Chargé le : " + DateTimeFormatter.ISO_LOCAL_DATE_TIME

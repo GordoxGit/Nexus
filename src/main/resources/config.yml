@@ -11,15 +11,45 @@ server:
   # Fuseau horaire utilisé pour les horodatages et les dumps
   timezone: "Europe/Paris"
 
-perf:
+services:
+  # Expose les services clés via le ServicesManager de Bukkit pour les autres plugins
+  expose-bukkit-services: false
+
+timeouts:
+  # Timeout global pour le démarrage des services (ms)
+  startMs: 5000
+  # Timeout global pour l'arrêt des services (ms)
+  stopMs: 3000
+
+degraded-mode:
+  # Active les mécanismes de repli (économie/profils en mémoire) si la DB ne répond pas
+  enabled: true
+  # Affiche une bannière opérateur lorsque le mode dégradé est actif
+  banner: true
+
+queue:
+  # Fréquence d'exécution du matchmaking (Hz)
+  tick_hz: 5
+  # Bonus de poids pour les joueurs VIP (0..3 conseillé)
+  vip_weight: 1
+
+arena:
   # Taux de rafraîchissement des HUD (5 Hz par défaut => toutes les 4 ticks)
   hud_hz: 5
   # Taux de rafraîchissement des scoreboards (3 Hz par défaut)
   scoreboard_hz: 3
-  # Budget particules pour les effets « doux » (peut être dépassé ponctuellement)
-  particles_soft_cap: 1200
-  # Limite stricte d'émission de particules (les tâches au-delà sont coupées)
-  particles_hard_cap: 2000
+  particles:
+    # Budget particules pour les effets « doux » (peut être dépassé ponctuellement)
+    soft_cap: 1200
+    # Limite stricte d'émission de particules (les tâches au-delà sont coupées)
+    hard_cap: 2000
+  budget:
+    # Nombre maximum d'entités actives par arène
+    max_entities: 200
+    # Nombre maximum d'items au sol
+    max_items: 128
+    # Nombre maximum de projectiles simultanés
+    max_projectiles: 64
 
 threads:
   # Pool I/O pour la base de données et les accès disque. Pas d'I/O sur le main thread !
