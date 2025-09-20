@@ -1,10 +1,15 @@
 # =============================================
-#  Placeholder économie — sera rempli ultérieurement
+#  Configuration économie Nexus
 # =============================================
 
-economy:
-  # currency: "NEX"
-  # starting-balance: 1000
-  # taxes:
-  #   enabled: false
-  #   rate: 0.05
+coins:
+  win_per_match: 20
+  lose_per_match: 5
+  first_win_bonus: 50
+
+battlepass:
+  season_days: 90
+  tiers: 65
+  xp_per_match:
+    win: 120
+    lose: 60

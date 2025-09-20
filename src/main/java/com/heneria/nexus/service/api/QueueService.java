@@ -1,6 +1,6 @@
 package com.heneria.nexus.service.api;
 
-import com.heneria.nexus.config.NexusConfig;
+import com.heneria.nexus.config.CoreConfig;
 import com.heneria.nexus.service.LifecycleAware;
 import java.util.Optional;
 import java.util.UUID;
@@ -38,5 +38,5 @@ public interface QueueService extends LifecycleAware {
     /**
      * Applies configuration updates impacting the queue tick rate.
      */
-    void applySettings(NexusConfig.QueueSettings settings);
+    void applySettings(CoreConfig.QueueSettings settings);
 }

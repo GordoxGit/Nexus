@@ -1,6 +1,6 @@
 package com.heneria.nexus.service.api;
 
-import com.heneria.nexus.config.NexusConfig;
+import com.heneria.nexus.config.CoreConfig;
 import com.heneria.nexus.service.LifecycleAware;
 import java.util.UUID;
 import java.util.concurrent.CompletionStage;
@@ -20,7 +20,7 @@ public interface EconomyService extends LifecycleAware {
 
     EconomyTransaction beginTransaction();
 
-    void applyDegradedModeSettings(NexusConfig.DegradedModeSettings settings);
+    void applyDegradedModeSettings(CoreConfig.DegradedModeSettings settings);
 
     boolean isDegraded();
 }

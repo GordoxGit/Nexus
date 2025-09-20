@@ -1,11 +1,10 @@
 package com.heneria.nexus.util;
 
 import com.heneria.nexus.config.MessageBundle;
+import java.util.List;
 import java.util.Locale;
-import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.concurrent.ConcurrentHashMap;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.minimessage.MiniMessage;
 import net.kyori.adventure.text.minimessage.tag.resolver.TagResolver;
@@ -19,7 +18,6 @@ public final class MessageFacade {
     private final MiniMessage miniMessage = MiniMessage.miniMessage();
     private final NexusLogger logger;
     private volatile MessageBundle bundle;
-    private final Map<String, Component> cache = new ConcurrentHashMap<>();
 
     public MessageFacade(MessageBundle bundle, NexusLogger logger) {
         this.bundle = Objects.requireNonNull(bundle, "bundle");
@@ -28,15 +26,17 @@ public final class MessageFacade {
 
     public void update(MessageBundle bundle) {
         this.bundle = Objects.requireNonNull(bundle, "bundle");
-        cache.clear();
     }
 
     public Component render(String key, TagResolver... resolvers) {
-        String template = lookup(key).orElse("<red>Message manquant: " + key + "</red>");
-        if (resolvers.length == 0) {
-            return cache.computeIfAbsent(template, this::deserialize);
+        MessageBundle.MessageEntry entry = bundle.entry(key).orElse(null);
+        if (entry == null) {
+            return missingMessage(key);
         }
-        return deserialize(template, resolvers);
+        if (resolvers.length == 0) {
+            return entry.component();
+        }
+        return deserialize(entry.raw(), resolvers);
     }
 
     public void send(CommandSender sender, String key, TagResolver... resolvers) {
@@ -47,12 +47,24 @@ public final class MessageFacade {
         return bundle.locale();
     }
 
-    public Optional<String> lookup(String key) {
+    public Optional<Component> lookup(String key) {
         return bundle.message(key);
     }
 
     public Component raw(String rawMessage, TagResolver... resolvers) {
         return deserialize(rawMessage, resolvers);
+    }
+
+    public Optional<Component> prefix() {
+        return bundle.prefix();
+    }
+
+    public Optional<List<Component>> messageList(String key) {
+        return bundle.messageList(key);
+    }
+
+    private Component missingMessage(String key) {
+        return Component.text("Message manquant: " + key);
     }
 
     private Component deserialize(String template) {

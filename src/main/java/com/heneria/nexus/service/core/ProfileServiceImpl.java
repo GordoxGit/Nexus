@@ -1,6 +1,6 @@
 package com.heneria.nexus.service.core;
 
-import com.heneria.nexus.config.NexusConfig;
+import com.heneria.nexus.config.CoreConfig;
 import com.heneria.nexus.db.DbProvider;
 import com.heneria.nexus.concurrent.ExecutorManager;
 import com.heneria.nexus.service.api.PlayerProfile;
@@ -29,9 +29,9 @@ public final class ProfileServiceImpl implements ProfileService {
     private final ConcurrentHashMap<UUID, CacheEntry> cache = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<UUID, PlayerProfile> persistentStore = new ConcurrentHashMap<>();
     private final AtomicBoolean degraded = new AtomicBoolean();
-    private final AtomicReference<NexusConfig.DegradedModeSettings> degradedSettings = new AtomicReference<>();
+    private final AtomicReference<CoreConfig.DegradedModeSettings> degradedSettings = new AtomicReference<>();
 
-    public ProfileServiceImpl(NexusLogger logger, DbProvider dbProvider, ExecutorManager executorManager, NexusConfig config) {
+    public ProfileServiceImpl(NexusLogger logger, DbProvider dbProvider, ExecutorManager executorManager, CoreConfig config) {
         this.logger = Objects.requireNonNull(logger, "logger");
         this.dbProvider = Objects.requireNonNull(dbProvider, "dbProvider");
         this.executorManager = Objects.requireNonNull(executorManager, "executorManager");
@@ -81,7 +81,7 @@ public final class ProfileServiceImpl implements ProfileService {
     }
 
     @Override
-    public void applyDegradedModeSettings(NexusConfig.DegradedModeSettings settings) {
+    public void applyDegradedModeSettings(CoreConfig.DegradedModeSettings settings) {
         degradedSettings.set(Objects.requireNonNull(settings, "settings"));
     }
 
@@ -94,7 +94,7 @@ public final class ProfileServiceImpl implements ProfileService {
         boolean fallback = dbProvider.isDegraded();
         boolean previous = degraded.getAndSet(fallback);
         if (fallback && !previous) {
-            NexusConfig.DegradedModeSettings settings = degradedSettings.get();
+            CoreConfig.DegradedModeSettings settings = degradedSettings.get();
             if (settings.banner()) {
                 logger.warn("Mode dégradé activé pour le ProfileService : stockage en mémoire");
             }

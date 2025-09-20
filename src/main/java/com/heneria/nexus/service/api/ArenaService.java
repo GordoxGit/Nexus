@@ -1,6 +1,6 @@
 package com.heneria.nexus.service.api;
 
-import com.heneria.nexus.config.NexusConfig;
+import com.heneria.nexus.config.CoreConfig;
 import com.heneria.nexus.service.LifecycleAware;
 import java.util.Collection;
 import java.util.Optional;
@@ -58,7 +58,7 @@ public interface ArenaService extends LifecycleAware {
      * Applies new arena related settings. Called when the configuration is
      * reloaded.
      */
-    void applyArenaSettings(NexusConfig.ArenaSettings settings);
+    void applyArenaSettings(CoreConfig.ArenaSettings settings);
 
     interface ArenaListener {
         void onPhaseChange(ArenaHandle handle, ArenaPhase previous, ArenaPhase next);

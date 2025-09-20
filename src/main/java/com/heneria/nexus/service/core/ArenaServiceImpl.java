@@ -1,6 +1,6 @@
 package com.heneria.nexus.service.core;
 
-import com.heneria.nexus.config.NexusConfig;
+import com.heneria.nexus.config.CoreConfig;
 import com.heneria.nexus.concurrent.ExecutorManager;
 import com.heneria.nexus.service.api.ArenaBudget;
 import com.heneria.nexus.service.api.ArenaCreationException;
@@ -40,7 +40,7 @@ public final class ArenaServiceImpl implements ArenaService {
     private final ExecutorManager executorManager;
     private final ConcurrentHashMap<UUID, ArenaHandle> arenas = new ConcurrentHashMap<>();
     private final CopyOnWriteArrayList<ArenaListener> listeners = new CopyOnWriteArrayList<>();
-    private final AtomicReference<NexusConfig.ArenaSettings> settingsRef;
+    private final AtomicReference<CoreConfig.ArenaSettings> settingsRef;
 
     public ArenaServiceImpl(JavaPlugin plugin,
                             NexusLogger logger,
@@ -49,7 +49,7 @@ public final class ArenaServiceImpl implements ArenaService {
                             Optional<ProfileService> profileService,
                             EconomyService economyService,
                             ExecutorManager executorManager,
-                            NexusConfig config) {
+                            CoreConfig config) {
         this.plugin = Objects.requireNonNull(plugin, "plugin");
         this.logger = Objects.requireNonNull(logger, "logger");
         this.mapService = Objects.requireNonNull(mapService, "mapService");
@@ -129,7 +129,7 @@ public final class ArenaServiceImpl implements ArenaService {
 
     @Override
     public ArenaBudget budget(ArenaHandle handle) {
-        NexusConfig.ArenaSettings settings = settingsRef.get();
+        CoreConfig.ArenaSettings settings = settingsRef.get();
         return new ArenaBudget(settings.maxEntities(), settings.maxItems(), settings.maxProjectiles());
     }
 
@@ -144,7 +144,7 @@ public final class ArenaServiceImpl implements ArenaService {
     }
 
     @Override
-    public void applyArenaSettings(NexusConfig.ArenaSettings settings) {
+    public void applyArenaSettings(CoreConfig.ArenaSettings settings) {
         settingsRef.set(Objects.requireNonNull(settings, "settings"));
         logger.info("Paramètres d'arène mis à jour: hud=" + settings.hudHz() + " scoreboard=" + settings.scoreboardHz());
     }

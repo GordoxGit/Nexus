@@ -1,6 +1,6 @@
 package com.heneria.nexus.db;
 
-import com.heneria.nexus.config.NexusConfig;
+import com.heneria.nexus.config.CoreConfig;
 import com.heneria.nexus.service.LifecycleAware;
 import com.heneria.nexus.util.NexusLogger;
 import com.zaxxer.hikari.HikariConfig;
@@ -27,7 +27,7 @@ public final class DbProvider implements LifecycleAware {
 
     private final NexusLogger logger;
     private final AtomicReference<HikariDataSource> dataSourceRef = new AtomicReference<>();
-    private final AtomicReference<NexusConfig.DatabaseSettings> settingsRef = new AtomicReference<>();
+    private final AtomicReference<CoreConfig.DatabaseSettings> settingsRef = new AtomicReference<>();
     private final AtomicLong failedAttempts = new AtomicLong();
     private volatile boolean degraded;
 
@@ -35,7 +35,7 @@ public final class DbProvider implements LifecycleAware {
         this.logger = Objects.requireNonNull(logger, "logger");
     }
 
-    public CompletableFuture<Boolean> applyConfiguration(NexusConfig.DatabaseSettings settings, Executor executor) {
+    public CompletableFuture<Boolean> applyConfiguration(CoreConfig.DatabaseSettings settings, Executor executor) {
         settingsRef.set(settings);
         if (!settings.enabled()) {
             logger.info("Persistance désactivée, fonctionnement en mémoire");
@@ -78,7 +78,7 @@ public final class DbProvider implements LifecycleAware {
         }
     }
 
-    private HikariConfig toHikariConfig(NexusConfig.DatabaseSettings settings) {
+    private HikariConfig toHikariConfig(CoreConfig.DatabaseSettings settings) {
         HikariConfig config = new HikariConfig();
         config.setJdbcUrl(settings.jdbcUrl());
         config.setUsername(settings.username());
@@ -115,7 +115,7 @@ public final class DbProvider implements LifecycleAware {
     public Diagnostics diagnostics() {
         HikariDataSource dataSource = dataSourceRef.get();
         HikariPoolMXBean pool = dataSource != null ? dataSource.getHikariPoolMXBean() : null;
-        NexusConfig.DatabaseSettings settings = settingsRef.get();
+        CoreConfig.DatabaseSettings settings = settingsRef.get();
         return new Diagnostics(
                 settings,
                 degraded,
@@ -152,7 +152,7 @@ public final class DbProvider implements LifecycleAware {
         T apply(Connection connection) throws SQLException;
     }
 
-    public record Diagnostics(NexusConfig.DatabaseSettings settings,
+    public record Diagnostics(CoreConfig.DatabaseSettings settings,
                               boolean degraded,
                               int activeConnections,
                               int idleConnections,

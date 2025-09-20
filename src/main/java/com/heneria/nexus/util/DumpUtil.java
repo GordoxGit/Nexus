@@ -34,8 +34,8 @@ public final class DumpUtil {
         lines.add(Component.text("=== État Nexus ===", NamedTextColor.GOLD));
         lines.add(Component.text("Serveur : " + server.getVersion(), NamedTextColor.YELLOW));
         lines.add(Component.text("Java : " + System.getProperty("java.version"), NamedTextColor.YELLOW));
-        lines.add(Component.text("Fuseau horaire : " + bundle.config().timezone(), NamedTextColor.YELLOW));
-        lines.add(Component.text("Mode : " + bundle.config().serverMode(), NamedTextColor.YELLOW));
+        lines.add(Component.text("Fuseau horaire : " + bundle.core().timezone(), NamedTextColor.YELLOW));
+        lines.add(Component.text("Mode : " + bundle.core().serverMode(), NamedTextColor.YELLOW));
 
         ExecutorManager.PoolStats poolDiagnostics = executorManager.stats();
         lines.add(Component.empty());
@@ -89,7 +89,7 @@ public final class DumpUtil {
 
         lines.add(Component.empty());
         lines.add(Component.text("Chargé le : " + DateTimeFormatter.ISO_LOCAL_DATE_TIME
-                .withZone(bundle.config().timezone())
+                .withZone(bundle.core().timezone())
                 .format(bundle.loadedAt()), NamedTextColor.DARK_GRAY));
         return lines;
     }
