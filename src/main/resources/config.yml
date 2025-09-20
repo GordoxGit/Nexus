@@ -51,6 +51,30 @@ arena:
     # Nombre maximum de projectiles simultanés
     max_projectiles: 64
 
+ring:
+  defaults:
+    HUD: "5hz"
+    SCOREBOARD: "4hz"
+    PARTICLES: "5hz"
+    GENERATOR: "2hz"
+    EVENTS: "2hz"
+    QUEUE: "2hz"
+    MISC: "5hz"
+  profiles:
+    RESET:
+      enableCosmetics: false
+      enableQueue: false
+    END:
+      hudHz: "2hz"
+      scoreboardHz: "2hz"
+  degrade:
+    soft:
+      mspt: 30
+      scale: 0.6
+    hard:
+      mspt: 45
+      pauseCosmetics: true
+
 executors:
   io:
     # Active les threads virtuels (Java 21+) pour les tâches fortement bloquantes.
