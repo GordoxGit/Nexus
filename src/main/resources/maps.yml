@@ -1,10 +1,19 @@
 # =============================================
-#  Placeholder cartes — détails à venir
+#  Catalogue des maps Nexus
 # =============================================
 
+rotation:
+  enabled: true
+  weighted_pick: true
+  veto_vote: true
+  min_votes_to_pick: 1
+
 maps:
-  # default-map: "vallon"
-  # rotation:
-  #   - "vallon"
-  #   - "caverne"
-  #   - "tournoi"
+  - id: "temple_ancien"
+    display: "Temple Ancien"
+    weight: 3
+    modes: ["2v2", "4v4"]
+  - id: "caverne_glacee"
+    display: "Caverne Glacée"
+    weight: 2
+    modes: ["2v2"]

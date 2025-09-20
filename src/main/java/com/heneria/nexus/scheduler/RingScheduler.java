@@ -1,6 +1,6 @@
 package com.heneria.nexus.scheduler;
 
-import com.heneria.nexus.config.NexusConfig;
+import com.heneria.nexus.config.CoreConfig;
 import com.heneria.nexus.service.LifecycleAware;
 import com.heneria.nexus.util.NexusLogger;
 import java.util.EnumMap;
@@ -50,7 +50,7 @@ public final class RingScheduler implements LifecycleAware {
         profileIntervals.put(TaskProfile.SCOREBOARD, 7L);
     }
 
-    public void applyPerfSettings(NexusConfig.ArenaSettings arenaSettings) {
+    public void applyPerfSettings(CoreConfig.ArenaSettings arenaSettings) {
         profileIntervals.put(TaskProfile.HUD, hzToTicks(arenaSettings.hudHz()));
         profileIntervals.put(TaskProfile.SCOREBOARD, hzToTicks(arenaSettings.scoreboardHz()));
         tasks.values().forEach(task -> {

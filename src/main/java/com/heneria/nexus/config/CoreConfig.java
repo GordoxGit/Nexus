@@ -7,7 +7,7 @@ import java.util.Objects;
 /**
  * Immutable view over the main nexus configuration.
  */
-public final class NexusConfig {
+public final class CoreConfig {
 
     private final String serverMode;
     private final Locale language;
@@ -20,16 +20,16 @@ public final class NexusConfig {
     private final DegradedModeSettings degradedModeSettings;
     private final QueueSettings queueSettings;
 
-    public NexusConfig(String serverMode,
-                       Locale language,
-                       ZoneId timezone,
-                       ArenaSettings arenaSettings,
-                       ExecutorSettings executorSettings,
-                       DatabaseSettings databaseSettings,
-                       ServiceSettings serviceSettings,
-                       TimeoutSettings timeoutSettings,
-                       DegradedModeSettings degradedModeSettings,
-                       QueueSettings queueSettings) {
+    public CoreConfig(String serverMode,
+                      Locale language,
+                      ZoneId timezone,
+                      ArenaSettings arenaSettings,
+                      ExecutorSettings executorSettings,
+                      DatabaseSettings databaseSettings,
+                      ServiceSettings serviceSettings,
+                      TimeoutSettings timeoutSettings,
+                      DegradedModeSettings degradedModeSettings,
+                      QueueSettings queueSettings) {
         this.serverMode = Objects.requireNonNull(serverMode, "serverMode");
         this.language = Objects.requireNonNull(language, "language");
         this.timezone = Objects.requireNonNull(timezone, "timezone");

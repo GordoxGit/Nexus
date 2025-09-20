@@ -3,7 +3,8 @@ package com.heneria.nexus;
 import com.heneria.nexus.command.NexusCommand;
 import com.heneria.nexus.config.ConfigBundle;
 import com.heneria.nexus.config.ConfigManager;
-import com.heneria.nexus.config.NexusConfig;
+import com.heneria.nexus.config.CoreConfig;
+import com.heneria.nexus.config.ReloadReport;
 import com.heneria.nexus.db.DbProvider;
 import com.heneria.nexus.scheduler.GamePhase;
 import com.heneria.nexus.scheduler.RingScheduler;
@@ -59,23 +60,24 @@ public final class NexusPlugin extends JavaPlugin {
     public void onLoad() {
         this.logger = new NexusLogger(getLogger(), LOG_PREFIX);
         this.configManager = new ConfigManager(this, logger);
-        ConfigManager.LoadResult loadResult = configManager.initialLoad();
-        if (!loadResult.success()) {
-            loadResult.errors().forEach(error -> logger.error("Erreur de configuration: " + error));
+        ReloadReport report = configManager.initialLoad();
+        if (!report.success()) {
+            report.errors().forEach(error -> logger.error(formatIssue(error)));
             bootstrapFailed = true;
             return;
         }
-        this.bundle = loadResult.bundle();
+        report.warnings().forEach(warning -> logger.warn(formatIssue(warning)));
+        this.bundle = configManager.currentBundle();
         this.messageFacade = new MessageFacade(bundle.messages(), logger);
-        this.executorManager = new ExecutorManager(this, logger, bundle.config().executorSettings());
+        this.executorManager = new ExecutorManager(this, logger, bundle.core().executorSettings());
         this.serviceRegistry = new ServiceRegistry(logger);
         registerSingletons();
         registerServices();
         try {
-            serviceRegistry.wire(Duration.ofMillis(bundle.config().timeoutSettings().startMs()));
+            serviceRegistry.wire(Duration.ofMillis(bundle.core().timeoutSettings().startMs()));
             this.ringScheduler = serviceRegistry.get(RingScheduler.class);
             this.dbProvider = serviceRegistry.get(DbProvider.class);
-            ringScheduler.applyPerfSettings(bundle.config().arenaSettings());
+            ringScheduler.applyPerfSettings(bundle.core().arenaSettings());
         } catch (Exception exception) {
             logger.error("Impossible d'initialiser le registre de services", exception);
             bootstrapFailed = true;
@@ -93,9 +95,9 @@ public final class NexusPlugin extends JavaPlugin {
         this.messageFacade.update(bundle.messages());
         registerCommands();
         logEnvironment();
-        configureDatabase(bundle.config().databaseSettings());
+        configureDatabase(bundle.core().databaseSettings());
         try {
-            serviceRegistry.startAll(Duration.ofMillis(bundle.config().timeoutSettings().startMs()));
+            serviceRegistry.startAll(Duration.ofMillis(bundle.core().timeoutSettings().startMs()));
             ringScheduler.registerProfile(TaskProfile.HUD,
                     EnumSet.of(GamePhase.LOBBY, GamePhase.STARTING, GamePhase.PLAYING),
                     () -> {
@@ -118,27 +120,30 @@ public final class NexusPlugin extends JavaPlugin {
             servicesExposed = false;
         }
         if (serviceRegistry != null) {
-            serviceRegistry.stopAll(Duration.ofMillis(bundle != null ? bundle.config().timeoutSettings().stopMs() : 3000L));
+            serviceRegistry.stopAll(Duration.ofMillis(bundle != null ? bundle.core().timeoutSettings().stopMs() : 3000L));
         }
         if (executorManager != null) {
-            long await = bundle != null ? bundle.config().executorSettings().shutdown().awaitSeconds() : 5L;
-            long force = bundle != null ? bundle.config().executorSettings().shutdown().forceCancelSeconds() : 3L;
+            long await = bundle != null ? bundle.core().executorSettings().shutdown().awaitSeconds() : 5L;
+            long force = bundle != null ? bundle.core().executorSettings().shutdown().forceCancelSeconds() : 3L;
             executorManager.shutdownGracefully(Duration.ofSeconds(await + force));
+        }
+        if (configManager != null) {
+            configManager.close();
         }
         logger.info("Nexus désactivé proprement");
     }
 
-    private void configureDatabase(NexusConfig.DatabaseSettings settings) {
+    private void configureDatabase(CoreConfig.DatabaseSettings settings) {
         CompletionStage<Boolean> future = executorManager.withTimeout(
                 dbProvider.applyConfiguration(settings, executorManager.io()),
-                Duration.ofMillis(bundle.config().timeoutSettings().startMs()));
+                Duration.ofMillis(bundle.core().timeoutSettings().startMs()));
         try {
             future.whenComplete((success, throwable) -> {
                 if (throwable != null) {
                     logger.warn("Configuration MariaDB impossible", throwable);
                     return;
                 }
-                if (!success && bundle.config().degradedModeSettings().enabled()) {
+                if (!success && bundle.core().degradedModeSettings().enabled()) {
                     logger.warn("Mode dégradé activé : MariaDB indisponible");
                 }
             }).toCompletableFuture().join();
@@ -158,12 +163,12 @@ public final class NexusPlugin extends JavaPlugin {
         logger.info("Démarrage de Nexus %s".formatted(getDescription().getVersion()));
         logger.info("Java: %s".formatted(System.getProperty("java.version")));
         logger.info("Paper: %s".formatted(getServer().getVersion()));
-        logger.info("Fuseau horaire: %s".formatted(bundle.config().timezone()));
+        logger.info("Fuseau horaire: %s".formatted(bundle.core().timezone()));
         logger.info("HUD: %d Hz, scoreboard: %d Hz".formatted(
-                bundle.config().arenaSettings().hudHz(),
-                bundle.config().arenaSettings().scoreboardHz()));
-        logger.info("Matchmaking: %d Hz".formatted(bundle.config().queueSettings().tickHz()));
-        NexusConfig.ExecutorSettings executorSettings = bundle.config().executorSettings();
+                bundle.core().arenaSettings().hudHz(),
+                bundle.core().arenaSettings().scoreboardHz()));
+        logger.info("Matchmaking: %d Hz".formatted(bundle.core().queueSettings().tickHz()));
+        CoreConfig.ExecutorSettings executorSettings = bundle.core().executorSettings();
         String ioMode = executorSettings.io().virtual()
                 ? "threads virtuels"
                 : "%d threads".formatted(executorSettings.io().maxThreads());
@@ -171,70 +176,83 @@ public final class NexusPlugin extends JavaPlugin {
     }
 
     public void sendHelp(CommandSender sender) {
-        messageFacade.send(sender, "commands.help.header");
-        messageFacade.send(sender, "commands.help.help");
+        messageFacade.send(sender, "help.header");
+        messageFacade.messageList("help.lines").ifPresent(lines -> lines.forEach(sender::sendMessage));
         if (sender.hasPermission("nexus.admin.reload")) {
-            messageFacade.send(sender, "commands.help.reload");
+            messageFacade.send(sender, "help.admin.reload");
         }
         if (sender.hasPermission("nexus.admin.dump")) {
-            messageFacade.send(sender, "commands.help.dump");
+            messageFacade.send(sender, "help.admin.dump");
         }
     }
 
     public void handleReload(CommandSender sender) {
         if (!sender.hasPermission("nexus.admin.reload")) {
-            messageFacade.send(sender, "commands.errors.no-permission");
+            messageFacade.send(sender, "errors.no_permission");
             return;
         }
-        messageFacade.send(sender, "commands.reload.start");
-        ConfigManager.LoadResult reload = configManager.reloadFromDisk();
-        if (!reload.success()) {
-            messageFacade.send(sender, "commands.errors.invalid-config");
-            reload.errors().forEach(error -> sender.sendMessage(Component.text(" • " + error, NamedTextColor.RED)));
-            return;
-        }
-        ConfigBundle previous = this.bundle;
-        try {
-            applyBundle(reload.bundle());
-            messageFacade.send(sender, "commands.reload.success");
-        } catch (Exception exception) {
-            this.bundle = previous;
-            configManager.applyBundle(previous);
-            messageFacade.send(sender, "commands.reload.failure");
-            logger.error("Erreur lors du rechargement", exception);
-        }
+        messageFacade.send(sender, "admin.reload.start");
+        configManager.reloadAllAsync(sender).whenComplete((report, throwable) ->
+                getServer().getScheduler().runTask(this, () -> {
+                    if (throwable != null) {
+                        messageFacade.send(sender, "admin.reload.fail");
+                        logger.error("Erreur lors du rechargement", throwable);
+                        return;
+                    }
+                    if (!report.success()) {
+                        messageFacade.send(sender, "admin.reload.fail");
+                        report.errors().forEach(error -> {
+                            logger.error(formatIssue(error));
+                            sender.sendMessage(formatIssue(error, NamedTextColor.RED));
+                        });
+                        return;
+                    }
+                    ConfigBundle previous = this.bundle;
+                    ConfigBundle refreshed = configManager.currentBundle();
+                    try {
+                        applyBundle(refreshed);
+                        messageFacade.send(sender, "admin.reload.ok");
+                        report.warnings().forEach(warning -> {
+                            logger.warn(formatIssue(warning));
+                            sender.sendMessage(formatIssue(warning, NamedTextColor.YELLOW));
+                        });
+                    } catch (Exception exception) {
+                        this.bundle = previous;
+                        messageFacade.send(sender, "admin.reload.fail");
+                        logger.error("Erreur lors de l'application de la configuration", exception);
+                    }
+                }));
     }
 
     private synchronized void applyBundle(ConfigBundle newBundle) {
-        executorManager.reconfigure(newBundle.config().executorSettings());
-        ringScheduler.applyPerfSettings(newBundle.config().arenaSettings());
+        executorManager.reconfigure(newBundle.core().executorSettings());
+        ringScheduler.applyPerfSettings(newBundle.core().arenaSettings());
         messageFacade.update(newBundle.messages());
         this.bundle = newBundle;
-        configManager.applyBundle(newBundle);
         serviceRegistry.updateSingleton(ConfigBundle.class, newBundle);
-        serviceRegistry.updateSingleton(NexusConfig.class, newBundle.config());
-        configureDatabase(newBundle.config().databaseSettings());
-        serviceRegistry.get(QueueService.class).applySettings(newBundle.config().queueSettings());
-        serviceRegistry.get(ArenaService.class).applyArenaSettings(newBundle.config().arenaSettings());
-        serviceRegistry.get(ProfileService.class).applyDegradedModeSettings(newBundle.config().degradedModeSettings());
-        serviceRegistry.get(EconomyService.class).applyDegradedModeSettings(newBundle.config().degradedModeSettings());
-        if (servicesExposed && !newBundle.config().serviceSettings().exposeBukkitServices()) {
+        serviceRegistry.updateSingleton(CoreConfig.class, newBundle.core());
+        configureDatabase(newBundle.core().databaseSettings());
+        serviceRegistry.get(QueueService.class).applySettings(newBundle.core().queueSettings());
+        serviceRegistry.get(ArenaService.class).applyArenaSettings(newBundle.core().arenaSettings());
+        serviceRegistry.get(ProfileService.class).applyDegradedModeSettings(newBundle.core().degradedModeSettings());
+        serviceRegistry.get(EconomyService.class).applyDegradedModeSettings(newBundle.core().degradedModeSettings());
+        if (servicesExposed && !newBundle.core().serviceSettings().exposeBukkitServices()) {
             getServer().getServicesManager().unregisterAll(this);
             servicesExposed = false;
-        } else if (!servicesExposed && newBundle.config().serviceSettings().exposeBukkitServices()) {
+        } else if (!servicesExposed && newBundle.core().serviceSettings().exposeBukkitServices()) {
             maybeExposeServices();
         }
     }
 
     public void handleDump(CommandSender sender) {
         if (!sender.hasPermission("nexus.admin.dump")) {
-            messageFacade.send(sender, "commands.errors.no-permission");
+            messageFacade.send(sender, "errors.no_permission");
             return;
         }
-        messageFacade.send(sender, "commands.dump.header");
+        messageFacade.send(sender, "admin.dump.header");
         List<Component> lines = DumpUtil.createDump(getServer(), bundle, executorManager, ringScheduler, dbProvider, serviceRegistry);
         lines.forEach(sender::sendMessage);
-        messageFacade.send(sender, "commands.dump.success");
+        messageFacade.send(sender, "admin.dump.success");
     }
 
     public MessageFacade messages() {
@@ -245,13 +263,21 @@ public final class NexusPlugin extends JavaPlugin {
         return bundle;
     }
 
+    private String formatIssue(ReloadReport.ValidationMessage message) {
+        return "[%s] %s -> %s".formatted(message.file(), message.path(), message.message());
+    }
+
+    private Component formatIssue(ReloadReport.ValidationMessage message, NamedTextColor color) {
+        return Component.text(" • [" + message.file() + "] " + message.path() + " -> " + message.message(), color);
+    }
+
     private void registerSingletons() {
         serviceRegistry.registerSingleton(JavaPlugin.class, this);
         serviceRegistry.registerSingleton(NexusPlugin.class, this);
         serviceRegistry.registerSingleton(NexusLogger.class, logger);
         serviceRegistry.registerSingleton(ConfigManager.class, configManager);
         serviceRegistry.registerSingleton(ConfigBundle.class, bundle);
-        serviceRegistry.registerSingleton(NexusConfig.class, bundle.config());
+        serviceRegistry.registerSingleton(CoreConfig.class, bundle.core());
         serviceRegistry.registerSingleton(ExecutorManager.class, executorManager);
     }
 
@@ -266,7 +292,7 @@ public final class NexusPlugin extends JavaPlugin {
     }
 
     private void maybeExposeServices() {
-        if (!bundle.config().serviceSettings().exposeBukkitServices()) {
+        if (!bundle.core().serviceSettings().exposeBukkitServices()) {
             return;
         }
         ServicesManager servicesManager = getServer().getServicesManager();

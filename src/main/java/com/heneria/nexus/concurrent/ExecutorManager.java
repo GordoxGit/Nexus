@@ -1,6 +1,6 @@
 package com.heneria.nexus.concurrent;
 
-import com.heneria.nexus.config.NexusConfig;
+import com.heneria.nexus.config.CoreConfig;
 import com.heneria.nexus.util.NamedThreadFactory;
 import com.heneria.nexus.util.NexusLogger;
 import java.time.Duration;
@@ -39,7 +39,7 @@ public final class ExecutorManager implements AutoCloseable {
 
     private final JavaPlugin plugin;
     private final NexusLogger logger;
-    private final AtomicReference<NexusConfig.ExecutorSettings> settingsRef;
+    private final AtomicReference<CoreConfig.ExecutorSettings> settingsRef;
     private final AtomicBoolean shutdown = new AtomicBoolean();
     private final AtomicLong lastBackpressureWarn = new AtomicLong();
     private final SchedulerBridge schedulerBridge;
@@ -49,7 +49,7 @@ public final class ExecutorManager implements AutoCloseable {
 
     public ExecutorManager(JavaPlugin plugin,
                            NexusLogger logger,
-                           NexusConfig.ExecutorSettings settings) {
+                           CoreConfig.ExecutorSettings settings) {
         this.plugin = Objects.requireNonNull(plugin, "plugin");
         this.logger = Objects.requireNonNull(logger, "logger");
         this.settingsRef = new AtomicReference<>(Objects.requireNonNull(settings, "settings"));
@@ -60,13 +60,13 @@ public final class ExecutorManager implements AutoCloseable {
     }
 
     private void logConfiguration(String prefix) {
-        NexusConfig.ExecutorSettings current = settingsRef.get();
+        CoreConfig.ExecutorSettings current = settingsRef.get();
         logger.info("%s — IO: %s, compute: %d threads".formatted(prefix,
                 current.io().virtual() ? "virtual threads" : (current.io().maxThreads() + " threads"),
                 current.compute().size()));
     }
 
-    private ManagedExecutor createIoExecutor(NexusConfig.ExecutorSettings.IoSettings settings) {
+    private ManagedExecutor createIoExecutor(CoreConfig.ExecutorSettings.IoSettings settings) {
         Objects.requireNonNull(settings, "settings");
         boolean virtual = settings.virtual();
         if (virtual && !supportsVirtualThreads()) {
@@ -95,7 +95,7 @@ public final class ExecutorManager implements AutoCloseable {
         return new PooledManagedExecutor("io", executor, maxThreads, logger, null);
     }
 
-    private ManagedExecutor createComputeExecutor(NexusConfig.ExecutorSettings.ComputeSettings settings) {
+    private ManagedExecutor createComputeExecutor(CoreConfig.ExecutorSettings.ComputeSettings settings) {
         Objects.requireNonNull(settings, "settings");
         int size = Math.max(1, settings.size());
         ThreadPoolExecutor executor = new ThreadPoolExecutor(
@@ -284,9 +284,9 @@ public final class ExecutorManager implements AutoCloseable {
         return result;
     }
 
-    public synchronized void reconfigure(NexusConfig.ExecutorSettings newSettings) {
+    public synchronized void reconfigure(CoreConfig.ExecutorSettings newSettings) {
         Objects.requireNonNull(newSettings, "newSettings");
-        NexusConfig.ExecutorSettings current = settingsRef.get();
+        CoreConfig.ExecutorSettings current = settingsRef.get();
         if (current.equals(newSettings)) {
             return;
         }
@@ -305,7 +305,7 @@ public final class ExecutorManager implements AutoCloseable {
         shutdownAsync("Compute", oldCompute, current.shutdown());
     }
 
-    private void shutdownAsync(String name, ManagedExecutor executor, NexusConfig.ExecutorSettings.ShutdownSettings settings) {
+    private void shutdownAsync(String name, ManagedExecutor executor, CoreConfig.ExecutorSettings.ShutdownSettings settings) {
         if (executor == null) {
             return;
         }
@@ -317,7 +317,7 @@ public final class ExecutorManager implements AutoCloseable {
         if (!shutdown.compareAndSet(false, true)) {
             return;
         }
-        NexusConfig.ExecutorSettings current = settingsRef.get();
+        CoreConfig.ExecutorSettings current = settingsRef.get();
         Duration remaining = (timeout != null && timeout.compareTo(Duration.ZERO) > 0) ? timeout : null;
         remaining = stopExecutor("IO", ioExecutor, current.shutdown(), remaining);
         stopExecutor("Compute", computeExecutor, current.shutdown(), remaining);
@@ -326,7 +326,7 @@ public final class ExecutorManager implements AutoCloseable {
 
     private Duration stopExecutor(String name,
                                   ManagedExecutor executor,
-                                  NexusConfig.ExecutorSettings.ShutdownSettings settings,
+                                  CoreConfig.ExecutorSettings.ShutdownSettings settings,
                                   Duration remaining) {
         if (executor == null) {
             return remaining;

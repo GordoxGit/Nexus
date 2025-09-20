@@ -1,6 +1,6 @@
 package com.heneria.nexus.service.core;
 
-import com.heneria.nexus.config.NexusConfig;
+import com.heneria.nexus.config.CoreConfig;
 import com.heneria.nexus.concurrent.ExecutorManager;
 import com.heneria.nexus.service.api.ArenaMode;
 import com.heneria.nexus.service.api.MatchPlan;
@@ -42,7 +42,7 @@ public final class QueueServiceImpl implements QueueService {
     private final Map<ArenaMode, ConcurrentLinkedQueue<QueueTicket>> queues = new EnumMap<>(ArenaMode.class);
     private final ConcurrentHashMap<UUID, QueueTicket> ticketsByPlayer = new ConcurrentHashMap<>();
     private final AtomicLong matchesFormed = new AtomicLong();
-    private final AtomicReference<NexusConfig.QueueSettings> settingsRef;
+    private final AtomicReference<CoreConfig.QueueSettings> settingsRef;
     private final AtomicReference<QueueStats> stats = new AtomicReference<>(new QueueStats(0, 0, 0L, 0L));
     private volatile BukkitTask tickerTask;
 
@@ -50,7 +50,7 @@ public final class QueueServiceImpl implements QueueService {
                             NexusLogger logger,
                             ExecutorManager executorManager,
                             ProfileService profileService,
-                            NexusConfig config) {
+                            CoreConfig config) {
         this.plugin = Objects.requireNonNull(plugin, "plugin");
         this.logger = Objects.requireNonNull(logger, "logger");
         this.executorManager = Objects.requireNonNull(executorManager, "executorManager");
@@ -157,7 +157,7 @@ public final class QueueServiceImpl implements QueueService {
     }
 
     @Override
-    public void applySettings(NexusConfig.QueueSettings settings) {
+    public void applySettings(CoreConfig.QueueSettings settings) {
         Objects.requireNonNull(settings, "settings");
         settingsRef.set(settings);
         scheduleTicker();

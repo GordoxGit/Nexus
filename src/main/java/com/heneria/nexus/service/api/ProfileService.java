@@ -1,6 +1,6 @@
 package com.heneria.nexus.service.api;
 
-import com.heneria.nexus.config.NexusConfig;
+import com.heneria.nexus.config.CoreConfig;
 import com.heneria.nexus.service.LifecycleAware;
 import java.util.UUID;
 import java.util.concurrent.CompletionStage;
@@ -16,7 +16,7 @@ public interface ProfileService extends LifecycleAware {
 
     void invalidate(UUID playerId);
 
-    void applyDegradedModeSettings(NexusConfig.DegradedModeSettings settings);
+    void applyDegradedModeSettings(CoreConfig.DegradedModeSettings settings);
 
     boolean isDegraded();
 }
