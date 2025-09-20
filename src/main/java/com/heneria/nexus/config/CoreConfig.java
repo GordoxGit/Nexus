@@ -2,7 +2,10 @@ package com.heneria.nexus.config;
 
 import java.time.ZoneId;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
+import net.kyori.adventure.bossbar.BossBar;
 
 /**
  * Immutable view over the main nexus configuration.
@@ -19,6 +22,7 @@ public final class CoreConfig {
     private final TimeoutSettings timeoutSettings;
     private final DegradedModeSettings degradedModeSettings;
     private final QueueSettings queueSettings;
+    private final UiSettings uiSettings;
 
     public CoreConfig(String serverMode,
                       Locale language,
@@ -29,7 +33,8 @@ public final class CoreConfig {
                       ServiceSettings serviceSettings,
                       TimeoutSettings timeoutSettings,
                       DegradedModeSettings degradedModeSettings,
-                      QueueSettings queueSettings) {
+                      QueueSettings queueSettings,
+                      UiSettings uiSettings) {
         this.serverMode = Objects.requireNonNull(serverMode, "serverMode");
         this.language = Objects.requireNonNull(language, "language");
         this.timezone = Objects.requireNonNull(timezone, "timezone");
@@ -40,6 +45,7 @@ public final class CoreConfig {
         this.timeoutSettings = Objects.requireNonNull(timeoutSettings, "timeoutSettings");
         this.degradedModeSettings = Objects.requireNonNull(degradedModeSettings, "degradedModeSettings");
         this.queueSettings = Objects.requireNonNull(queueSettings, "queueSettings");
+        this.uiSettings = Objects.requireNonNull(uiSettings, "uiSettings");
     }
 
     public String serverMode() {
@@ -80,6 +86,10 @@ public final class CoreConfig {
 
     public QueueSettings queueSettings() {
         return queueSettings;
+    }
+
+    public UiSettings uiSettings() {
+        return uiSettings;
     }
 
     public record ArenaSettings(int hudHz, int scoreboardHz, int particlesSoftCap, int particlesHardCap,
@@ -200,6 +210,45 @@ public final class CoreConfig {
             }
             if (vipWeight < 0) {
                 throw new IllegalArgumentException("vipWeight must be >= 0");
+            }
+        }
+    }
+
+    public record UiSettings(boolean strictMiniMessage,
+                             Map<String, TitleTimesProfile> titleProfiles,
+                             BossBarDefaults bossBarDefaults) {
+        public UiSettings {
+            Objects.requireNonNull(titleProfiles, "titleProfiles");
+            this.titleProfiles = Map.copyOf(titleProfiles);
+            Objects.requireNonNull(bossBarDefaults, "bossBarDefaults");
+        }
+    }
+
+    public record TitleTimesProfile(int fadeInTicks, int stayTicks, int fadeOutTicks) {
+        public TitleTimesProfile {
+            if (fadeInTicks < 0) {
+                throw new IllegalArgumentException("fadeInTicks must be >= 0");
+            }
+            if (stayTicks <= 0) {
+                throw new IllegalArgumentException("stayTicks must be > 0");
+            }
+            if (fadeOutTicks < 0) {
+                throw new IllegalArgumentException("fadeOutTicks must be >= 0");
+            }
+        }
+    }
+
+    public record BossBarDefaults(BossBar.Color color,
+                                  BossBar.Overlay overlay,
+                                  Set<BossBar.Flag> flags,
+                                  int updateEveryTicks) {
+        public BossBarDefaults {
+            Objects.requireNonNull(color, "color");
+            Objects.requireNonNull(overlay, "overlay");
+            Objects.requireNonNull(flags, "flags");
+            this.flags = flags.isEmpty() ? Set.of() : Set.copyOf(flags);
+            if (updateEveryTicks <= 0) {
+                throw new IllegalArgumentException("updateEveryTicks must be > 0");
             }
         }
     }

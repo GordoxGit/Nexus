@@ -22,3 +22,15 @@ admin:
   dump:
     header: "<gold>Dump Nexus</gold>"
     success: "<green>Dump généré.</green>"
+
+titles:
+  round_start:
+    title: "<gold>Début du round</gold>"
+    subtitle: "<gray>Préparez-vous au combat !</gray>"
+  victory:
+    title: "<green>Victoire !</green>"
+    subtitle: "<yellow>Félicitations <player_name/></yellow>"
+
+bossbars:
+  match_timer:
+    name: "<gold>Temps restant : <white><timer/></white></gold>"
