@@ -54,7 +54,7 @@ import org.bukkit.plugin.ServicesManager;
 import org.bukkit.plugin.java.JavaPlugin;
 
 /**
- * Main entry point for the Nexus plugin.
+ * Main entry point for the Nexus plugin. pipi
  */
 public final class NexusPlugin extends JavaPlugin {
 
