@@ -83,10 +83,11 @@ public final class DbProvider implements LifecycleAware {
 
     private HikariConfig toHikariConfig(CoreConfig.DatabaseSettings settings) {
         HikariConfig config = new HikariConfig();
-        config.setClassLoader(plugin.getClass().getClassLoader());
-        config.setJdbcUrl(settings.jdbcUrl());
-        config.setUsername(settings.username());
-        config.setPassword(settings.password());
+        // Utilise la configuration recommandée pour HikariCP 5.x avec un driver relocalisé
+        config.setDataSourceClassName("com.heneria.nexus.lib.mariadb.jdbc.MariaDbDataSource");
+        config.addDataSourceProperty("url", settings.jdbcUrl());
+        config.addDataSourceProperty("user", settings.username());
+        config.addDataSourceProperty("password", settings.password());
         config.setMaximumPoolSize(settings.poolSettings().maxSize());
         config.setMinimumIdle(settings.poolSettings().minIdle());
         config.setConnectionTimeout(settings.poolSettings().connectionTimeoutMs());
