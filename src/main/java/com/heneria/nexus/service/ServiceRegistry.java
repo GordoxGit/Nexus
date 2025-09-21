@@ -1,6 +1,7 @@
 package com.heneria.nexus.service;
 
 import com.heneria.nexus.util.NexusLogger;
+
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Parameter;
 import java.lang.reflect.ParameterizedType;
@@ -20,6 +21,7 @@ import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * Lightweight service registry used to bootstrap the plugin without relying on
@@ -101,7 +103,7 @@ public final class ServiceRegistry {
         List<ServiceHolder<?>> order = computeTopologicalOrder();
         Deque<Class<?>> stack = new ArrayDeque<>();
         for (ServiceHolder<?> holder : order) {
-            holder.ensureInitialized(this, stack, initializationTimeout);
+            holder.ensureInitialized(stack, initializationTimeout);
         }
         this.startOrder = List.copyOf(order);
         this.wired = true;
@@ -171,21 +173,6 @@ public final class ServiceRegistry {
             throw new IllegalStateException("No service registered for " + type.getName());
         }
         return (T) holder.instance;
-    }
-
-    /**
-     * Returns an optional view over a managed service or singleton.
-     */
-    public <T> Optional<T> find(Class<T> type) {
-        Objects.requireNonNull(type, "type");
-        if (singletons.containsKey(type)) {
-            return Optional.of(type.cast(singletons.get(type)));
-        }
-        ServiceHolder<?> holder = holders.get(type);
-        if (holder == null || holder.instance == null) {
-            return Optional.empty();
-        }
-        return Optional.of(type.cast(holder.instance));
     }
 
     /**
@@ -261,18 +248,18 @@ public final class ServiceRegistry {
         logger.info("-".repeat(header.length()));
         for (ServiceHolder<?> holder : startOrder) {
             ServiceDefinition<?> definition = holder.definition;
-            String deps = definition.dependencies().isEmpty()
+            String dependencies = definition.dependencies().isEmpty()
                     ? "—"
                     : definition.dependencies().stream()
-                            .filter(dep -> dep.type() != ServiceRegistry.class)
-                            .map(dep -> dep.type().getSimpleName() + (dep.optional() ? "?" : ""))
-                            .reduce((left, right) -> left + ", " + right)
-                            .orElse("—");
+                    .filter(dep -> dep.type() != ServiceRegistry.class)
+                    .map(dep -> dep.type().getSimpleName() + (dep.optional() ? "?" : ""))
+                    .reduce((left, right) -> left + ", " + right)
+                    .orElse("—");
             logger.info(String.format(Locale.ROOT,
                     "%-22s | %-30s | %s",
                     definition.serviceType().getSimpleName(),
                     definition.implementationType().getSimpleName(),
-                    deps));
+                    dependencies));
         }
     }
 
@@ -291,7 +278,7 @@ public final class ServiceRegistry {
                 throw new ServiceRegistryException("Cycle détecté: " + cycleToString(stack));
             }
             stack.addLast(type);
-            Object value = holder.ensureInitialized(this, stack, timeout);
+            Object value = holder.ensureInitialized(stack, timeout);
             stack.removeLast();
             return value;
         }
@@ -306,22 +293,10 @@ public final class ServiceRegistry {
         PERMANENT
     }
 
-    private static final class ServiceDefinition<T> {
-
-        private final Class<T> serviceType;
-        private final Class<? extends T> implementationType;
-        private final Constructor<? extends T> constructor;
-        private final List<Dependency> dependencies;
-
-        private ServiceDefinition(Class<T> serviceType,
-                                  Class<? extends T> implementationType,
-                                  Constructor<? extends T> constructor,
-                                  List<Dependency> dependencies) {
-            this.serviceType = serviceType;
-            this.implementationType = implementationType;
-            this.constructor = constructor;
-            this.dependencies = dependencies;
-        }
+    private record ServiceDefinition<T>(Class<T> serviceType,
+                                        Class<? extends T> implementationType,
+                                        Constructor<? extends T> constructor,
+                                        List<Dependency> dependencies) {
 
         static <T> ServiceDefinition<T> create(Class<T> serviceType, Class<? extends T> implementationType) {
             Constructor<? extends T> constructor = selectConstructor(implementationType);
@@ -329,6 +304,7 @@ public final class ServiceRegistry {
             return new ServiceDefinition<>(serviceType, implementationType, constructor, dependencies);
         }
 
+        @SuppressWarnings("unchecked")
         private static <T> Constructor<? extends T> selectConstructor(Class<? extends T> implementation) {
             Constructor<?>[] constructors = implementation.getDeclaredConstructors();
             if (constructors.length != 1) {
@@ -366,40 +342,9 @@ public final class ServiceRegistry {
             }
             return new Dependency(rawType, false);
         }
-
-        Class<T> serviceType() {
-            return serviceType;
-        }
-
-        Class<? extends T> implementationType() {
-            return implementationType;
-        }
-
-        Constructor<? extends T> constructor() {
-            return constructor;
-        }
-
-        List<Dependency> dependencies() {
-            return dependencies;
-        }
     }
 
-    private static final class Dependency {
-        private final Class<?> type;
-        private final boolean optional;
-
-        private Dependency(Class<?> type, boolean optional) {
-            this.type = type;
-            this.optional = optional;
-        }
-
-        Class<?> type() {
-            return type;
-        }
-
-        boolean optional() {
-            return optional;
-        }
+    private record Dependency(Class<?> type, boolean optional) {
     }
 
     private final class ServiceHolder<T> {
@@ -407,7 +352,7 @@ public final class ServiceRegistry {
         private final ServiceDefinition<T> definition;
         private volatile T instance;
         private volatile ServiceLifecycle lifecycle = ServiceLifecycle.NEW;
-        private volatile Throwable lastError;
+        private final AtomicReference<Throwable> lastError = new AtomicReference<>();
         private volatile boolean healthy = true;
         private Duration initializationDuration = Duration.ZERO;
         private Duration startDuration = Duration.ZERO;
@@ -417,7 +362,7 @@ public final class ServiceRegistry {
             this.definition = definition;
         }
 
-        T ensureInitialized(ServiceRegistry registry, Deque<Class<?>> stack, Duration timeout) {
+        T ensureInitialized(Deque<Class<?>> stack, Duration timeout) {
             if (instance != null) {
                 return instance;
             }
@@ -447,11 +392,11 @@ public final class ServiceRegistry {
                     return created;
                 } catch (ServiceRegistryException exception) {
                     lifecycle = ServiceLifecycle.FAILED;
-                    lastError = exception.getCause();
+                    lastError.set(exception.getCause());
                     throw exception;
                 } catch (Throwable throwable) {
                     lifecycle = ServiceLifecycle.FAILED;
-                    lastError = throwable;
+                    lastError.set(throwable);
                     throw new ServiceRegistryException("Impossible d'initialiser " + definition.serviceType().getSimpleName(), throwable);
                 }
             }
@@ -471,7 +416,7 @@ public final class ServiceRegistry {
         }
 
         void start(Duration timeout) {
-            ensureInitialized(ServiceRegistry.this, new ArrayDeque<>(), timeout);
+            ensureInitialized(new ArrayDeque<>(), timeout);
             if (!(instance instanceof LifecycleAware lifecycleAware)) {
                 lifecycle = ServiceLifecycle.STARTED;
                 return;
@@ -490,11 +435,11 @@ public final class ServiceRegistry {
                     updateHealth();
                 } catch (ServiceRegistryException exception) {
                     lifecycle = ServiceLifecycle.FAILED;
-                    lastError = exception.getCause();
+                    lastError.set(exception.getCause());
                     throw exception;
                 } catch (Throwable throwable) {
                     lifecycle = ServiceLifecycle.FAILED;
-                    lastError = throwable;
+                    lastError.set(throwable);
                     throw new ServiceRegistryException("Erreur lors du démarrage de "
                             + definition.serviceType().getSimpleName(), throwable);
                 }
@@ -519,11 +464,11 @@ public final class ServiceRegistry {
                     lifecycle = ServiceLifecycle.STOPPED;
                 } catch (ServiceRegistryException exception) {
                     lifecycle = ServiceLifecycle.FAILED;
-                    lastError = exception.getCause();
+                    lastError.set(exception.getCause());
                     throw exception;
                 } catch (Throwable throwable) {
                     lifecycle = ServiceLifecycle.FAILED;
-                    lastError = throwable;
+                    lastError.set(throwable);
                     throw new ServiceRegistryException("Erreur lors de l'arrêt de "
                             + definition.serviceType().getSimpleName(), throwable);
                 }
@@ -532,7 +477,7 @@ public final class ServiceRegistry {
 
         void markFailed(Throwable throwable) {
             this.lifecycle = ServiceLifecycle.FAILED;
-            this.lastError = throwable;
+            this.lastError.set(throwable);
             this.healthy = false;
         }
 
@@ -562,7 +507,7 @@ public final class ServiceRegistry {
         private void updateHealth() {
             if (instance instanceof LifecycleAware lifecycleAware) {
                 healthy = lifecycleAware.isHealthy();
-                lastError = lifecycleAware.lastError().orElse(lastError);
+                lifecycleAware.lastError().ifPresent(lastError::set);
             }
         }
 
@@ -571,7 +516,7 @@ public final class ServiceRegistry {
                     definition.serviceType(),
                     lifecycle,
                     healthy,
-                    Optional.ofNullable(lastError),
+                    Optional.ofNullable(lastError.get()),
                     initializationDuration,
                     startDuration,
                     stopDuration,
@@ -582,5 +527,3 @@ public final class ServiceRegistry {
         }
     }
 }
-
-*** End Patch
