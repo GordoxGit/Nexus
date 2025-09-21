@@ -4,8 +4,6 @@ import com.heneria.nexus.config.CoreConfig;
 import com.heneria.nexus.service.api.ArenaHandle;
 import com.heneria.nexus.service.api.ArenaMode;
 import com.heneria.nexus.util.NexusLogger;
-import io.papermc.paper.event.entity.EntityAddToWorldEvent;
-import io.papermc.paper.event.entity.EntityRemoveFromWorldEvent;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -30,8 +28,12 @@ import org.bukkit.entity.EntityType;
 import org.bukkit.entity.Player;
 import org.bukkit.entity.Projectile;
 import org.bukkit.event.EventHandler;
+import org.bukkit.event.EventPriority;
 import org.bukkit.event.HandlerList;
 import org.bukkit.event.Listener;
+import org.bukkit.event.entity.EntityDeathEvent;
+import org.bukkit.event.entity.EntitySpawnEvent;
+import org.bukkit.event.entity.ItemDespawnEvent;
 import org.bukkit.persistence.PersistentDataContainer;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.PluginManager;
@@ -286,7 +288,7 @@ public final class BudgetServiceImpl implements BudgetService {
         if (type == EntityType.PLAYER) {
             return null;
         }
-        if (type == EntityType.DROPPED_ITEM) {
+        if (type == EntityType.ITEM) {
             return BudgetType.ITEM;
         }
         Class<? extends Entity> entityClass = type.getEntityClass();
@@ -300,7 +302,7 @@ public final class BudgetServiceImpl implements BudgetService {
         if (entity instanceof Player) {
             return null;
         }
-        if (entity.getType() == EntityType.DROPPED_ITEM) {
+        if (entity.getType() == EntityType.ITEM) {
             return BudgetType.ITEM;
         }
         if (entity instanceof Projectile) {
@@ -311,13 +313,18 @@ public final class BudgetServiceImpl implements BudgetService {
 
     private final class EntityLifecycleListener implements Listener {
 
-        @EventHandler
-        public void onEntityAdd(EntityAddToWorldEvent event) {
+        @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+        public void onEntitySpawn(EntitySpawnEvent event) {
             recordEntityAdded(event.getEntity());
         }
 
-        @EventHandler
-        public void onEntityRemove(EntityRemoveFromWorldEvent event) {
+        @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+        public void onEntityDeath(EntityDeathEvent event) {
+            recordEntityRemoved(event.getEntity());
+        }
+
+        @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+        public void onItemDespawn(ItemDespawnEvent event) {
             recordEntityRemoved(event.getEntity());
         }
     }
