@@ -6,6 +6,7 @@ import com.heneria.nexus.util.NexusLogger;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
 import com.zaxxer.hikari.HikariPoolMXBean;
+import org.bukkit.plugin.java.JavaPlugin;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -26,13 +27,15 @@ public final class DbProvider implements LifecycleAware {
     private static final Duration LEAK_DETECTION = Duration.ofSeconds(15);
 
     private final NexusLogger logger;
+    private final JavaPlugin plugin;
     private final AtomicReference<HikariDataSource> dataSourceRef = new AtomicReference<>();
     private final AtomicReference<CoreConfig.DatabaseSettings> settingsRef = new AtomicReference<>();
     private final AtomicLong failedAttempts = new AtomicLong();
     private volatile boolean degraded;
 
-    public DbProvider(NexusLogger logger) {
+    public DbProvider(NexusLogger logger, JavaPlugin plugin) {
         this.logger = Objects.requireNonNull(logger, "logger");
+        this.plugin = Objects.requireNonNull(plugin, "plugin");
     }
 
     public CompletableFuture<Boolean> applyConfiguration(CoreConfig.DatabaseSettings settings, Executor executor) {
@@ -80,6 +83,7 @@ public final class DbProvider implements LifecycleAware {
 
     private HikariConfig toHikariConfig(CoreConfig.DatabaseSettings settings) {
         HikariConfig config = new HikariConfig();
+        config.setClassLoader(plugin.getClass().getClassLoader());
         config.setJdbcUrl(settings.jdbcUrl());
         config.setUsername(settings.username());
         config.setPassword(settings.password());
