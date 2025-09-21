@@ -26,6 +26,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.atomic.LongAdder;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
 import org.bukkit.plugin.java.JavaPlugin;
 
 /**
@@ -253,13 +254,14 @@ public final class ExecutorManager implements AutoCloseable {
         if (stages.isEmpty()) {
             return CompletableFuture.completedFuture(List.of());
         }
-        List<CompletableFuture<? extends T>> futures = stages.stream()
-                .map(this::toCompletableFuture)
-                .toList();
-        CompletableFuture<?>[] array = futures.toArray(CompletableFuture[]::new);
-        return CompletableFuture.allOf(array).thenApply(ignored -> futures.stream()
-                .map(CompletableFuture::join)
-                .toList());
+        // CORRECTION: Correction du problème de type générique
+        CompletableFuture<?>[] futures = stages.stream()
+                .map(CompletionStage::toCompletableFuture)
+                .toArray(CompletableFuture[]::new);
+
+        return CompletableFuture.allOf(futures).thenApply(v -> stages.stream()
+                .map(stage -> stage.toCompletableFuture().join())
+                .collect(Collectors.toList()));
     }
 
     public <T> CompletableFuture<T> anyOfFast(List<? extends CompletionStage<? extends T>> stages) {
@@ -267,8 +269,9 @@ public final class ExecutorManager implements AutoCloseable {
         if (stages.isEmpty()) {
             return CompletableFuture.failedFuture(new IllegalArgumentException("Liste vide"));
         }
-        List<CompletableFuture<? extends T>> futures = stages.stream()
-                .map(this::toCompletableFuture)
+        // CORRECTION: Correction du problème de type générique
+        List<? extends CompletableFuture<? extends T>> futures = stages.stream()
+                .map(CompletionStage::toCompletableFuture)
                 .toList();
         CompletableFuture<T> result = new CompletableFuture<>();
         for (CompletableFuture<? extends T> future : futures) {
