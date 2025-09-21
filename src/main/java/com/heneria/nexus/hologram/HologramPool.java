@@ -69,7 +69,7 @@ final class HologramPool {
         }
         hideFrom(viewers, display);
         hideFromAll(display);
-        display.setText(Component.empty());
+        display.setText(String.valueOf(Component.empty()));
         display.setGlowColorOverride(null);
         if (!display.isValid() || textPool.size() >= maxTextDisplays.get()) {
             display.remove();
@@ -139,7 +139,7 @@ final class HologramPool {
             entity.setBrightness(new Display.Brightness(15, 15));
             entity.setViewRange((float) viewRange);
             entity.setRotation(location.getYaw(), location.getPitch());
-            entity.setText(Component.empty());
+            entity.setText(String.valueOf(Component.empty()));
             try {
                 entity.setVisibleByDefault(false);
             } catch (NoSuchMethodError ignored) {
@@ -153,7 +153,7 @@ final class HologramPool {
         display.teleport(location);
         display.setViewRange((float) viewRange);
         display.setRotation(location.getYaw(), location.getPitch());
-        display.setText(Component.empty());
+        display.setText(String.valueOf(Component.empty()));
     }
 
     private Interaction spawnInteraction(Location location) {
