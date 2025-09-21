@@ -84,7 +84,7 @@ public final class DbProvider implements LifecycleAware {
     private HikariConfig toHikariConfig(CoreConfig.DatabaseSettings settings) {
         HikariConfig config = new HikariConfig();
         // Utilise la configuration recommandée pour HikariCP 5.x avec un driver relocalisé
-        config.setDataSourceClassName("com.heneria.nexus.lib.mariadb.jdbc.MariaDbDataSource");
+        config.setDataSourceClassName("com.heneria.nexus.lib.mariadb.MariaDbDataSource");
         config.addDataSourceProperty("url", settings.jdbcUrl());
         config.addDataSourceProperty("user", settings.username());
         config.addDataSourceProperty("password", settings.password());
