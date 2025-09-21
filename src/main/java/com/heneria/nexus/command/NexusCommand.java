@@ -15,7 +15,8 @@ import org.bukkit.command.TabCompleter;
  */
 public final class NexusCommand implements CommandExecutor, TabCompleter {
 
-    private static final List<String> SUB_COMMANDS = List.of("help", "reload", "dump", "budget");
+    private static final List<String> SUB_COMMANDS = List.of("help", "reload", "dump", "budget", "holo");
+    private static final List<String> HOLO_SUB = List.of("create", "remove", "move", "list", "reload");
 
     private final NexusPlugin plugin;
 
@@ -47,6 +48,10 @@ public final class NexusCommand implements CommandExecutor, TabCompleter {
                 plugin.handleBudget(sender, args);
                 yield true;
             }
+            case "holo" -> {
+                plugin.handleHologram(sender, args);
+                yield true;
+            }
             default -> {
                 plugin.sendHelp(sender);
                 yield true;
@@ -63,10 +68,32 @@ public final class NexusCommand implements CommandExecutor, TabCompleter {
                         if (sub.equals("reload") || sub.equals("dump") || sub.equals("budget")) {
                             return sender.hasPermission("nexus.admin." + sub);
                         }
+                        if (sub.equals("holo")) {
+                            return sender.hasPermission("nexus.holo.manage");
+                        }
                         return true;
                     })
                     .filter(sub -> sub.startsWith(prefix))
                     .collect(Collectors.toList());
+        }
+        if (args.length >= 2 && args[0].equalsIgnoreCase("holo")) {
+            if (!sender.hasPermission("nexus.holo.manage")) {
+                return Collections.emptyList();
+            }
+            if (args.length == 2) {
+                String prefix = args[1].toLowerCase(Locale.ROOT);
+                return HOLO_SUB.stream()
+                        .filter(sub -> sub.startsWith(prefix))
+                        .toList();
+            }
+            if (args.length == 3 && (args[1].equalsIgnoreCase("move") || args[1].equalsIgnoreCase("remove"))) {
+                String prefix = args[2].toLowerCase(Locale.ROOT);
+                return plugin.suggestHolograms(prefix);
+            }
+            if (args.length == 4 && args[1].equalsIgnoreCase("create")) {
+                String prefix = args[3].toLowerCase(Locale.ROOT);
+                return "default".startsWith(prefix) ? List.of("default") : Collections.emptyList();
+            }
         }
         if (args.length == 2 && args[0].equalsIgnoreCase("budget")) {
             if (!sender.hasPermission("nexus.admin.budget")) {

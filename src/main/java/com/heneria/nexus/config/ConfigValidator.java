@@ -91,6 +91,13 @@ public final class ConfigValidator {
         int queueVip = nonNegativeInt(yaml, "queue.vip_weight", 0, issues);
         boolean strictMiniMessage = yaml.getBoolean("ui.minimessage.strict", true);
 
+        int hologramHz = positiveInt(yaml, "holograms.update_hz", 5, issues, true);
+        int hologramMaxVisible = positiveInt(yaml, "holograms.max_visible_per_instance", 80, issues, true);
+        double hologramSpacing = positiveDouble(yaml, "holograms.line_spacing", 0.27D, issues, true);
+        double hologramViewRange = positiveDouble(yaml, "holograms.view_range", 48.0D, issues, true);
+        int hologramPoolText = nonNegativeInt(yaml, "holograms.pool.max_text_displays", 64, issues);
+        int hologramPoolInteractions = nonNegativeInt(yaml, "holograms.pool.max_interactions", 32, issues);
+
         Map<String, CoreConfig.TitleTimesProfile> titleProfiles = new LinkedHashMap<>();
         ConfigurationSection timesSection = yaml.getConfigurationSection("ui.title.times");
         if (timesSection != null) {
@@ -148,6 +155,7 @@ public final class ConfigValidator {
         CoreConfig.TimeoutSettings timeoutSettings;
         CoreConfig.DegradedModeSettings degradedModeSettings = new CoreConfig.DegradedModeSettings(degradedEnabled, degradedBanner);
         CoreConfig.QueueSettings queueSettings;
+        CoreConfig.HologramSettings hologramSettings;
 
         try {
             arenaSettings = new CoreConfig.ArenaSettings(hudHz, scoreboardHz, particlesSoft, particlesHard,
@@ -214,9 +222,16 @@ public final class ConfigValidator {
             issues.error("queue", exception.getMessage());
             queueSettings = new CoreConfig.QueueSettings(5, 0);
         }
+        try {
+            hologramSettings = new CoreConfig.HologramSettings(hologramHz, hologramMaxVisible,
+                    hologramSpacing, hologramViewRange, hologramPoolText, hologramPoolInteractions);
+        } catch (IllegalArgumentException exception) {
+            issues.error("holograms", exception.getMessage());
+            hologramSettings = new CoreConfig.HologramSettings(5, 80, 0.27D, 48.0D, 64, 32);
+        }
 
         return new CoreConfig(mode, locale, zone, arenaSettings, executorSettings, databaseSettings,
-                serviceSettings, timeoutSettings, degradedModeSettings, queueSettings, uiSettings);
+                serviceSettings, timeoutSettings, degradedModeSettings, queueSettings, hologramSettings, uiSettings);
     }
 
     public MessageBundle validateMessages(YamlConfiguration yaml, IssueCollector issues) {
@@ -456,6 +471,18 @@ public final class ConfigValidator {
         if (value <= 0) {
             issues.error(path, "Doit être > 0");
             return Math.max(1, value);
+        }
+        return value;
+    }
+
+    private double positiveDouble(YamlConfiguration yaml, String path, double def, IssueCollector issues, boolean warnOnMissing) {
+        double value = yaml.getDouble(path, def);
+        if (!yaml.isSet(path) && warnOnMissing) {
+            issues.warn(path, "Valeur manquante, utilisation de " + def);
+        }
+        if (value <= 0D) {
+            issues.error(path, "Doit être > 0");
+            return def;
         }
         return value;
     }
