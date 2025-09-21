@@ -97,6 +97,7 @@ public final class NexusPlugin extends JavaPlugin {
         this.messageFacade = new MessageFacade(bundle.messages(), logger);
         this.executorManager = new ExecutorManager(this, logger, bundle.core().executorSettings());
         this.serviceRegistry = new ServiceRegistry(logger);
+        this.dbProvider = new DbProvider(logger, this);
 
         registerSingletons();
         registerServices();
@@ -492,10 +493,10 @@ public final class NexusPlugin extends JavaPlugin {
         serviceRegistry.registerSingleton(ConfigBundle.class, bundle);
         serviceRegistry.registerSingleton(CoreConfig.class, bundle.core());
         serviceRegistry.registerSingleton(ExecutorManager.class, executorManager);
+        serviceRegistry.registerSingleton(DbProvider.class, dbProvider);
     }
 
     private void registerServices() {
-        serviceRegistry.registerService(DbProvider.class, DbProvider.class);
         serviceRegistry.registerService(RingScheduler.class, RingScheduler.class);
         serviceRegistry.registerService(MapService.class, MapServiceImpl.class);
         serviceRegistry.registerService(ProfileService.class, ProfileServiceImpl.class);
