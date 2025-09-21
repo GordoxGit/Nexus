@@ -57,6 +57,15 @@ queue:
   tick_hz: 5
   vip_weight: 1
 
+holograms:
+  update_hz: 5
+  max_visible_per_instance: 80
+  line_spacing: 0.27
+  view_range: 48.0
+  pool:
+    max_text_displays: 64
+    max_interactions: 32
+
 ui:
   minimessage:
     strict: true

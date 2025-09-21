@@ -1,0 +1,19 @@
+# =============================================
+#  Définition des hologrammes Nexus
+#  Chaque hologramme est défini par son monde, sa position et ses lignes.
+#  La position correspond à la première ligne (les lignes suivantes sont
+#  empilées vers le bas selon le line_spacing défini dans config.yml).
+# =============================================
+
+holograms:
+  hub_welcome:
+    world: world
+    x: 0.5
+    y: 70.5
+    z: 0.5
+    yaw: 180.0
+    pitch: 0.0
+    group: default
+    lines:
+      - "<gold>Bienvenue sur Nexus</gold>"
+      - "<gray>Tps: %server_tps%</gray>"

@@ -11,6 +11,7 @@ help:
     reload: "<gray>/nexus reload</gray> <dark_gray>-</dark_gray> <yellow>Recharge les configurations et messages.</yellow>"
     dump: "<gray>/nexus dump</gray> <dark_gray>-</dark_gray> <yellow>Affiche l'état courant (threads, DB, scheduler).</yellow>"
     budget: "<gray>/nexus budget [arène]</gray> <dark_gray>-</dark_gray> <yellow>Inspecte les budgets en cours.</yellow>"
+    holo: "<gray>/nexus holo <create|remove|move|list|reload></gray> <dark_gray>-</dark_gray> <yellow>Gère les hologrammes.</yellow>"
 
 errors:
   no_permission: "<red>Vous n'avez pas la permission requise.</red>"
@@ -35,3 +36,22 @@ titles:
 bossbars:
   match_timer:
     name: "<gold>Temps restant : <white><timer/></white></gold>"
+
+holograms:
+  usage: "<gray>/nexus holo <create|remove|move|list|reload></gray>"
+  created: "<green>Hologramme <id> créé.</green>"
+  moved: "<green>Hologramme <id> déplacé.</green>"
+  removed: "<green>Hologramme <id> supprimé.</green>"
+  reload:
+    ok: "<green>Hologrammes rechargés depuis la configuration.</green>"
+  list:
+    header: "<gold>Hologrammes actifs (<count>) :</gold>"
+    entry: "<gray>- <white><id></white> @ <yellow><world></yellow> <aqua><x>, <y>, <z></aqua> (<lines> lignes, groupe <group>)</gray>"
+    empty: "<gray>Aucun hologramme actif.</gray>"
+  errors:
+    player_only: "<red>Cette commande doit être exécutée en jeu.</red>"
+    duplicate: "<red>Un hologramme avec l'identifiant <id> existe déjà.</red>"
+    not_found: "<red>Aucun hologramme trouvé pour <id>.</red>"
+    invalid_definition: "<red>Impossible de créer l'hologramme : aucune ligne valide.</red>"
+  create:
+    help: "<gray>Usage :</gray> <yellow>/nexus holo create <id> <groupe> <ligne1|ligne2|...></yellow>"

@@ -72,6 +72,17 @@ public final class RingScheduler implements LifecycleAware {
         tasks.put(id, new RingTask(id, runnable, phases, intervalTicks, offset));
     }
 
+    public void unregisterTask(String id) {
+        tasks.remove(id);
+    }
+
+    public void updateTaskInterval(String id, long intervalTicks) {
+        RingTask task = tasks.get(id);
+        if (task != null) {
+            task.updateInterval(intervalTicks);
+        }
+    }
+
     public void setPhase(GamePhase phase) {
         this.phase.set(Objects.requireNonNull(phase, "phase"));
     }

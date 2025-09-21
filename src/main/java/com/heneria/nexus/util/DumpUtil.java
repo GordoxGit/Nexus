@@ -5,6 +5,7 @@ import com.heneria.nexus.budget.BudgetSnapshot;
 import com.heneria.nexus.config.ConfigBundle;
 import com.heneria.nexus.concurrent.ExecutorManager;
 import com.heneria.nexus.db.DbProvider;
+import com.heneria.nexus.hologram.HoloService;
 import com.heneria.nexus.scheduler.RingScheduler;
 import com.heneria.nexus.service.ServiceRegistry;
 import com.heneria.nexus.watchdog.WatchdogReport;
@@ -36,7 +37,8 @@ public final class DumpUtil {
                                              DbProvider dbProvider,
                                              ServiceRegistry serviceRegistry,
                                              BudgetService budgetService,
-                                             WatchdogService watchdogService) {
+                                             WatchdogService watchdogService,
+                                             HoloService holoService) {
         List<Component> lines = new ArrayList<>();
         lines.add(Component.text("=== État Nexus ===", NamedTextColor.GOLD));
         lines.add(Component.text("Serveur : " + server.getVersion(), NamedTextColor.YELLOW));
@@ -74,6 +76,13 @@ public final class DumpUtil {
         lines.add(Component.text("Connexions totales : " + dbDiagnostics.totalConnections(), NamedTextColor.GRAY));
         lines.add(Component.text("Threads en attente : " + dbDiagnostics.awaitingThreads(), NamedTextColor.GRAY));
         lines.add(Component.text("Tentatives échouées : " + dbDiagnostics.failedAttempts(), NamedTextColor.GRAY));
+
+        HoloService.Diagnostics holoDiagnostics = holoService.diagnostics();
+        lines.add(Component.empty());
+        lines.add(Component.text("-- Hologrammes --", NamedTextColor.AQUA));
+        lines.add(Component.text("Actifs : " + holoDiagnostics.activeHolograms(), NamedTextColor.GRAY));
+        lines.add(Component.text("Pool TextDisplay : " + holoDiagnostics.pooledTextDisplays(), NamedTextColor.GRAY));
+        lines.add(Component.text("Pool Interaction : " + holoDiagnostics.pooledInteractions(), NamedTextColor.GRAY));
 
         lines.add(Component.empty());
         lines.add(Component.text("-- Services --", NamedTextColor.AQUA));
