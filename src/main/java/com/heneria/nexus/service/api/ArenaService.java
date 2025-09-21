@@ -3,6 +3,7 @@ package com.heneria.nexus.service.api;
 import com.heneria.nexus.config.CoreConfig;
 import com.heneria.nexus.service.LifecycleAware;
 import java.util.Collection;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.UUID;
@@ -59,6 +60,10 @@ public interface ArenaService extends LifecycleAware {
      * reloaded.
      */
     void applyArenaSettings(CoreConfig.ArenaSettings settings);
+
+    default void applyWatchdogSettings(CoreConfig.TimeoutSettings.WatchdogSettings settings) {
+        Objects.requireNonNull(settings, "settings");
+    }
 
     interface ArenaListener {
         void onPhaseChange(ArenaHandle handle, ArenaPhase previous, ArenaPhase next);

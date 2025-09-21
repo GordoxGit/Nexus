@@ -7,6 +7,8 @@ import com.heneria.nexus.concurrent.ExecutorManager;
 import com.heneria.nexus.db.DbProvider;
 import com.heneria.nexus.scheduler.RingScheduler;
 import com.heneria.nexus.service.ServiceRegistry;
+import com.heneria.nexus.watchdog.WatchdogReport;
+import com.heneria.nexus.watchdog.WatchdogService;
 import java.lang.management.ManagementFactory;
 import java.lang.management.ThreadMXBean;
 import java.time.format.DateTimeFormatter;
@@ -33,7 +35,8 @@ public final class DumpUtil {
                                              RingScheduler scheduler,
                                              DbProvider dbProvider,
                                              ServiceRegistry serviceRegistry,
-                                             BudgetService budgetService) {
+                                             BudgetService budgetService,
+                                             WatchdogService watchdogService) {
         List<Component> lines = new ArrayList<>();
         lines.add(Component.text("=== État Nexus ===", NamedTextColor.GOLD));
         lines.add(Component.text("Serveur : " + server.getVersion(), NamedTextColor.YELLOW));
@@ -91,6 +94,23 @@ public final class DumpUtil {
             lines.add(Component.text(state, NamedTextColor.GRAY));
         });
 
+        WatchdogService.WatchdogStatistics watchdogStats = watchdogService.statistics();
+        lines.add(Component.empty());
+        lines.add(Component.text("-- Watchdog --", NamedTextColor.AQUA));
+        lines.add(Component.text("Tâches surveillées : " + watchdogStats.monitoredTasks(), NamedTextColor.GRAY));
+        lines.add(Component.text("Timeouts : " + watchdogStats.timedOutTasks(), NamedTextColor.GRAY));
+        lines.add(Component.text("Temps moyen : " + String.format(Locale.ROOT, "%.2f ms", watchdogStats.averageDurationMillis()), NamedTextColor.GRAY));
+        List<WatchdogReport> incidents = watchdogService.recentReports().stream()
+                .filter(report -> report.status() != WatchdogReport.Status.COMPLETED)
+                .limit(5)
+                .toList();
+        if (incidents.isEmpty()) {
+            lines.add(Component.text("Aucun incident récent.", NamedTextColor.DARK_GRAY));
+        } else {
+            lines.add(Component.text("Incidents récents :", NamedTextColor.GRAY));
+            incidents.forEach(report -> lines.add(Component.text(formatWatchdogReport(report), NamedTextColor.DARK_GRAY)));
+        }
+
         Collection<BudgetSnapshot> budgets = budgetService.snapshots();
         if (!budgets.isEmpty()) {
             lines.add(Component.empty());
@@ -125,5 +145,23 @@ public final class DumpUtil {
                 + " terminés=" + snapshot.completedTasks()
                 + " rejetés=" + snapshot.rejectedTasks()
                 + " avg=" + String.format(Locale.ROOT, "%.2fms", snapshot.averageExecutionMillis()), NamedTextColor.GRAY));
+    }
+
+    private static String formatWatchdogReport(WatchdogReport report) {
+        StringBuilder builder = new StringBuilder(" • ")
+                .append(report.taskName())
+                .append(" [")
+                .append(report.status())
+                .append("] ")
+                .append(report.duration().toMillis())
+                .append(" ms");
+        report.error().ifPresent(error -> {
+            builder.append(" -> ")
+                    .append(error.getClass().getSimpleName());
+            if (error.getMessage() != null && !error.getMessage().isBlank()) {
+                builder.append(": ").append(error.getMessage());
+            }
+        });
+        return builder.toString();
     }
 }

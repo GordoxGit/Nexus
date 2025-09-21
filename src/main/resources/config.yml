@@ -45,6 +45,9 @@ services:
 timeouts:
   startMs: 5000
   stopMs: 3000
+  watchdog:
+    reset_ms: 10000
+    paste_ms: 8000
 
 degraded-mode:
   enabled: true

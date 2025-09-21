@@ -14,9 +14,11 @@ import com.heneria.nexus.service.api.MapService;
 import com.heneria.nexus.service.api.ProfileService;
 import com.heneria.nexus.service.api.QueueService;
 import com.heneria.nexus.util.NexusLogger;
+import com.heneria.nexus.watchdog.WatchdogService;
+import com.heneria.nexus.watchdog.WatchdogTimeoutException;
+import java.time.Duration;
 import java.util.Collection;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalLong;
@@ -40,9 +42,11 @@ public final class ArenaServiceImpl implements ArenaService {
     private final EconomyService economyService;
     private final ExecutorManager executorManager;
     private final BudgetService budgetService;
+    private final WatchdogService watchdogService;
     private final ConcurrentHashMap<UUID, ArenaHandle> arenas = new ConcurrentHashMap<>();
     private final CopyOnWriteArrayList<ArenaListener> listeners = new CopyOnWriteArrayList<>();
     private final AtomicReference<CoreConfig.ArenaSettings> settingsRef;
+    private final AtomicReference<CoreConfig.TimeoutSettings.WatchdogSettings> watchdogSettingsRef;
 
     public ArenaServiceImpl(JavaPlugin plugin,
                             NexusLogger logger,
@@ -52,6 +56,7 @@ public final class ArenaServiceImpl implements ArenaService {
                             EconomyService economyService,
                             ExecutorManager executorManager,
                             BudgetService budgetService,
+                            WatchdogService watchdogService,
                             CoreConfig config) {
         this.plugin = Objects.requireNonNull(plugin, "plugin");
         this.logger = Objects.requireNonNull(logger, "logger");
@@ -61,7 +66,9 @@ public final class ArenaServiceImpl implements ArenaService {
         this.economyService = Objects.requireNonNull(economyService, "economyService");
         this.executorManager = Objects.requireNonNull(executorManager, "executorManager");
         this.budgetService = Objects.requireNonNull(budgetService, "budgetService");
+        this.watchdogService = Objects.requireNonNull(watchdogService, "watchdogService");
         this.settingsRef = new AtomicReference<>(config.arenaSettings());
+        this.watchdogSettingsRef = new AtomicReference<>(config.timeoutSettings().watchdog());
     }
 
     @Override
@@ -105,6 +112,7 @@ public final class ArenaServiceImpl implements ArenaService {
         listeners.forEach(listener -> safe(() -> listener.onPhaseChange(handle, previous, nextPhase)));
         if (nextPhase == ArenaPhase.RESET) {
             listeners.forEach(listener -> safe(() -> listener.onResetStart(handle)));
+            scheduleReset(handle);
             executorManager.compute().execute(() -> logger.debug(() -> "Préparation du reset pour " + handle.id()));
         } else if (previous == ArenaPhase.RESET && nextPhase != ArenaPhase.RESET) {
             listeners.forEach(listener -> safe(() -> listener.onResetEnd(handle)));
@@ -153,5 +161,57 @@ public final class ArenaServiceImpl implements ArenaService {
     public void applyArenaSettings(CoreConfig.ArenaSettings settings) {
         settingsRef.set(Objects.requireNonNull(settings, "settings"));
         logger.info("Paramètres d'arène mis à jour: hud=" + settings.hudHz() + " scoreboard=" + settings.scoreboardHz());
+    }
+
+    @Override
+    public void applyWatchdogSettings(CoreConfig.TimeoutSettings.WatchdogSettings settings) {
+        watchdogSettingsRef.set(Objects.requireNonNull(settings, "settings"));
+        logger.info("Timeouts watchdog mis à jour: reset=" + settings.resetMs() + "ms paste=" + settings.pasteMs() + "ms");
+    }
+
+    private void scheduleReset(ArenaHandle handle) {
+        CoreConfig.TimeoutSettings.WatchdogSettings settings = watchdogSettingsRef.get();
+        Duration timeout = Duration.ofMillis(Math.max(1L, settings.resetMs()));
+        String taskName = "arena-reset-" + handle.id();
+        watchdogService.registerFallback(taskName, throwable -> forceEnd(handle, throwable));
+        watchdogService.monitor(taskName, timeout, () -> performReset(handle)).whenComplete((unused, throwable) -> {
+            if (throwable == null) {
+                return;
+            }
+            if (throwable instanceof WatchdogTimeoutException) {
+                return;
+            }
+            logger.warn("Reset de l'arène " + handle.id() + " terminé avec une erreur", throwable);
+            forceEnd(handle, throwable);
+        });
+    }
+
+    private CompletableFuture<Void> performReset(ArenaHandle handle) {
+        return executorManager.runCompute(() ->
+                logger.debug(() -> "Réinitialisation de l'arène " + handle.id() + " sur map " + handle.mapId()))
+                .thenCompose(ignored -> monitorPaste(handle));
+    }
+
+    private CompletableFuture<Void> monitorPaste(ArenaHandle handle) {
+        CoreConfig.TimeoutSettings.WatchdogSettings settings = watchdogSettingsRef.get();
+        Duration timeout = Duration.ofMillis(Math.max(1L, settings.pasteMs()));
+        String taskName = "arena-paste-" + handle.id();
+        watchdogService.registerFallback(taskName, throwable -> forceEnd(handle, throwable));
+        return watchdogService.monitor(taskName, timeout, () -> executorManager.runCompute(() ->
+                logger.debug(() -> "Application du schematic pour " + handle.id())));
+    }
+
+    private void forceEnd(ArenaHandle handle, Throwable cause) {
+        executorManager.mainThread().runNow(() -> {
+            if (!arenas.containsKey(handle.id())) {
+                return;
+            }
+            if (cause != null) {
+                logger.warn("Arène " + handle.id() + " forcée en phase END suite à un incident de reset.", cause);
+            } else {
+                logger.warn("Arène " + handle.id() + " forcée en phase END suite à un incident de reset.");
+            }
+            transition(handle, ArenaPhase.END);
+        });
     }
 }

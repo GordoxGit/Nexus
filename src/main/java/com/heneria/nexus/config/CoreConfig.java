@@ -189,13 +189,25 @@ public final class CoreConfig {
     public record ServiceSettings(boolean exposeBukkitServices) {
     }
 
-    public record TimeoutSettings(long startMs, long stopMs) {
+    public record TimeoutSettings(long startMs, long stopMs, WatchdogSettings watchdog) {
         public TimeoutSettings {
             if (startMs <= 0L) {
                 throw new IllegalArgumentException("startMs must be positive");
             }
             if (stopMs <= 0L) {
                 throw new IllegalArgumentException("stopMs must be positive");
+            }
+            Objects.requireNonNull(watchdog, "watchdog");
+        }
+
+        public record WatchdogSettings(long resetMs, long pasteMs) {
+            public WatchdogSettings {
+                if (resetMs <= 0L) {
+                    throw new IllegalArgumentException("resetMs must be positive");
+                }
+                if (pasteMs <= 0L) {
+                    throw new IllegalArgumentException("pasteMs must be positive");
+                }
             }
         }
     }
