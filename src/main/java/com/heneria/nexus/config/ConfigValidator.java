@@ -83,6 +83,8 @@ public final class ConfigValidator {
         boolean exposeServices = yaml.getBoolean("services.expose-bukkit-services", false);
         long timeoutStart = positiveLong(yaml, "timeouts.startMs", 5000L, issues, true);
         long timeoutStop = positiveLong(yaml, "timeouts.stopMs", 3000L, issues, true);
+        long watchdogReset = positiveLong(yaml, "timeouts.watchdog.reset_ms", 10_000L, issues, true);
+        long watchdogPaste = positiveLong(yaml, "timeouts.watchdog.paste_ms", 8_000L, issues, true);
         boolean degradedEnabled = yaml.getBoolean("degraded-mode.enabled", true);
         boolean degradedBanner = yaml.getBoolean("degraded-mode.banner", true);
         int queueHz = positiveInt(yaml, "queue.tick_hz", 5, issues, true);
@@ -192,11 +194,19 @@ public final class ConfigValidator {
         }
         databaseSettings = new CoreConfig.DatabaseSettings(databaseEnabled, jdbc, user, password, poolSettings);
 
+        CoreConfig.TimeoutSettings.WatchdogSettings watchdogSettings;
         try {
-            timeoutSettings = new CoreConfig.TimeoutSettings(timeoutStart, timeoutStop);
+            watchdogSettings = new CoreConfig.TimeoutSettings.WatchdogSettings(watchdogReset, watchdogPaste);
+        } catch (IllegalArgumentException exception) {
+            issues.error("timeouts.watchdog", exception.getMessage());
+            watchdogSettings = new CoreConfig.TimeoutSettings.WatchdogSettings(10_000L, 8_000L);
+        }
+        try {
+            timeoutSettings = new CoreConfig.TimeoutSettings(timeoutStart, timeoutStop, watchdogSettings);
         } catch (IllegalArgumentException exception) {
             issues.error("timeouts", exception.getMessage());
-            timeoutSettings = new CoreConfig.TimeoutSettings(5000L, 3000L);
+            timeoutSettings = new CoreConfig.TimeoutSettings(5000L, 3000L,
+                    new CoreConfig.TimeoutSettings.WatchdogSettings(10_000L, 8_000L));
         }
         try {
             queueSettings = new CoreConfig.QueueSettings(queueHz, queueVip);

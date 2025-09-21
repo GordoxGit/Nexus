@@ -27,6 +27,8 @@ import com.heneria.nexus.service.core.QueueServiceImpl;
 import com.heneria.nexus.util.DumpUtil;
 import com.heneria.nexus.util.MessageFacade;
 import com.heneria.nexus.util.NexusLogger;
+import com.heneria.nexus.watchdog.WatchdogService;
+import com.heneria.nexus.watchdog.WatchdogServiceImpl;
 import java.time.Duration;
 import java.util.Collection;
 import java.util.EnumSet;
@@ -242,6 +244,7 @@ public final class NexusPlugin extends JavaPlugin {
         configureDatabase(newBundle.core().databaseSettings());
         serviceRegistry.get(QueueService.class).applySettings(newBundle.core().queueSettings());
         serviceRegistry.get(ArenaService.class).applyArenaSettings(newBundle.core().arenaSettings());
+        serviceRegistry.get(ArenaService.class).applyWatchdogSettings(newBundle.core().timeoutSettings().watchdog());
         serviceRegistry.get(BudgetService.class).applySettings(newBundle.core().arenaSettings());
         serviceRegistry.get(ProfileService.class).applyDegradedModeSettings(newBundle.core().degradedModeSettings());
         serviceRegistry.get(EconomyService.class).applyDegradedModeSettings(newBundle.core().degradedModeSettings());
@@ -260,7 +263,7 @@ public final class NexusPlugin extends JavaPlugin {
         }
         messageFacade.send(sender, "admin.dump.header");
         List<Component> lines = DumpUtil.createDump(getServer(), bundle, executorManager, ringScheduler, dbProvider, serviceRegistry,
-                serviceRegistry.get(BudgetService.class));
+                serviceRegistry.get(BudgetService.class), serviceRegistry.get(WatchdogService.class));
         lines.forEach(sender::sendMessage);
         messageFacade.send(sender, "admin.dump.success");
     }
@@ -357,6 +360,7 @@ public final class NexusPlugin extends JavaPlugin {
         serviceRegistry.registerService(EconomyService.class, EconomyServiceImpl.class);
         serviceRegistry.registerService(QueueService.class, QueueServiceImpl.class);
         serviceRegistry.registerService(BudgetService.class, BudgetServiceImpl.class);
+        serviceRegistry.registerService(WatchdogService.class, WatchdogServiceImpl.class);
         serviceRegistry.registerService(ArenaService.class, ArenaServiceImpl.class);
     }
 
