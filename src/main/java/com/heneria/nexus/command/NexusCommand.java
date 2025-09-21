@@ -11,7 +11,7 @@ import org.bukkit.command.CommandSender;
 import org.bukkit.command.TabCompleter;
 
 /**
- * Main command entry point.
+ * Main command entry point. caca
  */
 public final class NexusCommand implements CommandExecutor, TabCompleter {
 
