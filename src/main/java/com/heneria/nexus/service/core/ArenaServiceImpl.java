@@ -1,5 +1,6 @@
 package com.heneria.nexus.service.core;
 
+import com.heneria.nexus.budget.BudgetService;
 import com.heneria.nexus.config.CoreConfig;
 import com.heneria.nexus.concurrent.ExecutorManager;
 import com.heneria.nexus.service.api.ArenaBudget;
@@ -38,6 +39,7 @@ public final class ArenaServiceImpl implements ArenaService {
     private final Optional<ProfileService> profileService;
     private final EconomyService economyService;
     private final ExecutorManager executorManager;
+    private final BudgetService budgetService;
     private final ConcurrentHashMap<UUID, ArenaHandle> arenas = new ConcurrentHashMap<>();
     private final CopyOnWriteArrayList<ArenaListener> listeners = new CopyOnWriteArrayList<>();
     private final AtomicReference<CoreConfig.ArenaSettings> settingsRef;
@@ -49,6 +51,7 @@ public final class ArenaServiceImpl implements ArenaService {
                             Optional<ProfileService> profileService,
                             EconomyService economyService,
                             ExecutorManager executorManager,
+                            BudgetService budgetService,
                             CoreConfig config) {
         this.plugin = Objects.requireNonNull(plugin, "plugin");
         this.logger = Objects.requireNonNull(logger, "logger");
@@ -57,6 +60,7 @@ public final class ArenaServiceImpl implements ArenaService {
         this.profileService = Objects.requireNonNull(profileService, "profileService");
         this.economyService = Objects.requireNonNull(economyService, "economyService");
         this.executorManager = Objects.requireNonNull(executorManager, "executorManager");
+        this.budgetService = Objects.requireNonNull(budgetService, "budgetService");
         this.settingsRef = new AtomicReference<>(config.arenaSettings());
     }
 
@@ -74,6 +78,7 @@ public final class ArenaServiceImpl implements ArenaService {
         }
         ArenaHandle handle = new ArenaHandle(UUID.randomUUID(), mapId, mode, ArenaPhase.LOBBY);
         arenas.put(handle.id(), handle);
+        budgetService.registerArena(handle);
         logger.info("Nouvelle arène " + handle.id() + " sur map " + mapId + " mode " + mode);
         seed.ifPresent(value -> logger.debug(() -> "Seed déterministe appliqué à " + handle.id() + " -> " + value));
         return handle;
@@ -108,6 +113,7 @@ public final class ArenaServiceImpl implements ArenaService {
                 logger.warn("Économie en mode dégradé lors du score pour " + handle.id());
             }
         } else if (nextPhase == ArenaPhase.END) {
+            budgetService.unregisterArena(handle);
             arenas.remove(handle.id());
             executorManager.compute().execute(() -> queueService.tryMatch(handle.mode()).ifPresent(plan ->
                     logger.info("Match prêt après fin d'arène " + handle.id() + " -> " + plan.matchId())));

@@ -1,5 +1,7 @@
 package com.heneria.nexus.util;
 
+import com.heneria.nexus.budget.BudgetService;
+import com.heneria.nexus.budget.BudgetSnapshot;
 import com.heneria.nexus.config.ConfigBundle;
 import com.heneria.nexus.concurrent.ExecutorManager;
 import com.heneria.nexus.db.DbProvider;
@@ -9,6 +11,7 @@ import java.lang.management.ManagementFactory;
 import java.lang.management.ThreadMXBean;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -29,7 +32,8 @@ public final class DumpUtil {
                                              ExecutorManager executorManager,
                                              RingScheduler scheduler,
                                              DbProvider dbProvider,
-                                             ServiceRegistry serviceRegistry) {
+                                             ServiceRegistry serviceRegistry,
+                                             BudgetService budgetService) {
         List<Component> lines = new ArrayList<>();
         lines.add(Component.text("=== État Nexus ===", NamedTextColor.GOLD));
         lines.add(Component.text("Serveur : " + server.getVersion(), NamedTextColor.YELLOW));
@@ -86,6 +90,24 @@ public final class DumpUtil {
             }
             lines.add(Component.text(state, NamedTextColor.GRAY));
         });
+
+        Collection<BudgetSnapshot> budgets = budgetService.snapshots();
+        if (!budgets.isEmpty()) {
+            lines.add(Component.empty());
+            lines.add(Component.text("-- Budgets --", NamedTextColor.AQUA));
+            budgets.stream()
+                    .sorted((left, right) -> left.arenaId().compareTo(right.arenaId()))
+                    .forEach(snapshot -> lines.add(Component.text(
+                            snapshot.arenaId() + " -> Entités=" + snapshot.entities() + "/" + snapshot.maxEntities()
+                                    + " (pending=" + snapshot.pendingEntities() + ")"
+                                    + " Items=" + snapshot.items() + "/" + snapshot.maxItems()
+                                    + " (pending=" + snapshot.pendingItems() + ")"
+                                    + " Projectiles=" + snapshot.projectiles() + "/" + snapshot.maxProjectiles()
+                                    + " (pending=" + snapshot.pendingProjectiles() + ")"
+                                    + " Particules=" + snapshot.particles() + "/" + snapshot.particlesSoftCap()
+                                    + " (Hard=" + snapshot.particlesHardCap() + ")",
+                            NamedTextColor.GRAY)));
+        }
 
         lines.add(Component.empty());
         lines.add(Component.text("Chargé le : " + DateTimeFormatter.ISO_LOCAL_DATE_TIME

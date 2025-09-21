@@ -1,5 +1,8 @@
 package com.heneria.nexus;
 
+import com.heneria.nexus.budget.BudgetService;
+import com.heneria.nexus.budget.BudgetServiceImpl;
+import com.heneria.nexus.budget.BudgetSnapshot;
 import com.heneria.nexus.command.NexusCommand;
 import com.heneria.nexus.config.ConfigBundle;
 import com.heneria.nexus.config.ConfigManager;
@@ -25,9 +28,11 @@ import com.heneria.nexus.util.DumpUtil;
 import com.heneria.nexus.util.MessageFacade;
 import com.heneria.nexus.util.NexusLogger;
 import java.time.Duration;
+import java.util.Collection;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import net.kyori.adventure.text.Component;
@@ -184,6 +189,9 @@ public final class NexusPlugin extends JavaPlugin {
         if (sender.hasPermission("nexus.admin.dump")) {
             messageFacade.send(sender, "help.admin.dump");
         }
+        if (sender.hasPermission("nexus.admin.budget")) {
+            messageFacade.send(sender, "help.admin.budget");
+        }
     }
 
     public void handleReload(CommandSender sender) {
@@ -234,6 +242,7 @@ public final class NexusPlugin extends JavaPlugin {
         configureDatabase(newBundle.core().databaseSettings());
         serviceRegistry.get(QueueService.class).applySettings(newBundle.core().queueSettings());
         serviceRegistry.get(ArenaService.class).applyArenaSettings(newBundle.core().arenaSettings());
+        serviceRegistry.get(BudgetService.class).applySettings(newBundle.core().arenaSettings());
         serviceRegistry.get(ProfileService.class).applyDegradedModeSettings(newBundle.core().degradedModeSettings());
         serviceRegistry.get(EconomyService.class).applyDegradedModeSettings(newBundle.core().degradedModeSettings());
         if (servicesExposed && !newBundle.core().serviceSettings().exposeBukkitServices()) {
@@ -250,9 +259,68 @@ public final class NexusPlugin extends JavaPlugin {
             return;
         }
         messageFacade.send(sender, "admin.dump.header");
-        List<Component> lines = DumpUtil.createDump(getServer(), bundle, executorManager, ringScheduler, dbProvider, serviceRegistry);
+        List<Component> lines = DumpUtil.createDump(getServer(), bundle, executorManager, ringScheduler, dbProvider, serviceRegistry,
+                serviceRegistry.get(BudgetService.class));
         lines.forEach(sender::sendMessage);
         messageFacade.send(sender, "admin.dump.success");
+    }
+
+    public void handleBudget(CommandSender sender, String[] args) {
+        if (!sender.hasPermission("nexus.admin.budget")) {
+            messageFacade.send(sender, "errors.no_permission");
+            return;
+        }
+        BudgetService budgetService = serviceRegistry.get(BudgetService.class);
+        if (args.length <= 1) {
+            sendBudgetSummary(sender, budgetService);
+            return;
+        }
+        UUID arenaId;
+        try {
+            arenaId = UUID.fromString(args[1]);
+        } catch (IllegalArgumentException exception) {
+            sender.sendMessage(Component.text("Identifiant d'arène invalide.", NamedTextColor.RED));
+            return;
+        }
+        budgetService.getSnapshot(arenaId).ifPresentOrElse(snapshot -> {
+            messageFacade.prefix().ifPresent(sender::sendMessage);
+            sender.sendMessage(Component.text("=== Budget pour l'arène " + snapshot.arenaId() + " ===", NamedTextColor.GOLD));
+            sender.sendMessage(Component.text("Map: " + snapshot.mapId() + " | Mode: " + snapshot.mode(), NamedTextColor.GRAY));
+            sender.sendMessage(Component.text("Entités: " + snapshot.entities() + " / " + snapshot.maxEntities()
+                    + formatPending(snapshot.pendingEntities()), NamedTextColor.YELLOW));
+            sender.sendMessage(Component.text("Items au sol: " + snapshot.items() + " / " + snapshot.maxItems()
+                    + formatPending(snapshot.pendingItems()), NamedTextColor.YELLOW));
+            sender.sendMessage(Component.text("Projectiles: " + snapshot.projectiles() + " / " + snapshot.maxProjectiles()
+                    + formatPending(snapshot.pendingProjectiles()), NamedTextColor.YELLOW));
+            sender.sendMessage(Component.text("Particules (tick): " + snapshot.particles() + " / "
+                    + snapshot.particlesSoftCap() + " (Soft) / " + snapshot.particlesHardCap() + " (Hard)", NamedTextColor.YELLOW));
+        }, () -> sender.sendMessage(Component.text("Arène non trouvée.", NamedTextColor.RED)));
+    }
+
+    private void sendBudgetSummary(CommandSender sender, BudgetService budgetService) {
+        Collection<BudgetSnapshot> snapshots = budgetService.snapshots();
+        messageFacade.prefix().ifPresent(sender::sendMessage);
+        sender.sendMessage(Component.text("=== Budgets actifs ===", NamedTextColor.GOLD));
+        if (snapshots.isEmpty()) {
+            sender.sendMessage(Component.text("Aucune arène active.", NamedTextColor.GRAY));
+            return;
+        }
+        snapshots.stream()
+                .sorted((left, right) -> left.arenaId().compareTo(right.arenaId()))
+                .forEach(snapshot -> sender.sendMessage(Component.text(
+                        "• " + snapshot.arenaId()
+                                + " -> Entités: " + snapshot.entities() + "/" + snapshot.maxEntities()
+                                + ", Items: " + snapshot.items() + "/" + snapshot.maxItems()
+                                + ", Projectiles: " + snapshot.projectiles() + "/" + snapshot.maxProjectiles()
+                                + ", Particules: " + snapshot.particles() + "/" + snapshot.particlesSoftCap()
+                                + " (Soft)", NamedTextColor.GRAY)));
+    }
+
+    private String formatPending(long pending) {
+        if (pending <= 0L) {
+            return "";
+        }
+        return " (en attente: " + pending + ")";
     }
 
     public MessageFacade messages() {
@@ -288,6 +356,7 @@ public final class NexusPlugin extends JavaPlugin {
         serviceRegistry.registerService(ProfileService.class, ProfileServiceImpl.class);
         serviceRegistry.registerService(EconomyService.class, EconomyServiceImpl.class);
         serviceRegistry.registerService(QueueService.class, QueueServiceImpl.class);
+        serviceRegistry.registerService(BudgetService.class, BudgetServiceImpl.class);
         serviceRegistry.registerService(ArenaService.class, ArenaServiceImpl.class);
     }
 
@@ -301,6 +370,16 @@ public final class NexusPlugin extends JavaPlugin {
         servicesManager.register(QueueService.class, serviceRegistry.get(QueueService.class), this, ServicePriority.Normal);
         servicesManager.register(EconomyService.class, serviceRegistry.get(EconomyService.class), this, ServicePriority.Normal);
         servicesManager.register(ProfileService.class, serviceRegistry.get(ProfileService.class), this, ServicePriority.Normal);
+        servicesManager.register(BudgetService.class, serviceRegistry.get(BudgetService.class), this, ServicePriority.Normal);
         servicesExposed = true;
+    }
+
+    public List<String> suggestBudgetArenas(String prefix) {
+        BudgetService budgetService = serviceRegistry.get(BudgetService.class);
+        return budgetService.snapshots().stream()
+                .map(snapshot -> snapshot.arenaId().toString())
+                .filter(id -> id.startsWith(prefix))
+                .sorted()
+                .toList();
     }
 }

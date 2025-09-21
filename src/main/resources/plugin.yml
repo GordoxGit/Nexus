@@ -8,7 +8,7 @@ load: POSTWORLD
 commands:
   nexus:
     description: Commande principale du plugin Nexus.
-    usage: /<command> help|reload|dump
+    usage: /<command> help|reload|dump|budget [arena]
     permission: nexus.use
     aliases: [nx]
 permissions:
@@ -21,9 +21,13 @@ permissions:
   nexus.admin.dump:
     description: Afficher un dump d'état Nexus.
     default: op
+  nexus.admin.budget:
+    description: Inspecter les budgets des arènes.
+    default: op
   nexus.admin.*:
     description: Accès complet aux commandes d'administration Nexus.
     default: op
     children:
       nexus.admin.reload: true
       nexus.admin.dump: true
+      nexus.admin.budget: true

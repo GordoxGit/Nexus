@@ -15,7 +15,7 @@ import org.bukkit.command.TabCompleter;
  */
 public final class NexusCommand implements CommandExecutor, TabCompleter {
 
-    private static final List<String> SUB_COMMANDS = List.of("help", "reload", "dump");
+    private static final List<String> SUB_COMMANDS = List.of("help", "reload", "dump", "budget");
 
     private final NexusPlugin plugin;
 
@@ -43,6 +43,10 @@ public final class NexusCommand implements CommandExecutor, TabCompleter {
                 plugin.handleDump(sender);
                 yield true;
             }
+            case "budget" -> {
+                plugin.handleBudget(sender, args);
+                yield true;
+            }
             default -> {
                 plugin.sendHelp(sender);
                 yield true;
@@ -56,13 +60,20 @@ public final class NexusCommand implements CommandExecutor, TabCompleter {
             String prefix = args[0].toLowerCase(Locale.ROOT);
             return SUB_COMMANDS.stream()
                     .filter(sub -> {
-                        if (sub.equals("reload") || sub.equals("dump")) {
+                        if (sub.equals("reload") || sub.equals("dump") || sub.equals("budget")) {
                             return sender.hasPermission("nexus.admin." + sub);
                         }
                         return true;
                     })
                     .filter(sub -> sub.startsWith(prefix))
                     .collect(Collectors.toList());
+        }
+        if (args.length == 2 && args[0].equalsIgnoreCase("budget")) {
+            if (!sender.hasPermission("nexus.admin.budget")) {
+                return Collections.emptyList();
+            }
+            String prefix = args[1].toLowerCase(Locale.ROOT);
+            return plugin.suggestBudgetArenas(prefix);
         }
         return Collections.emptyList();
     }
