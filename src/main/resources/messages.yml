@@ -10,6 +10,7 @@ help:
   admin:
     reload: "<gray>/nexus reload</gray> <dark_gray>-</dark_gray> <yellow>Recharge les configurations et messages.</yellow>"
     dump: "<gray>/nexus dump</gray> <dark_gray>-</dark_gray> <yellow>Affiche l'état courant (threads, DB, scheduler).</yellow>"
+    budget: "<gray>/nexus budget [arène]</gray> <dark_gray>-</dark_gray> <yellow>Inspecte les budgets en cours.</yellow>"
 
 errors:
   no_permission: "<red>Vous n'avez pas la permission requise.</red>"
