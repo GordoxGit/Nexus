@@ -83,20 +83,6 @@ public final class NexusPlugin extends JavaPlugin {
         }
         report.warnings().forEach(warning -> logger.warn(formatIssue(warning)));
         this.bundle = configManager.currentBundle();
-        this.messageFacade = new MessageFacade(bundle.messages(), logger);
-        this.executorManager = new ExecutorManager(this, logger, bundle.core().executorSettings());
-        this.serviceRegistry = new ServiceRegistry(logger);
-        registerSingletons();
-        registerServices();
-        try {
-            serviceRegistry.wire(Duration.ofMillis(bundle.core().timeoutSettings().startMs()));
-            this.ringScheduler = serviceRegistry.get(RingScheduler.class);
-            this.dbProvider = serviceRegistry.get(DbProvider.class);
-            ringScheduler.applyPerfSettings(bundle.core().arenaSettings());
-        } catch (Exception exception) {
-            logger.error("Impossible d'initialiser le registre de services", exception);
-            bootstrapFailed = true;
-        }
     }
 
     @Override
@@ -106,26 +92,45 @@ public final class NexusPlugin extends JavaPlugin {
             getServer().getPluginManager().disablePlugin(this);
             return;
         }
-        this.logger = new NexusLogger(getLogger(), LOG_PREFIX);
+
+        // Initialisation des composants critiques qui dépendent du serveur actif
+        this.messageFacade = new MessageFacade(bundle.messages(), logger);
+        this.executorManager = new ExecutorManager(this, logger, bundle.core().executorSettings());
+        this.serviceRegistry = new ServiceRegistry(logger);
+
+        registerSingletons();
+        registerServices();
+
+        try {
+            serviceRegistry.wire(Duration.ofMillis(bundle.core().timeoutSettings().startMs()));
+            this.ringScheduler = serviceRegistry.get(RingScheduler.class);
+            this.dbProvider = serviceRegistry.get(DbProvider.class);
+            ringScheduler.applyPerfSettings(bundle.core().arenaSettings());
+
+            // Démarrage des services
+            serviceRegistry.startAll(Duration.ofMillis(bundle.core().timeoutSettings().startMs()));
+
+        } catch (Exception exception) {
+            logger.error("Impossible d'initialiser ou de démarrer le registre de services", exception);
+            bootstrapFailed = true;
+            getServer().getPluginManager().disablePlugin(this);
+            return;
+        }
+
         this.messageFacade.update(bundle.messages());
         registerCommands();
         logEnvironment();
         configureDatabase(bundle.core().databaseSettings());
-        try {
-            serviceRegistry.startAll(Duration.ofMillis(bundle.core().timeoutSettings().startMs()));
-            ringScheduler.registerProfile(TaskProfile.HUD,
-                    EnumSet.of(GamePhase.LOBBY, GamePhase.STARTING, GamePhase.PLAYING),
-                    () -> {
-                    });
-            ringScheduler.registerProfile(TaskProfile.SCOREBOARD,
-                    EnumSet.of(GamePhase.STARTING, GamePhase.PLAYING, GamePhase.RESET),
-                    () -> {
-                    });
-            maybeExposeServices();
-        } catch (Exception exception) {
-            logger.error("Démarrage des services impossible", exception);
-            getServer().getPluginManager().disablePlugin(this);
-        }
+
+        ringScheduler.registerProfile(TaskProfile.HUD,
+                EnumSet.of(GamePhase.LOBBY, GamePhase.STARTING, GamePhase.PLAYING),
+                () -> {
+                });
+        ringScheduler.registerProfile(TaskProfile.SCOREBOARD,
+                EnumSet.of(GamePhase.STARTING, GamePhase.PLAYING, GamePhase.RESET),
+                () -> {
+                });
+        maybeExposeServices();
     }
 
     @Override
