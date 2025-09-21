@@ -22,6 +22,7 @@ public final class CoreConfig {
     private final TimeoutSettings timeoutSettings;
     private final DegradedModeSettings degradedModeSettings;
     private final QueueSettings queueSettings;
+    private final HologramSettings hologramSettings;
     private final UiSettings uiSettings;
 
     public CoreConfig(String serverMode,
@@ -34,6 +35,7 @@ public final class CoreConfig {
                       TimeoutSettings timeoutSettings,
                       DegradedModeSettings degradedModeSettings,
                       QueueSettings queueSettings,
+                      HologramSettings hologramSettings,
                       UiSettings uiSettings) {
         this.serverMode = Objects.requireNonNull(serverMode, "serverMode");
         this.language = Objects.requireNonNull(language, "language");
@@ -45,6 +47,7 @@ public final class CoreConfig {
         this.timeoutSettings = Objects.requireNonNull(timeoutSettings, "timeoutSettings");
         this.degradedModeSettings = Objects.requireNonNull(degradedModeSettings, "degradedModeSettings");
         this.queueSettings = Objects.requireNonNull(queueSettings, "queueSettings");
+        this.hologramSettings = Objects.requireNonNull(hologramSettings, "hologramSettings");
         this.uiSettings = Objects.requireNonNull(uiSettings, "uiSettings");
     }
 
@@ -86,6 +89,10 @@ public final class CoreConfig {
 
     public QueueSettings queueSettings() {
         return queueSettings;
+    }
+
+    public HologramSettings hologramSettings() {
+        return hologramSettings;
     }
 
     public UiSettings uiSettings() {
@@ -187,6 +194,34 @@ public final class CoreConfig {
     }
 
     public record ServiceSettings(boolean exposeBukkitServices) {
+    }
+
+    public record HologramSettings(int updateHz,
+                                   int maxVisiblePerInstance,
+                                   double lineSpacing,
+                                   double viewRange,
+                                   int maxPooledTextDisplays,
+                                   int maxPooledInteractions) {
+        public HologramSettings {
+            if (updateHz <= 0) {
+                throw new IllegalArgumentException("updateHz must be positive");
+            }
+            if (maxVisiblePerInstance <= 0) {
+                throw new IllegalArgumentException("maxVisiblePerInstance must be positive");
+            }
+            if (lineSpacing <= 0D) {
+                throw new IllegalArgumentException("lineSpacing must be > 0");
+            }
+            if (viewRange <= 0D) {
+                throw new IllegalArgumentException("viewRange must be > 0");
+            }
+            if (maxPooledTextDisplays < 0) {
+                throw new IllegalArgumentException("maxPooledTextDisplays must be >= 0");
+            }
+            if (maxPooledInteractions < 0) {
+                throw new IllegalArgumentException("maxPooledInteractions must be >= 0");
+            }
+        }
     }
 
     public record TimeoutSettings(long startMs, long stopMs, WatchdogSettings watchdog) {

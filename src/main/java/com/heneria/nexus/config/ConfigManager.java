@@ -32,6 +32,7 @@ public final class ConfigManager implements AutoCloseable {
     private static final String MESSAGES_FILE = "messages.yml";
     private static final String MAPS_FILE = "maps.yml";
     private static final String ECONOMY_FILE = "economy.yml";
+    private static final String HOLOGRAMS_FILE = "holograms.yml";
 
     private final JavaPlugin plugin;
     private final NexusLogger logger;
@@ -189,6 +190,7 @@ public final class ConfigManager implements AutoCloseable {
         copyResourceIfMissing(MESSAGES_FILE);
         copyResourceIfMissing(MAPS_FILE);
         copyResourceIfMissing(ECONOMY_FILE);
+        copyResourceIfMissing(HOLOGRAMS_FILE);
     }
 
     private void copyResourceIfMissing(String resource) {

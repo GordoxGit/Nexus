@@ -9,6 +9,9 @@ import com.heneria.nexus.config.ConfigManager;
 import com.heneria.nexus.config.CoreConfig;
 import com.heneria.nexus.config.ReloadReport;
 import com.heneria.nexus.db.DbProvider;
+import com.heneria.nexus.hologram.HoloService;
+import com.heneria.nexus.hologram.HoloServiceImpl;
+import com.heneria.nexus.hologram.Hologram;
 import com.heneria.nexus.scheduler.GamePhase;
 import com.heneria.nexus.scheduler.RingScheduler;
 import com.heneria.nexus.scheduler.RingScheduler.TaskProfile;
@@ -29,18 +32,23 @@ import com.heneria.nexus.util.MessageFacade;
 import com.heneria.nexus.util.NexusLogger;
 import com.heneria.nexus.watchdog.WatchdogService;
 import com.heneria.nexus.watchdog.WatchdogServiceImpl;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.time.Duration;
 import java.util.Collection;
 import java.util.EnumSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
+import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
 import org.bukkit.command.CommandSender;
 import org.bukkit.command.PluginCommand;
+import org.bukkit.Location;
 import org.bukkit.plugin.ServicePriority;
 import org.bukkit.plugin.ServicesManager;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -194,6 +202,9 @@ public final class NexusPlugin extends JavaPlugin {
         if (sender.hasPermission("nexus.admin.budget")) {
             messageFacade.send(sender, "help.admin.budget");
         }
+        if (sender.hasPermission("nexus.holo.manage")) {
+            messageFacade.send(sender, "help.admin.holo");
+        }
     }
 
     public void handleReload(CommandSender sender) {
@@ -248,6 +259,8 @@ public final class NexusPlugin extends JavaPlugin {
         serviceRegistry.get(BudgetService.class).applySettings(newBundle.core().arenaSettings());
         serviceRegistry.get(ProfileService.class).applyDegradedModeSettings(newBundle.core().degradedModeSettings());
         serviceRegistry.get(EconomyService.class).applyDegradedModeSettings(newBundle.core().degradedModeSettings());
+        serviceRegistry.get(HoloService.class).applySettings(newBundle.core().hologramSettings());
+        serviceRegistry.get(HoloService.class).loadFromConfig();
         if (servicesExposed && !newBundle.core().serviceSettings().exposeBukkitServices()) {
             getServer().getServicesManager().unregisterAll(this);
             servicesExposed = false;
@@ -263,9 +276,133 @@ public final class NexusPlugin extends JavaPlugin {
         }
         messageFacade.send(sender, "admin.dump.header");
         List<Component> lines = DumpUtil.createDump(getServer(), bundle, executorManager, ringScheduler, dbProvider, serviceRegistry,
-                serviceRegistry.get(BudgetService.class), serviceRegistry.get(WatchdogService.class));
+                serviceRegistry.get(BudgetService.class), serviceRegistry.get(WatchdogService.class), serviceRegistry.get(HoloService.class));
         lines.forEach(sender::sendMessage);
         messageFacade.send(sender, "admin.dump.success");
+    }
+
+    public void handleHologram(CommandSender sender, String[] args) {
+        if (!sender.hasPermission("nexus.holo.manage")) {
+            messageFacade.send(sender, "errors.no_permission");
+            return;
+        }
+        if (args.length <= 1) {
+            messageFacade.send(sender, "holograms.usage");
+            return;
+        }
+        String action = args[1].toLowerCase(Locale.ROOT);
+        HoloService holoService = serviceRegistry.get(HoloService.class);
+        switch (action) {
+            case "list" -> handleHologramList(sender, holoService);
+            case "reload" -> {
+                holoService.loadFromConfig();
+                messageFacade.send(sender, "holograms.reload.ok");
+            }
+            case "create" -> handleHologramCreate(sender, args, holoService);
+            case "move" -> handleHologramMove(sender, args, holoService);
+            case "remove" -> handleHologramRemove(sender, args, holoService);
+            default -> messageFacade.send(sender, "holograms.usage");
+        }
+    }
+
+    private void handleHologramList(CommandSender sender, HoloService service) {
+        List<Hologram> holograms = new ArrayList<>(service.holograms());
+        if (holograms.isEmpty()) {
+            messageFacade.send(sender, "holograms.list.empty");
+            return;
+        }
+        messageFacade.send(sender, "holograms.list.header",
+                Placeholder.unparsed("count", Integer.toString(holograms.size())));
+        holograms.stream()
+                .sorted((left, right) -> left.id().compareToIgnoreCase(right.id()))
+                .forEach(hologram -> {
+                    Location location = hologram.location();
+                    String world = location != null && location.getWorld() != null ? location.getWorld().getName() : "?";
+                    messageFacade.send(sender, "holograms.list.entry",
+                            Placeholder.unparsed("id", hologram.id()),
+                            Placeholder.unparsed("world", world),
+                            Placeholder.unparsed("x", formatCoordinate(location == null ? 0D : location.getX())),
+                            Placeholder.unparsed("y", formatCoordinate(location == null ? 0D : location.getY())),
+                            Placeholder.unparsed("z", formatCoordinate(location == null ? 0D : location.getZ())),
+                            Placeholder.unparsed("lines", Integer.toString(hologram.lines().size())),
+                            Placeholder.unparsed("group", hologram.group()));
+                });
+    }
+
+    private void handleHologramCreate(CommandSender sender, String[] args, HoloService service) {
+        if (!(sender instanceof org.bukkit.entity.Player player)) {
+            messageFacade.send(sender, "holograms.errors.player_only");
+            return;
+        }
+        if (args.length < 5) {
+            messageFacade.send(sender, "holograms.create.help");
+            return;
+        }
+        String id = args[2];
+        if (service.getHologram(id).isPresent()) {
+            messageFacade.send(sender, "holograms.errors.duplicate", Placeholder.unparsed("id", id));
+            return;
+        }
+        String group = args[3];
+        String raw = String.join(" ", Arrays.copyOfRange(args, 4, args.length));
+        List<String> lines = Arrays.stream(raw.split("\\|"))
+                .map(String::trim)
+                .filter(entry -> !entry.isEmpty())
+                .toList();
+        if (lines.isEmpty()) {
+            messageFacade.send(sender, "holograms.errors.invalid_definition");
+            return;
+        }
+        try {
+            Hologram hologram = service.createHologram(id, player.getLocation(), lines);
+            hologram.setGroup(group);
+            messageFacade.send(sender, "holograms.created", Placeholder.unparsed("id", id));
+        } catch (IllegalArgumentException exception) {
+            messageFacade.send(sender, "holograms.errors.duplicate", Placeholder.unparsed("id", id));
+        }
+    }
+
+    private void handleHologramMove(CommandSender sender, String[] args, HoloService service) {
+        if (!(sender instanceof org.bukkit.entity.Player player)) {
+            messageFacade.send(sender, "holograms.errors.player_only");
+            return;
+        }
+        if (args.length < 3) {
+            messageFacade.send(sender, "holograms.usage");
+            return;
+        }
+        String id = args[2];
+        service.getHologram(id).ifPresentOrElse(hologram -> {
+            hologram.teleport(player.getLocation());
+            messageFacade.send(sender, "holograms.moved", Placeholder.unparsed("id", id));
+        }, () -> messageFacade.send(sender, "holograms.errors.not_found", Placeholder.unparsed("id", id)));
+    }
+
+    private void handleHologramRemove(CommandSender sender, String[] args, HoloService service) {
+        if (args.length < 3) {
+            messageFacade.send(sender, "holograms.usage");
+            return;
+        }
+        String id = args[2];
+        if (service.getHologram(id).isEmpty()) {
+            messageFacade.send(sender, "holograms.errors.not_found", Placeholder.unparsed("id", id));
+            return;
+        }
+        service.removeHologram(id);
+        messageFacade.send(sender, "holograms.removed", Placeholder.unparsed("id", id));
+    }
+
+    public List<String> suggestHolograms(String prefix) {
+        HoloService service = serviceRegistry.get(HoloService.class);
+        return service.holograms().stream()
+                .map(Hologram::id)
+                .filter(id -> id.startsWith(prefix))
+                .sorted()
+                .toList();
+    }
+
+    private String formatCoordinate(double value) {
+        return String.format(Locale.ROOT, "%.2f", value);
     }
 
     public void handleBudget(CommandSender sender, String[] args) {
@@ -362,6 +499,7 @@ public final class NexusPlugin extends JavaPlugin {
         serviceRegistry.registerService(BudgetService.class, BudgetServiceImpl.class);
         serviceRegistry.registerService(WatchdogService.class, WatchdogServiceImpl.class);
         serviceRegistry.registerService(ArenaService.class, ArenaServiceImpl.class);
+        serviceRegistry.registerService(HoloService.class, HoloServiceImpl.class);
     }
 
     private void maybeExposeServices() {
@@ -375,6 +513,7 @@ public final class NexusPlugin extends JavaPlugin {
         servicesManager.register(EconomyService.class, serviceRegistry.get(EconomyService.class), this, ServicePriority.Normal);
         servicesManager.register(ProfileService.class, serviceRegistry.get(ProfileService.class), this, ServicePriority.Normal);
         servicesManager.register(BudgetService.class, serviceRegistry.get(BudgetService.class), this, ServicePriority.Normal);
+        servicesManager.register(HoloService.class, serviceRegistry.get(HoloService.class), this, ServicePriority.Normal);
         servicesExposed = true;
     }
 

@@ -8,7 +8,7 @@ load: POSTWORLD
 commands:
   nexus:
     description: Commande principale du plugin Nexus.
-    usage: /<command> help|reload|dump|budget [arena]
+    usage: /<command> help|reload|dump|budget [arena]|holo
     permission: nexus.use
     aliases: [nx]
 permissions:
@@ -31,3 +31,12 @@ permissions:
       nexus.admin.reload: true
       nexus.admin.dump: true
       nexus.admin.budget: true
+  nexus.holo.manage:
+    description: Gérer les hologrammes Nexus via /nexus holo.
+    default: op
+  nexus.holo.view.default:
+    description: Voir les hologrammes du groupe default.
+    default: true
+  nexus.holo.view.*:
+    description: Voir tous les hologrammes, indépendamment du groupe.
+    default: op
