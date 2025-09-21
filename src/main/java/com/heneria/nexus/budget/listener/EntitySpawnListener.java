@@ -27,7 +27,8 @@ public final class EntitySpawnListener implements Listener {
     public void onEntitySpawn(EntitySpawnEvent event) {
         Entity entity = event.getEntity();
         EntityType type = entity.getType();
-        if (type == EntityType.PLAYER || type == EntityType.DROPPED_ITEM || entity instanceof Projectile) {
+        // CORRECTION: Remplacé DROPPED_ITEM par ITEM
+        if (type == EntityType.PLAYER || type == EntityType.ITEM || entity instanceof Projectile) {
             return;
         }
         Optional<UUID> arenaId = budgetService.resolveArenaId(entity.getLocation());
@@ -45,7 +46,8 @@ public final class EntitySpawnListener implements Listener {
     public void onEntitySpawnPost(EntitySpawnEvent event) {
         Entity entity = event.getEntity();
         EntityType type = entity.getType();
-        if (type == EntityType.PLAYER || type == EntityType.DROPPED_ITEM || entity instanceof Projectile) {
+        // CORRECTION: Remplacé DROPPED_ITEM par ITEM
+        if (type == EntityType.PLAYER || type == EntityType.ITEM || entity instanceof Projectile) {
             return;
         }
         if (!event.isCancelled()) {
