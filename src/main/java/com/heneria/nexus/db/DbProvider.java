@@ -6,6 +6,7 @@ import com.heneria.nexus.util.NexusLogger;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
 import com.zaxxer.hikari.HikariPoolMXBean;
+import org.bukkit.plugin.java.JavaPlugin;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -17,7 +18,6 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
-import org.bukkit.plugin.java.JavaPlugin;
 
 /**
  * Provides access to the MariaDB datasource.
@@ -83,16 +83,11 @@ public final class DbProvider implements LifecycleAware {
 
     private HikariConfig toHikariConfig(CoreConfig.DatabaseSettings settings) {
         HikariConfig config = new HikariConfig();
-
-        // On utilise la méthode moderne pour les drivers "shadés" (relocalisés)
+        // Utilise la configuration recommandée pour HikariCP 5.x avec un driver relocalisé
         config.setDataSourceClassName("com.heneria.nexus.lib.mariadb.jdbc.MariaDbDataSource");
-
-        // On passe les informations de connexion comme des propriétés
         config.addDataSourceProperty("url", settings.jdbcUrl());
         config.addDataSourceProperty("user", settings.username());
         config.addDataSourceProperty("password", settings.password());
-
-        // Le reste de la configuration
         config.setMaximumPoolSize(settings.poolSettings().maxSize());
         config.setMinimumIdle(settings.poolSettings().minIdle());
         config.setConnectionTimeout(settings.poolSettings().connectionTimeoutMs());
