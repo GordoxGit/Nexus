@@ -17,6 +17,7 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
+import org.bukkit.plugin.java.JavaPlugin;
 
 /**
  * Provides access to the MariaDB datasource.
@@ -26,13 +27,15 @@ public final class DbProvider implements LifecycleAware {
     private static final Duration LEAK_DETECTION = Duration.ofSeconds(15);
 
     private final NexusLogger logger;
+    private final JavaPlugin plugin;
     private final AtomicReference<HikariDataSource> dataSourceRef = new AtomicReference<>();
     private final AtomicReference<CoreConfig.DatabaseSettings> settingsRef = new AtomicReference<>();
     private final AtomicLong failedAttempts = new AtomicLong();
     private volatile boolean degraded;
 
-    public DbProvider(NexusLogger logger) {
+    public DbProvider(NexusLogger logger, JavaPlugin plugin) {
         this.logger = Objects.requireNonNull(logger, "logger");
+        this.plugin = Objects.requireNonNull(plugin, "plugin");
     }
 
     public CompletableFuture<Boolean> applyConfiguration(CoreConfig.DatabaseSettings settings, Executor executor) {
@@ -80,9 +83,16 @@ public final class DbProvider implements LifecycleAware {
 
     private HikariConfig toHikariConfig(CoreConfig.DatabaseSettings settings) {
         HikariConfig config = new HikariConfig();
-        config.setJdbcUrl(settings.jdbcUrl());
-        config.setUsername(settings.username());
-        config.setPassword(settings.password());
+
+        // On utilise la méthode moderne pour les drivers "shadés" (relocalisés)
+        config.setDataSourceClassName("com.heneria.nexus.lib.mariadb.jdbc.MariaDbDataSource");
+
+        // On passe les informations de connexion comme des propriétés
+        config.addDataSourceProperty("url", settings.jdbcUrl());
+        config.addDataSourceProperty("user", settings.username());
+        config.addDataSourceProperty("password", settings.password());
+
+        // Le reste de la configuration
         config.setMaximumPoolSize(settings.poolSettings().maxSize());
         config.setMinimumIdle(settings.poolSettings().minIdle());
         config.setConnectionTimeout(settings.poolSettings().connectionTimeoutMs());
