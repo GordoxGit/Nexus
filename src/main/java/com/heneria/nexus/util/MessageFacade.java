@@ -178,11 +178,10 @@ public final class MessageFacade {
     }
 
     private Locale resolveLocale(CommandSender sender) {
-        try {
-            return sender.locale();
-        } catch (Throwable ignored) {
-            return null;
+        if (sender instanceof Player player) {
+            return player.locale();
         }
+        return null;
     }
 
     private Component missingMessage(String key) {
