@@ -83,6 +83,10 @@ public final class Hologram {
         return lines.stream().map(Line::raw).toList();
     }
 
+    public double viewRange() {
+        return viewRange;
+    }
+
     void applySettings(CoreConfig.HologramSettings settings) {
         Objects.requireNonNull(settings, "settings");
         this.lineSpacing = settings.lineSpacing();
