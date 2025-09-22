@@ -321,7 +321,7 @@ public final class Hologram {
                 continue;
             }
             Component component = deserialize(resolved);
-            displays.get(index).setText(String.valueOf(component));
+            displays.get(index).text(component);
             line.onRendered(resolved);
         }
     }
