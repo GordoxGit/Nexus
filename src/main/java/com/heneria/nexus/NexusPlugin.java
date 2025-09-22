@@ -12,6 +12,7 @@ import com.heneria.nexus.db.DbProvider;
 import com.heneria.nexus.hologram.HoloService;
 import com.heneria.nexus.hologram.HoloServiceImpl;
 import com.heneria.nexus.hologram.Hologram;
+import com.heneria.nexus.hologram.HologramVisibilityListener;
 import com.heneria.nexus.scheduler.GamePhase;
 import com.heneria.nexus.scheduler.RingScheduler;
 import com.heneria.nexus.scheduler.RingScheduler.TaskProfile;
@@ -49,6 +50,7 @@ import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
 import org.bukkit.command.CommandSender;
 import org.bukkit.command.PluginCommand;
 import org.bukkit.Location;
+import org.bukkit.plugin.PluginManager;
 import org.bukkit.plugin.ServicePriority;
 import org.bukkit.plugin.ServicesManager;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -120,6 +122,7 @@ public final class NexusPlugin extends JavaPlugin {
 
         this.messageFacade.update(bundle.messages());
         registerCommands();
+        registerListeners();
         logEnvironment();
         configureDatabase(bundle.core().databaseSettings());
 
@@ -178,6 +181,11 @@ public final class NexusPlugin extends JavaPlugin {
         NexusCommand executor = new NexusCommand(this);
         command.setExecutor(executor);
         command.setTabCompleter(executor);
+    }
+
+    private void registerListeners() {
+        PluginManager manager = getServer().getPluginManager();
+        manager.registerEvents(new HologramVisibilityListener(serviceRegistry.get(HoloService.class)), this);
     }
 
     private void logEnvironment() {
