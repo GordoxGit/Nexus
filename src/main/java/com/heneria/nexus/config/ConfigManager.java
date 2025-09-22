@@ -10,6 +10,9 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
@@ -17,6 +20,7 @@ import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.function.Supplier;
+import java.util.stream.Stream;
 import org.bukkit.Bukkit;
 import org.bukkit.command.CommandSender;
 import org.bukkit.configuration.InvalidConfigurationException;
@@ -29,10 +33,14 @@ import org.bukkit.plugin.java.JavaPlugin;
 public final class ConfigManager implements AutoCloseable {
 
     private static final String CONFIG_FILE = "config.yml";
-    private static final String MESSAGES_FILE = "messages.yml";
     private static final String MAPS_FILE = "maps.yml";
     private static final String ECONOMY_FILE = "economy.yml";
     private static final String HOLOGRAMS_FILE = "holograms.yml";
+    private static final String LANG_DIRECTORY = "lang";
+    private static final String DEFAULT_LANGUAGE_FILENAME = "messages_fr.yml";
+    private static final String DEFAULT_LANGUAGE_FILE = "lang/" + DEFAULT_LANGUAGE_FILENAME;
+    private static final String MESSAGE_FILE_PREFIX = "messages_";
+    private static final String MESSAGE_FILE_SUFFIX = ".yml";
 
     private final JavaPlugin plugin;
     private final NexusLogger logger;
@@ -109,7 +117,7 @@ public final class ConfigManager implements AutoCloseable {
         return currentBundle().core();
     }
 
-    public MessageBundle getMessages() {
+    public MessageCatalog getMessages() {
         return currentBundle().messages();
     }
 
@@ -136,9 +144,7 @@ public final class ConfigManager implements AutoCloseable {
         YamlConfiguration coreYaml = loadYaml(CONFIG_FILE, coreIssues);
         CoreConfig core = validator.validateCore(coreYaml, coreIssues);
 
-        ConfigValidator.IssueCollector messageIssues = validator.collector(MESSAGES_FILE, builder);
-        YamlConfiguration messageYaml = loadYaml(MESSAGES_FILE, messageIssues);
-        MessageBundle messages = validator.validateMessages(messageYaml, messageIssues);
+        MessageCatalog messages = loadMessageBundles(core.language(), builder);
 
         ConfigValidator.IssueCollector mapsIssues = validator.collector(MAPS_FILE, builder);
         YamlConfiguration mapsYaml = loadYaml(MAPS_FILE, mapsIssues);
@@ -183,21 +189,149 @@ public final class ConfigManager implements AutoCloseable {
             if (Files.notExists(dataDirectory)) {
                 Files.createDirectories(dataDirectory);
             }
+            Path langPath = dataDirectory.resolve(LANG_DIRECTORY);
+            if (Files.notExists(langPath)) {
+                Files.createDirectories(langPath);
+            }
         } catch (IOException exception) {
             throw new IllegalStateException("Impossible de créer le dossier de données du plugin", exception);
         }
         copyResourceIfMissing(CONFIG_FILE);
-        copyResourceIfMissing(MESSAGES_FILE);
+        copyResourceIfMissing(DEFAULT_LANGUAGE_FILE);
         copyResourceIfMissing(MAPS_FILE);
         copyResourceIfMissing(ECONOMY_FILE);
         copyResourceIfMissing(HOLOGRAMS_FILE);
     }
 
     private void copyResourceIfMissing(String resource) {
-        File target = dataDirectory.resolve(resource).toFile();
+        Path targetPath = dataDirectory.resolve(resource);
+        File target = targetPath.toFile();
         if (!target.exists()) {
+            try {
+                Path parent = targetPath.getParent();
+                if (parent != null && Files.notExists(parent)) {
+                    Files.createDirectories(parent);
+                }
+            } catch (IOException exception) {
+                throw new IllegalStateException("Impossible de préparer le dossier pour " + resource, exception);
+            }
             plugin.saveResource(resource, false);
         }
+    }
+
+    private MessageCatalog loadMessageBundles(Locale configuredFallback, ReloadReport.Builder builder) {
+        List<MessageBundle> loaded = new ArrayList<>();
+        MessageBundle frenchBundle = null;
+
+        ConfigValidator.IssueCollector defaultIssues = validator.collector(DEFAULT_LANGUAGE_FILE, builder);
+        YamlConfiguration defaultYaml = loadYaml(DEFAULT_LANGUAGE_FILE, defaultIssues);
+        Locale expectedDefault = localeFromFilename(DEFAULT_LANGUAGE_FILENAME);
+        MessageBundle defaultBundle = validator.validateMessages(defaultYaml, expectedDefault, defaultIssues);
+        if (!defaultIssues.hasErrors()) {
+            frenchBundle = defaultBundle;
+            loaded.add(defaultBundle);
+        }
+
+        Path langDirectory = dataDirectory.resolve(LANG_DIRECTORY);
+        if (Files.exists(langDirectory) && Files.isDirectory(langDirectory)) {
+            try (Stream<Path> stream = Files.list(langDirectory)) {
+                stream.filter(Files::isRegularFile)
+                        .filter(path -> {
+                            String name = path.getFileName().toString();
+                            return name.startsWith(MESSAGE_FILE_PREFIX)
+                                    && name.endsWith(MESSAGE_FILE_SUFFIX)
+                                    && !name.equalsIgnoreCase(DEFAULT_LANGUAGE_FILENAME);
+                        })
+                        .sorted((left, right) -> left.getFileName().toString()
+                                .compareToIgnoreCase(right.getFileName().toString()))
+                        .forEach(path -> {
+                            String resourceName = dataDirectory.relativize(path)
+                                    .toString()
+                                    .replace(File.separatorChar, '/');
+                            ConfigValidator.IssueCollector issues = validator.collector(resourceName, builder);
+                            Locale expectedLocale = localeFromFilename(path.getFileName().toString());
+                            YamlConfiguration yaml = loadYaml(resourceName, issues);
+                            MessageBundle bundle = validator.validateMessages(yaml, expectedLocale, issues);
+                            if (!issues.hasErrors()) {
+                                loaded.add(bundle);
+                            }
+                        });
+            } catch (IOException exception) {
+                builder.error(LANG_DIRECTORY, "<root>",
+                        "Impossible de lister les fichiers de langue: " + exception.getMessage());
+            }
+        } else {
+            builder.warn(LANG_DIRECTORY, "<root>",
+                    "Dossier de langues introuvable, utilisation des ressources par défaut.");
+        }
+
+        if (loaded.isEmpty()) {
+            throw new IllegalStateException("Aucun fichier de messages valide chargé");
+        }
+
+        MessageBundle fallback = selectFallbackBundle(loaded, configuredFallback, frenchBundle, builder);
+        return new MessageCatalog(loaded, fallback);
+    }
+
+    private MessageBundle selectFallbackBundle(List<MessageBundle> bundles,
+                                               Locale configuredFallback,
+                                               MessageBundle frenchBundle,
+                                               ReloadReport.Builder builder) {
+        MessageBundle match = findBundleForLocale(bundles, configuredFallback);
+        if (match != null) {
+            return match;
+        }
+        if (frenchBundle != null) {
+            if (configuredFallback != null
+                    && !"fr".equalsIgnoreCase(configuredFallback.getLanguage())) {
+                builder.warn(CONFIG_FILE, "server.language",
+                        "Locale " + configuredFallback.toLanguageTag()
+                                + " introuvable, utilisation du français.");
+            }
+            return frenchBundle;
+        }
+        MessageBundle fallback = bundles.get(0);
+        if (configuredFallback != null) {
+            builder.warn(CONFIG_FILE, "server.language",
+                    "Locale " + configuredFallback.toLanguageTag()
+                            + " introuvable, utilisation de " + fallback.locale().toLanguageTag());
+        }
+        return fallback;
+    }
+
+    private MessageBundle findBundleForLocale(List<MessageBundle> bundles, Locale locale) {
+        if (locale == null) {
+            return null;
+        }
+        String tag = locale.toLanguageTag();
+        for (MessageBundle bundle : bundles) {
+            if (bundle.locale().toLanguageTag().equalsIgnoreCase(tag)) {
+                return bundle;
+            }
+        }
+        String language = locale.getLanguage();
+        if (!language.isEmpty()) {
+            for (MessageBundle bundle : bundles) {
+                if (bundle.locale().getLanguage().equalsIgnoreCase(language)) {
+                    return bundle;
+                }
+            }
+        }
+        return null;
+    }
+
+    private Locale localeFromFilename(String fileName) {
+        if (!fileName.startsWith(MESSAGE_FILE_PREFIX) || !fileName.endsWith(MESSAGE_FILE_SUFFIX)) {
+            return null;
+        }
+        String tag = fileName.substring(MESSAGE_FILE_PREFIX.length(),
+                fileName.length() - MESSAGE_FILE_SUFFIX.length());
+        tag = tag.replace('_', '-');
+        Locale locale = Locale.forLanguageTag(tag);
+        if (locale.toLanguageTag().isEmpty()) {
+            return null;
+        }
+        return locale;
     }
 
     private <T> CompletionStage<T> callSync(Supplier<T> supplier) {
@@ -218,7 +352,7 @@ public final class ConfigManager implements AutoCloseable {
     }
 
     private record LoadResult(CoreConfig core,
-                              MessageBundle messages,
+                              MessageCatalog messages,
                               MapsCatalogConfig maps,
                               EconomyConfig economy,
                               ReloadReport.Builder report) {

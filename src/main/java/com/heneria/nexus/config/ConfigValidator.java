@@ -41,7 +41,8 @@ public final class ConfigValidator {
         Objects.requireNonNull(issues, "issues");
 
         String mode = readString(yaml, "server.mode", DEFAULT_SERVER_MODE, issues, false);
-        Locale locale = parseLocale(readString(yaml, "server.language", DEFAULT_LOCALE.toLanguageTag(), issues, false), issues);
+        Locale locale = parseLocale(readString(yaml, "server.language", DEFAULT_LOCALE.toLanguageTag(), issues, false),
+                "server.language", issues);
         ZoneId zone = parseZone(readString(yaml, "server.timezone", DEFAULT_ZONE.getId(), issues, false), issues);
 
         int hudHz = boundedInt(yaml, "perf.hud_hz", 5, 1, 10, issues);
@@ -234,11 +235,17 @@ public final class ConfigValidator {
                 serviceSettings, timeoutSettings, degradedModeSettings, queueSettings, hologramSettings, uiSettings);
     }
 
-    public MessageBundle validateMessages(YamlConfiguration yaml, IssueCollector issues) {
+    public MessageBundle validateMessages(YamlConfiguration yaml, Locale expectedLocale, IssueCollector issues) {
         Objects.requireNonNull(yaml, "yaml");
         Objects.requireNonNull(issues, "issues");
 
-        Locale locale = parseLocale(readString(yaml, "meta.locale", DEFAULT_LOCALE.toLanguageTag(), issues, false), issues);
+        Locale defaultLocale = expectedLocale != null ? expectedLocale : DEFAULT_LOCALE;
+        Locale locale = parseLocale(readString(yaml, "meta.locale", defaultLocale.toLanguageTag(), issues, false),
+                "meta.locale", issues);
+        if (expectedLocale != null && !localeMatches(locale, expectedLocale)) {
+            issues.warn("meta.locale", "Locale déclarée " + locale.toLanguageTag()
+                    + " différente du nom de fichier (" + expectedLocale.toLanguageTag() + ")");
+        }
         MessageBundle.Builder builder = MessageBundle.builder(locale, Instant.now());
 
         if (yaml.contains("prefix")) {
@@ -258,7 +265,7 @@ public final class ConfigValidator {
         }
 
         if (builder.isEmpty()) {
-            issues.error("messages", "Aucune entrée valide dans messages.yml");
+            issues.error("<root>", "Aucune entrée valide dans le fichier de messages");
         }
 
         return builder.build();
@@ -411,7 +418,7 @@ public final class ConfigValidator {
         return new EconomyConfig(coinsSettings, battlePassSettings);
     }
 
-    private Locale parseLocale(String tag, IssueCollector issues) {
+    private Locale parseLocale(String tag, String path, IssueCollector issues) {
         try {
             Locale locale = Locale.forLanguageTag(tag == null ? DEFAULT_LOCALE.toLanguageTag() : tag);
             if (locale == null || locale.toLanguageTag().isBlank()) {
@@ -419,9 +426,22 @@ public final class ConfigValidator {
             }
             return locale;
         } catch (Exception exception) {
-            issues.warn("server.language", "Locale invalide, utilisation de fr" + " (" + exception.getMessage() + ")");
+            issues.warn(path, "Locale invalide, utilisation de fr" + " (" + exception.getMessage() + ")");
             return DEFAULT_LOCALE;
         }
+    }
+
+    private boolean localeMatches(Locale left, Locale right) {
+        if (left == null || right == null) {
+            return false;
+        }
+        if (left.toLanguageTag().equalsIgnoreCase(right.toLanguageTag())) {
+            return true;
+        }
+        String leftLanguage = left.getLanguage();
+        String rightLanguage = right.getLanguage();
+        return !leftLanguage.isEmpty()
+                && leftLanguage.equalsIgnoreCase(rightLanguage);
     }
 
     private ZoneId parseZone(String id, IssueCollector issues) {

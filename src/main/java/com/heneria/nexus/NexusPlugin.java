@@ -66,6 +66,7 @@ public final class NexusPlugin extends JavaPlugin {
     private ConfigManager configManager;
     private ConfigBundle bundle;
     private MessageFacade messageFacade;
+    private boolean placeholderApiAvailable;
     private ServiceRegistry serviceRegistry;
     private ExecutorManager executorManager;
     private RingScheduler ringScheduler;
@@ -96,7 +97,8 @@ public final class NexusPlugin extends JavaPlugin {
         }
 
         // Initialisation des composants critiques qui dépendent du serveur actif
-        this.messageFacade = new MessageFacade(bundle.messages(), logger);
+        this.placeholderApiAvailable = detectPlaceholderApi();
+        this.messageFacade = new MessageFacade(bundle.messages(), logger, placeholderApiAvailable);
         this.executorManager = new ExecutorManager(this, logger, bundle.core().executorSettings());
         this.serviceRegistry = new ServiceRegistry(logger);
         this.dbProvider = new DbProvider(logger, this);
@@ -121,6 +123,7 @@ public final class NexusPlugin extends JavaPlugin {
         }
 
         this.messageFacade.update(bundle.messages());
+        this.messageFacade.updatePlaceholderAvailability(placeholderApiAvailable);
         registerCommands();
         registerListeners();
         logEnvironment();
@@ -183,6 +186,15 @@ public final class NexusPlugin extends JavaPlugin {
         command.setTabCompleter(executor);
     }
 
+    private boolean detectPlaceholderApi() {
+        PluginManager manager = getServer().getPluginManager();
+        boolean present = manager.getPlugin("PlaceholderAPI") != null;
+        if (!present) {
+            logger.warn("PlaceholderAPI introuvable, les placeholders des messages resteront bruts.");
+        }
+        return present;
+    }
+
     private void registerListeners() {
         PluginManager manager = getServer().getPluginManager();
         manager.registerEvents(new HologramVisibilityListener(serviceRegistry.get(HoloService.class)), this);
@@ -206,7 +218,7 @@ public final class NexusPlugin extends JavaPlugin {
 
     public void sendHelp(CommandSender sender) {
         messageFacade.send(sender, "help.header");
-        messageFacade.messageList("help.lines").ifPresent(lines -> lines.forEach(sender::sendMessage));
+        messageFacade.messageList(sender, "help.lines").ifPresent(lines -> lines.forEach(sender::sendMessage));
         if (sender.hasPermission("nexus.admin.reload")) {
             messageFacade.send(sender, "help.admin.reload");
         }
@@ -260,6 +272,8 @@ public final class NexusPlugin extends JavaPlugin {
     }
 
     private synchronized void applyBundle(ConfigBundle newBundle) {
+        this.placeholderApiAvailable = detectPlaceholderApi();
+        messageFacade.updatePlaceholderAvailability(placeholderApiAvailable);
         executorManager.reconfigure(newBundle.core().executorSettings());
         ringScheduler.applyPerfSettings(newBundle.core().arenaSettings());
         messageFacade.update(newBundle.messages());
@@ -437,7 +451,7 @@ public final class NexusPlugin extends JavaPlugin {
             return;
         }
         budgetService.getSnapshot(arenaId).ifPresentOrElse(snapshot -> {
-            messageFacade.prefix().ifPresent(sender::sendMessage);
+            messageFacade.prefix(sender).ifPresent(sender::sendMessage);
             sender.sendMessage(Component.text("=== Budget pour l'arène " + snapshot.arenaId() + " ===", NamedTextColor.GOLD));
             sender.sendMessage(Component.text("Map: " + snapshot.mapId() + " | Mode: " + snapshot.mode(), NamedTextColor.GRAY));
             sender.sendMessage(Component.text("Entités: " + snapshot.entities() + " / " + snapshot.maxEntities()
@@ -453,7 +467,7 @@ public final class NexusPlugin extends JavaPlugin {
 
     private void sendBudgetSummary(CommandSender sender, BudgetService budgetService) {
         Collection<BudgetSnapshot> snapshots = budgetService.snapshots();
-        messageFacade.prefix().ifPresent(sender::sendMessage);
+        messageFacade.prefix(sender).ifPresent(sender::sendMessage);
         sender.sendMessage(Component.text("=== Budgets actifs ===", NamedTextColor.GOLD));
         if (snapshots.isEmpty()) {
             sender.sendMessage(Component.text("Aucune arène active.", NamedTextColor.GRAY));

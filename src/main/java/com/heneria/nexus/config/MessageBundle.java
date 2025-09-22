@@ -68,6 +68,10 @@ public final class MessageBundle {
         return Optional.ofNullable(prefix).map(MessageEntry::raw);
     }
 
+    public Optional<MessageEntry> prefixEntry() {
+        return Optional.ofNullable(prefix);
+    }
+
     public Locale locale() {
         return locale;
     }
