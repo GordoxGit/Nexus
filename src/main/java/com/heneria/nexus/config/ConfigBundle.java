@@ -10,14 +10,14 @@ public final class ConfigBundle {
 
     private final long version;
     private final CoreConfig core;
-    private final MessageBundle messages;
+    private final MessageCatalog messages;
     private final MapsCatalogConfig maps;
     private final EconomyConfig economy;
     private final Instant loadedAt;
 
     public ConfigBundle(long version,
                         CoreConfig core,
-                        MessageBundle messages,
+                        MessageCatalog messages,
                         MapsCatalogConfig maps,
                         EconomyConfig economy,
                         Instant loadedAt) {
@@ -37,7 +37,7 @@ public final class ConfigBundle {
         return core;
     }
 
-    public MessageBundle messages() {
+    public MessageCatalog messages() {
         return messages;
     }
 
