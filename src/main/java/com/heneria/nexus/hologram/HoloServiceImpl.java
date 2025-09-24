@@ -26,7 +26,6 @@ import org.bukkit.World;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.InvalidConfigurationException;
 import org.bukkit.configuration.file.YamlConfiguration;
-import org.bukkit.plugin.PluginManager;
 import org.bukkit.plugin.java.JavaPlugin;
 
 /**
@@ -47,14 +46,18 @@ public final class HoloServiceImpl implements HoloService {
     private final AtomicBoolean placeholderFailureLogged = new AtomicBoolean();
     private final boolean placeholderApiAvailable;
 
-    public HoloServiceImpl(JavaPlugin plugin, NexusLogger logger, CoreConfig coreConfig, RingScheduler scheduler) {
+    public HoloServiceImpl(JavaPlugin plugin,
+                           NexusLogger logger,
+                           CoreConfig coreConfig,
+                           RingScheduler scheduler,
+                           Boolean placeholderApiAvailable) {
         this.plugin = Objects.requireNonNull(plugin, "plugin");
         this.logger = Objects.requireNonNull(logger, "logger");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         Objects.requireNonNull(coreConfig, "coreConfig");
         this.settingsRef = new AtomicReference<>(coreConfig.hologramSettings());
         this.pool = new HologramPool(plugin, logger, coreConfig.hologramSettings());
-        this.placeholderApiAvailable = detectPlaceholderApi();
+        this.placeholderApiAvailable = Boolean.TRUE.equals(placeholderApiAvailable);
         UnaryOperator<String> resolver = buildPlaceholderResolver();
         this.factory = new HologramFactory(plugin, logger, pool, settingsRef::get, resolver);
     }
@@ -204,15 +207,6 @@ public final class HoloServiceImpl implements HoloService {
 
     private long hzToTicks(int hz) {
         return Math.max(1L, Math.round(20.0D / Math.max(1, hz)));
-    }
-
-    private boolean detectPlaceholderApi() {
-        PluginManager manager = plugin.getServer().getPluginManager();
-        boolean present = manager.getPlugin("PlaceholderAPI") != null;
-        if (!present) {
-            logger.warn("PlaceholderAPI introuvable, les placeholders des hologrammes resteront bruts.");
-        }
-        return present;
     }
 
     private UnaryOperator<String> buildPlaceholderResolver() {

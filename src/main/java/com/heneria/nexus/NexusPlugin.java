@@ -50,6 +50,7 @@ import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
 import org.bukkit.command.CommandSender;
 import org.bukkit.command.PluginCommand;
 import org.bukkit.Location;
+import org.bukkit.plugin.Plugin;
 import org.bukkit.plugin.PluginManager;
 import org.bukkit.plugin.ServicePriority;
 import org.bukkit.plugin.ServicesManager;
@@ -96,8 +97,12 @@ public final class NexusPlugin extends JavaPlugin {
             return;
         }
 
+        if (!checkDependencies()) {
+            getServer().getPluginManager().disablePlugin(this);
+            return;
+        }
+
         // Initialisation des composants critiques qui dépendent du serveur actif
-        this.placeholderApiAvailable = detectPlaceholderApi();
         this.messageFacade = new MessageFacade(bundle.messages(), logger, placeholderApiAvailable);
         this.executorManager = new ExecutorManager(this, logger, bundle.core().executorSettings());
         this.serviceRegistry = new ServiceRegistry(logger);
@@ -186,18 +191,44 @@ public final class NexusPlugin extends JavaPlugin {
         command.setTabCompleter(executor);
     }
 
-    private boolean detectPlaceholderApi() {
-        PluginManager manager = getServer().getPluginManager();
-        boolean present = manager.getPlugin("PlaceholderAPI") != null;
-        if (!present) {
-            logger.warn("PlaceholderAPI introuvable, les placeholders des messages resteront bruts.");
-        }
-        return present;
-    }
-
     private void registerListeners() {
         PluginManager manager = getServer().getPluginManager();
         manager.registerEvents(new HologramVisibilityListener(serviceRegistry.get(HoloService.class)), this);
+    }
+
+    private boolean checkDependencies() {
+        PluginManager manager = getServer().getPluginManager();
+
+        this.placeholderApiAvailable = isPluginAvailable(manager, "PlaceholderAPI");
+        if (placeholderApiAvailable) {
+            logger.info("PlaceholderAPI détecté. Intégration activée.");
+        } else {
+            logger.warn("PlaceholderAPI non trouvé. Les placeholders PAPI ne seront pas fonctionnels.");
+        }
+
+        if (!isPluginAvailable(manager, "Vault")) {
+            logMissingVaultError();
+            return false;
+        }
+        return true;
+    }
+
+    private boolean isPlaceholderApiPresent() {
+        return isPluginAvailable(getServer().getPluginManager(), "PlaceholderAPI");
+    }
+
+    private boolean isPluginAvailable(PluginManager manager, String name) {
+        Plugin plugin = manager.getPlugin(name);
+        return plugin != null && plugin.isEnabled();
+    }
+
+    private void logMissingVaultError() {
+        logger.error("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+        logger.error("!!! DÉPENDANCE REQUISE MANQUANTE : Vault");
+        logger.error("!!! Le plugin Nexus a besoin de Vault pour fonctionner.");
+        logger.error("!!! -> Téléchargez-le ici : https://www.spigotmc.org/resources/vault.34315/");
+        logger.error("!!! Le plugin va maintenant se désactiver.");
+        logger.error("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
     }
 
     private void logEnvironment() {
@@ -272,8 +303,9 @@ public final class NexusPlugin extends JavaPlugin {
     }
 
     private synchronized void applyBundle(ConfigBundle newBundle) {
-        this.placeholderApiAvailable = detectPlaceholderApi();
+        this.placeholderApiAvailable = isPlaceholderApiPresent();
         messageFacade.updatePlaceholderAvailability(placeholderApiAvailable);
+        serviceRegistry.updateSingleton(Boolean.class, placeholderApiAvailable);
         executorManager.reconfigure(newBundle.core().executorSettings());
         ringScheduler.applyPerfSettings(newBundle.core().arenaSettings());
         messageFacade.update(newBundle.messages());
@@ -516,6 +548,7 @@ public final class NexusPlugin extends JavaPlugin {
         serviceRegistry.registerSingleton(CoreConfig.class, bundle.core());
         serviceRegistry.registerSingleton(ExecutorManager.class, executorManager);
         serviceRegistry.registerSingleton(DbProvider.class, dbProvider);
+        serviceRegistry.registerSingleton(Boolean.class, placeholderApiAvailable);
     }
 
     private void registerServices() {
