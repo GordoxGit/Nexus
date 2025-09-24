@@ -2,6 +2,8 @@
 #  Configuration économie Nexus
 # =============================================
 
+config-version: 1
+
 coins:
   win_per_match: 20
   lose_per_match: 5

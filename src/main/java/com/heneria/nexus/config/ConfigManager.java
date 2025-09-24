@@ -48,6 +48,7 @@ public final class ConfigManager implements AutoCloseable {
     private final ExecutorService ioExecutor;
     private final ConfigValidator validator = new ConfigValidator();
     private final ConfigHotSwap hotSwap = new ConfigHotSwap();
+    private final ConfigMigrator migrator;
 
     public ConfigManager(JavaPlugin plugin, NexusLogger logger) {
         this.plugin = Objects.requireNonNull(plugin, "plugin");
@@ -55,6 +56,7 @@ public final class ConfigManager implements AutoCloseable {
         this.dataDirectory = plugin.getDataFolder().toPath();
         this.ioExecutor = Executors.newFixedThreadPool(Math.max(2, Runtime.getRuntime().availableProcessors() / 2),
                 new NamedThreadFactory("Nexus-Config", true, logger));
+        this.migrator = new ConfigMigrator(logger);
     }
 
     public ReloadReport initialLoad() {
@@ -160,27 +162,42 @@ public final class ConfigManager implements AutoCloseable {
     private YamlConfiguration loadYaml(String resourceName, ConfigValidator.IssueCollector issues) {
         File file = dataDirectory.resolve(resourceName).toFile();
         YamlConfiguration configuration = new YamlConfiguration();
+        boolean loaded = false;
         try {
             configuration.load(file);
+            loaded = true;
         } catch (IOException | InvalidConfigurationException exception) {
             issues.error("<root>", "Lecture impossible: " + exception.getMessage());
         }
-        applyDefaults(configuration, resourceName, issues);
+        YamlConfiguration defaults = loadDefaults(resourceName, issues);
+        if (defaults != null) {
+            if (loaded) {
+                try {
+                    migrator.migrate(dataDirectory, resourceName, configuration, defaults);
+                } catch (IOException exception) {
+                    issues.error("<root>", "Migration impossible: " + exception.getMessage());
+                    logger.error("Impossible de migrer le fichier '" + resourceName + "'", exception);
+                }
+            }
+            configuration.setDefaults(defaults);
+            configuration.options().copyDefaults(true);
+        }
         return configuration;
     }
 
-    private void applyDefaults(YamlConfiguration configuration, String resourceName, ConfigValidator.IssueCollector issues) {
+    private YamlConfiguration loadDefaults(String resourceName, ConfigValidator.IssueCollector issues) {
         try (InputStream inputStream = plugin.getResource(resourceName)) {
             if (inputStream == null) {
                 issues.warn("<root>", "Ressource embarquée manquante: " + resourceName);
-                return;
+                return null;
             }
             YamlConfiguration defaults = new YamlConfiguration();
             defaults.load(new InputStreamReader(inputStream, StandardCharsets.UTF_8));
-            configuration.setDefaults(defaults);
-            configuration.options().copyDefaults(true);
+            return defaults;
         } catch (IOException | InvalidConfigurationException exception) {
-            issues.warn("<root>", "Impossible de charger les valeurs par défaut pour " + resourceName + ": " + exception.getMessage());
+            issues.warn("<root>", "Impossible de charger les valeurs par défaut pour "
+                    + resourceName + ": " + exception.getMessage());
+            return null;
         }
     }
 

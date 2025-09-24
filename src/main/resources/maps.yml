@@ -2,6 +2,8 @@
 #  Catalogue des maps Nexus
 # =============================================
 
+config-version: 1
+
 rotation:
   enabled: true
   weighted_pick: true
