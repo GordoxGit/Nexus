@@ -1,6 +1,7 @@
 name: Nexus
 version: ${project.version}
 main: com.heneria.nexus.NexusPlugin
+softdepend: [Vault, PlaceholderAPI]
 description: Plugin noyau Nexus pour PaperMC.
 authors: [Heneria]
 api-version: '1.21'

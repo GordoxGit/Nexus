@@ -28,6 +28,7 @@ import com.heneria.nexus.service.core.EconomyServiceImpl;
 import com.heneria.nexus.service.core.MapServiceImpl;
 import com.heneria.nexus.service.core.ProfileServiceImpl;
 import com.heneria.nexus.service.core.QueueServiceImpl;
+import com.heneria.nexus.service.core.VaultEconomyService;
 import com.heneria.nexus.util.DumpUtil;
 import com.heneria.nexus.util.MessageFacade;
 import com.heneria.nexus.util.NexusLogger;
@@ -47,11 +48,13 @@ import java.util.concurrent.CompletionStage;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
+import net.milkbowl.vault.economy.Economy;
 import org.bukkit.command.CommandSender;
 import org.bukkit.command.PluginCommand;
 import org.bukkit.Location;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.plugin.PluginManager;
+import org.bukkit.plugin.RegisteredServiceProvider;
 import org.bukkit.plugin.ServicePriority;
 import org.bukkit.plugin.ServicesManager;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -109,6 +112,7 @@ public final class NexusPlugin extends JavaPlugin {
         this.dbProvider = new DbProvider(logger, this);
 
         registerSingletons();
+        setupEconomy();
         registerServices();
 
         try {
@@ -205,11 +209,6 @@ public final class NexusPlugin extends JavaPlugin {
         } else {
             logger.warn("PlaceholderAPI non trouvé. Les placeholders PAPI ne seront pas fonctionnels.");
         }
-
-        if (!isPluginAvailable(manager, "Vault")) {
-            logMissingVaultError();
-            return false;
-        }
         return true;
     }
 
@@ -220,15 +219,6 @@ public final class NexusPlugin extends JavaPlugin {
     private boolean isPluginAvailable(PluginManager manager, String name) {
         Plugin plugin = manager.getPlugin(name);
         return plugin != null && plugin.isEnabled();
-    }
-
-    private void logMissingVaultError() {
-        logger.error("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
-        logger.error("!!! DÉPENDANCE REQUISE MANQUANTE : Vault");
-        logger.error("!!! Le plugin Nexus a besoin de Vault pour fonctionner.");
-        logger.error("!!! -> Téléchargez-le ici : https://www.spigotmc.org/resources/vault.34315/");
-        logger.error("!!! Le plugin va maintenant se désactiver.");
-        logger.error("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
     }
 
     private void logEnvironment() {
@@ -551,11 +541,31 @@ public final class NexusPlugin extends JavaPlugin {
         serviceRegistry.registerSingleton(Boolean.class, placeholderApiAvailable);
     }
 
+    private void setupEconomy() {
+        PluginManager manager = getServer().getPluginManager();
+        if (!isPluginAvailable(manager, "Vault")) {
+            logger.warn("Vault non trouvé. Utilisation du système d'économie interne de Nexus (non persistant).");
+            serviceRegistry.registerService(EconomyService.class, EconomyServiceImpl.class);
+            return;
+        }
+
+        RegisteredServiceProvider<Economy> registration = getServer().getServicesManager().getRegistration(Economy.class);
+        if (registration == null || registration.getProvider() == null) {
+            logger.warn("Vault est installé, mais aucun fournisseur d'économie n'a été trouvé. Utilisation du système interne.");
+            serviceRegistry.registerService(EconomyService.class, EconomyServiceImpl.class);
+            return;
+        }
+
+        Economy provider = registration.getProvider();
+        serviceRegistry.registerSingleton(Economy.class, provider);
+        serviceRegistry.registerService(EconomyService.class, VaultEconomyService.class);
+        logger.info("Vault détecté et connecté ! L'économie sera gérée par Vault.");
+    }
+
     private void registerServices() {
         serviceRegistry.registerService(RingScheduler.class, RingScheduler.class);
         serviceRegistry.registerService(MapService.class, MapServiceImpl.class);
         serviceRegistry.registerService(ProfileService.class, ProfileServiceImpl.class);
-        serviceRegistry.registerService(EconomyService.class, EconomyServiceImpl.class);
         serviceRegistry.registerService(QueueService.class, QueueServiceImpl.class);
         serviceRegistry.registerService(BudgetService.class, BudgetServiceImpl.class);
         serviceRegistry.registerService(WatchdogService.class, WatchdogServiceImpl.class);
