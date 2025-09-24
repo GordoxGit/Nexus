@@ -5,6 +5,8 @@
 #  empilées vers le bas selon le line_spacing défini dans config.yml).
 # =============================================
 
+config-version: 1
+
 holograms:
   hub_welcome:
     world: world
