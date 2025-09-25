@@ -121,8 +121,8 @@ public final class VaultEconomyService implements EconomyService {
         return false;
     }
 
-    private CompletionStage<Long> supplyEconomy(EconomyCallable<Long> callable) {
-        CompletableFuture<Long> future = new CompletableFuture<>();
+    private <T> CompletionStage<T> supplyEconomy(EconomyCallable<T> callable) {
+        CompletableFuture<T> future = new CompletableFuture<>();
         executorManager.compute().execute(() -> {
             try {
                 future.complete(callable.call());

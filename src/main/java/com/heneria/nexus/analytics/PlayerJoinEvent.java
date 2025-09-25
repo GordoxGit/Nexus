@@ -9,12 +9,12 @@ import java.util.UUID;
 /**
  * Analytics event emitted when a player joins the server.
  */
-public record PlayerJoinEvent(UUID playerId,
+public record PlayerJoinEvent(UUID playerUuid,
                               String username,
                               Instant timestamp) implements AnalyticsEvent {
 
     public PlayerJoinEvent {
-        Objects.requireNonNull(playerId, "playerId");
+        Objects.requireNonNull(playerUuid, "playerUuid");
         Objects.requireNonNull(username, "username");
         Objects.requireNonNull(timestamp, "timestamp");
     }
@@ -26,7 +26,7 @@ public record PlayerJoinEvent(UUID playerId,
 
     @Override
     public Optional<UUID> playerId() {
-        return Optional.of(playerId);
+        return Optional.of(playerUuid);
     }
 
     @Override
