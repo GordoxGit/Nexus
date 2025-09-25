@@ -29,6 +29,7 @@ import com.heneria.nexus.service.core.MapServiceImpl;
 import com.heneria.nexus.service.core.ProfileServiceImpl;
 import com.heneria.nexus.service.core.QueueServiceImpl;
 import com.heneria.nexus.service.core.VaultEconomyService;
+import com.heneria.nexus.service.permissions.NexusContextManager;
 import com.heneria.nexus.util.DumpUtil;
 import com.heneria.nexus.util.MessageFacade;
 import com.heneria.nexus.util.NexusLogger;
@@ -58,6 +59,8 @@ import org.bukkit.plugin.RegisteredServiceProvider;
 import org.bukkit.plugin.ServicePriority;
 import org.bukkit.plugin.ServicesManager;
 import org.bukkit.plugin.java.JavaPlugin;
+import net.luckperms.api.LuckPerms;
+import net.luckperms.api.LuckPermsProvider;
 
 /**
  * Main entry point for the Nexus plugin.
@@ -75,6 +78,8 @@ public final class NexusPlugin extends JavaPlugin {
     private ExecutorManager executorManager;
     private RingScheduler ringScheduler;
     private DbProvider dbProvider;
+    private LuckPerms luckPermsApi;
+    private NexusContextManager contextManager;
     private boolean bootstrapFailed;
     private boolean servicesExposed;
 
@@ -113,6 +118,7 @@ public final class NexusPlugin extends JavaPlugin {
 
         registerSingletons();
         setupEconomy();
+        setupPermissions();
         registerServices();
 
         try {
@@ -151,6 +157,10 @@ public final class NexusPlugin extends JavaPlugin {
 
     @Override
     public void onDisable() {
+        if (contextManager != null) {
+            contextManager.close();
+            contextManager = null;
+        }
         if (servicesExposed) {
             getServer().getServicesManager().unregisterAll(this);
             servicesExposed = false;
@@ -560,6 +570,30 @@ public final class NexusPlugin extends JavaPlugin {
         serviceRegistry.registerSingleton(Economy.class, provider);
         serviceRegistry.registerService(EconomyService.class, VaultEconomyService.class);
         logger.info("Vault détecté et connecté ! L'économie sera gérée par Vault.");
+    }
+
+    private void setupPermissions() {
+        PluginManager manager = getServer().getPluginManager();
+        if (!isPluginAvailable(manager, "LuckPerms")) {
+            logger.warn("LuckPerms non trouvé. Les fonctionnalités de permissions avancées seront désactivées.");
+            contextManager = new NexusContextManager(this, logger, null);
+            serviceRegistry.registerSingleton(NexusContextManager.class, contextManager);
+            return;
+        }
+
+        try {
+            this.luckPermsApi = LuckPermsProvider.get();
+        } catch (IllegalStateException exception) {
+            logger.warn("LuckPerms détecté mais l'API n'est pas disponible. Les fonctionnalités de permissions avancées seront désactivées.");
+            contextManager = new NexusContextManager(this, logger, null);
+            serviceRegistry.registerSingleton(NexusContextManager.class, contextManager);
+            return;
+        }
+
+        serviceRegistry.registerSingleton(LuckPerms.class, luckPermsApi);
+        contextManager = new NexusContextManager(this, logger, luckPermsApi);
+        serviceRegistry.registerSingleton(NexusContextManager.class, contextManager);
+        logger.info("LuckPerms détecté et connecté !");
     }
 
     private void registerServices() {

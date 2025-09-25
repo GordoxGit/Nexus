@@ -27,8 +27,14 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
-import org.bukkit.scheduler.BukkitTask;
+import net.luckperms.api.LuckPerms;
+import net.luckperms.api.model.group.Group;
+import net.luckperms.api.model.group.GroupManager;
+import net.luckperms.api.model.user.User;
+import net.luckperms.api.node.NodeType;
+import net.luckperms.api.node.types.InheritanceNode;
 import org.bukkit.plugin.java.JavaPlugin;
+import org.bukkit.scheduler.BukkitTask;
 
 /**
  * Default matchmaking service using in-memory queues.
@@ -39,6 +45,7 @@ public final class QueueServiceImpl implements QueueService {
     private final NexusLogger logger;
     private final ExecutorManager executorManager;
     private final ProfileService profileService;
+    private final Optional<LuckPerms> luckPerms;
     private final Map<ArenaMode, ConcurrentLinkedQueue<QueueTicket>> queues = new EnumMap<>(ArenaMode.class);
     private final ConcurrentHashMap<UUID, QueueTicket> ticketsByPlayer = new ConcurrentHashMap<>();
     private final AtomicLong matchesFormed = new AtomicLong();
@@ -50,11 +57,13 @@ public final class QueueServiceImpl implements QueueService {
                             NexusLogger logger,
                             ExecutorManager executorManager,
                             ProfileService profileService,
-                            CoreConfig config) {
+                            CoreConfig config,
+                            Optional<LuckPerms> luckPerms) {
         this.plugin = Objects.requireNonNull(plugin, "plugin");
         this.logger = Objects.requireNonNull(logger, "logger");
         this.executorManager = Objects.requireNonNull(executorManager, "executorManager");
         this.profileService = Objects.requireNonNull(profileService, "profileService");
+        this.luckPerms = Objects.requireNonNull(luckPerms, "luckPerms");
         this.settingsRef = new AtomicReference<>(config.queueSettings());
         for (ArenaMode mode : ArenaMode.values()) {
             queues.put(mode, new ConcurrentLinkedQueue<>());
@@ -164,8 +173,10 @@ public final class QueueServiceImpl implements QueueService {
     }
 
     private int weightForTicket(QueueTicket ticket) {
-        int vipBonus = ticket.options().vip() ? settingsRef.get().vipWeight() : 0;
-        return vipBonus + ticket.options().weight();
+        int groupWeight = luckPerms
+                .map(api -> highestGroupWeight(api, ticket.playerId()))
+                .orElseGet(() -> ticket.options().vip() ? settingsRef.get().vipWeight() : 0);
+        return ticket.options().weight() + groupWeight;
     }
 
     private void updateStats() {
@@ -176,5 +187,29 @@ public final class QueueServiceImpl implements QueueService {
                 .sum();
         long averageWait = tickets.isEmpty() ? 0L : totalWait / tickets.size();
         stats.set(new QueueStats(tickets.size(), (int) vip, averageWait, matchesFormed.get()));
+    }
+
+    private int highestGroupWeight(LuckPerms api, UUID playerId) {
+        User user = api.getUserManager().getUser(playerId);
+        if (user == null) {
+            return 0;
+        }
+        GroupManager groupManager = api.getGroupManager();
+        int best = weightOfGroup(groupManager, user.getPrimaryGroup());
+        for (InheritanceNode node : user.getNodes(NodeType.INHERITANCE)) {
+            best = Math.max(best, weightOfGroup(groupManager, node.getGroupName()));
+        }
+        return best;
+    }
+
+    private int weightOfGroup(GroupManager groupManager, String groupName) {
+        if (groupName == null || groupName.isEmpty()) {
+            return 0;
+        }
+        Group group = groupManager.getGroup(groupName);
+        if (group == null) {
+            return 0;
+        }
+        return group.getWeight().orElse(0);
     }
 }
