@@ -335,7 +335,7 @@ public final class NexusPlugin extends JavaPlugin {
             return;
         }
         messageFacade.send(sender, "admin.dump.header");
-        List<Component> lines = DumpUtil.createDump(getServer(), bundle, executorManager, ringScheduler, dbProvider, serviceRegistry,
+        List<Component> lines = DumpUtil.createDump(this, getServer(), bundle, executorManager, ringScheduler, dbProvider, serviceRegistry,
                 serviceRegistry.get(BudgetService.class), serviceRegistry.get(WatchdogService.class), serviceRegistry.get(HoloService.class));
         lines.forEach(sender::sendMessage);
         messageFacade.send(sender, "admin.dump.success");
