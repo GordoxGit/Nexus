@@ -8,7 +8,7 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import net.luckperms.api.LuckPerms;
 import net.luckperms.api.context.ContextCalculator;
-import net.luckperms.api.context.MutableContextSet;
+import net.luckperms.api.context.ContextConsumer;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
 
@@ -69,7 +69,7 @@ public final class NexusContextManager implements ContextCalculator<Player>, Aut
     }
 
     @Override
-    public void calculate(Player target, MutableContextSet accumulator) {
+    public void calculate(Player target, ContextConsumer consumer) {
         if (!enabled) {
             return;
         }
@@ -77,7 +77,7 @@ public final class NexusContextManager implements ContextCalculator<Player>, Aut
         if (mode == null) {
             return;
         }
-        accumulator.add(CONTEXT_KEY, toContextValue(mode));
+        consumer.accept(CONTEXT_KEY, toContextValue(mode));
     }
 
     @Override
