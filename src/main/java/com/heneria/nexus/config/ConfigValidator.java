@@ -99,6 +99,10 @@ public final class ConfigValidator {
         int hologramPoolText = nonNegativeInt(yaml, "holograms.pool.max_text_displays", 64, issues);
         int hologramPoolInteractions = nonNegativeInt(yaml, "holograms.pool.max_interactions", 32, issues);
 
+        boolean analyticsEnabled = yaml.getBoolean("analytics.outbox.enabled", false);
+        long flushIntervalSeconds = positiveLong(yaml, "analytics.outbox.flush_interval_seconds", 30L, issues, true);
+        int analyticsMaxBatch = positiveInt(yaml, "analytics.outbox.max_batch_size", 200, issues, true);
+
         Map<String, CoreConfig.TitleTimesProfile> titleProfiles = new LinkedHashMap<>();
         ConfigurationSection timesSection = yaml.getConfigurationSection("ui.title.times");
         if (timesSection != null) {
@@ -231,8 +235,19 @@ public final class ConfigValidator {
             hologramSettings = new CoreConfig.HologramSettings(5, 80, 0.27D, 48.0D, 64, 32);
         }
 
+        CoreConfig.AnalyticsSettings.OutboxSettings outboxSettings;
+        try {
+            outboxSettings = new CoreConfig.AnalyticsSettings.OutboxSettings(analyticsEnabled,
+                    java.time.Duration.ofSeconds(Math.max(1L, flushIntervalSeconds)), Math.max(1, analyticsMaxBatch));
+        } catch (IllegalArgumentException exception) {
+            issues.error("analytics.outbox", exception.getMessage());
+            outboxSettings = new CoreConfig.AnalyticsSettings.OutboxSettings(false, java.time.Duration.ofSeconds(30L), 200);
+        }
+        CoreConfig.AnalyticsSettings analyticsSettings = new CoreConfig.AnalyticsSettings(outboxSettings);
+
         return new CoreConfig(mode, locale, zone, arenaSettings, executorSettings, databaseSettings,
-                serviceSettings, timeoutSettings, degradedModeSettings, queueSettings, hologramSettings, uiSettings);
+                serviceSettings, timeoutSettings, degradedModeSettings, queueSettings, hologramSettings,
+                analyticsSettings, uiSettings);
     }
 
     public MessageBundle validateMessages(YamlConfiguration yaml, Locale expectedLocale, IssueCollector issues) {

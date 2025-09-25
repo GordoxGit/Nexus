@@ -1,5 +1,7 @@
 package com.heneria.nexus;
 
+import com.heneria.nexus.analytics.AnalyticsRepository;
+import com.heneria.nexus.analytics.AnalyticsService;
 import com.heneria.nexus.budget.BudgetService;
 import com.heneria.nexus.budget.BudgetServiceImpl;
 import com.heneria.nexus.budget.BudgetSnapshot;
@@ -606,6 +608,8 @@ public final class NexusPlugin extends JavaPlugin {
         serviceRegistry.registerService(TimerService.class, TimerServiceImpl.class);
         serviceRegistry.registerService(BudgetService.class, BudgetServiceImpl.class);
         serviceRegistry.registerService(WatchdogService.class, WatchdogServiceImpl.class);
+        serviceRegistry.registerService(AnalyticsRepository.class, AnalyticsRepository.class);
+        serviceRegistry.registerService(AnalyticsService.class, AnalyticsService.class);
         serviceRegistry.registerService(ArenaService.class, ArenaServiceImpl.class);
         serviceRegistry.registerService(HoloService.class, HoloServiceImpl.class);
     }
