@@ -1,11 +1,11 @@
 package com.heneria.nexus.service.core;
 
 import com.heneria.nexus.concurrent.ExecutorManager;
-import com.heneria.nexus.service.api.MapDefinition;
-import com.heneria.nexus.service.api.MapLoadException;
-import com.heneria.nexus.service.api.MapQuery;
-import com.heneria.nexus.service.api.MapService;
-import com.heneria.nexus.service.api.ValidationReport;
+import com.heneria.nexus.api.MapDefinition;
+import com.heneria.nexus.api.MapLoadException;
+import com.heneria.nexus.api.MapQuery;
+import com.heneria.nexus.api.MapService;
+import com.heneria.nexus.api.ValidationReport;
 import com.heneria.nexus.util.NexusLogger;
 import java.nio.file.Files;
 import java.nio.file.Path;

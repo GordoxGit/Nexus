@@ -1,6 +1,6 @@
 package com.heneria.nexus.budget;
 
-import com.heneria.nexus.service.api.ArenaMode;
+import com.heneria.nexus.api.ArenaMode;
 import java.util.UUID;
 
 /**

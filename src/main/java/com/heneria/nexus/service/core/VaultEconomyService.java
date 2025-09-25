@@ -2,10 +2,10 @@ package com.heneria.nexus.service.core;
 
 import com.heneria.nexus.config.CoreConfig;
 import com.heneria.nexus.concurrent.ExecutorManager;
-import com.heneria.nexus.service.api.EconomyException;
-import com.heneria.nexus.service.api.EconomyService;
-import com.heneria.nexus.service.api.EconomyTransaction;
-import com.heneria.nexus.service.api.EconomyTransferResult;
+import com.heneria.nexus.api.EconomyException;
+import com.heneria.nexus.api.EconomyService;
+import com.heneria.nexus.api.EconomyTransaction;
+import com.heneria.nexus.api.EconomyTransferResult;
 import com.heneria.nexus.util.NexusLogger;
 import java.util.ArrayList;
 import java.util.List;

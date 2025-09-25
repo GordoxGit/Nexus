@@ -1,8 +1,8 @@
 package com.heneria.nexus.budget;
 
 import com.heneria.nexus.config.CoreConfig;
-import com.heneria.nexus.service.api.ArenaHandle;
-import com.heneria.nexus.service.api.ArenaMode;
+import com.heneria.nexus.api.ArenaHandle;
+import com.heneria.nexus.api.ArenaMode;
 import com.heneria.nexus.util.NexusLogger;
 import java.util.ArrayList;
 import java.util.Collection;

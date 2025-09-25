@@ -3,16 +3,18 @@ package com.heneria.nexus.service.core;
 import com.heneria.nexus.budget.BudgetService;
 import com.heneria.nexus.config.CoreConfig;
 import com.heneria.nexus.concurrent.ExecutorManager;
-import com.heneria.nexus.service.api.ArenaBudget;
-import com.heneria.nexus.service.api.ArenaCreationException;
-import com.heneria.nexus.service.api.ArenaHandle;
-import com.heneria.nexus.service.api.ArenaMode;
-import com.heneria.nexus.service.api.ArenaPhase;
-import com.heneria.nexus.service.api.ArenaService;
-import com.heneria.nexus.service.api.EconomyService;
-import com.heneria.nexus.service.api.MapService;
-import com.heneria.nexus.service.api.ProfileService;
-import com.heneria.nexus.service.api.QueueService;
+import com.heneria.nexus.api.ArenaBudget;
+import com.heneria.nexus.api.ArenaCreationException;
+import com.heneria.nexus.api.ArenaHandle;
+import com.heneria.nexus.api.ArenaMode;
+import com.heneria.nexus.api.ArenaPhase;
+import com.heneria.nexus.api.ArenaService;
+import com.heneria.nexus.api.EconomyService;
+import com.heneria.nexus.api.MapService;
+import com.heneria.nexus.api.ProfileService;
+import com.heneria.nexus.api.QueueService;
+import com.heneria.nexus.api.events.NexusArenaEndEvent;
+import com.heneria.nexus.api.events.NexusArenaStartEvent;
 import com.heneria.nexus.util.NexusLogger;
 import com.heneria.nexus.watchdog.WatchdogService;
 import com.heneria.nexus.watchdog.WatchdogTimeoutException;
@@ -27,6 +29,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicReference;
+import org.bukkit.plugin.PluginManager;
 import org.bukkit.plugin.java.JavaPlugin;
 
 /**
@@ -109,6 +112,10 @@ public final class ArenaServiceImpl implements ArenaService {
             throw new IllegalStateException("Les transitions d'arène doivent être réalisées sur le main thread");
         }
         ArenaPhase previous = handle.setPhase(nextPhase);
+        PluginManager pluginManager = plugin.getServer().getPluginManager();
+        if (nextPhase == ArenaPhase.PLAYING) {
+            pluginManager.callEvent(new NexusArenaStartEvent(handle));
+        }
         listeners.forEach(listener -> safe(() -> listener.onPhaseChange(handle, previous, nextPhase)));
         if (nextPhase == ArenaPhase.RESET) {
             listeners.forEach(listener -> safe(() -> listener.onResetStart(handle)));
@@ -121,6 +128,7 @@ public final class ArenaServiceImpl implements ArenaService {
                 logger.warn("Économie en mode dégradé lors du score pour " + handle.id());
             }
         } else if (nextPhase == ArenaPhase.END) {
+            pluginManager.callEvent(new NexusArenaEndEvent(handle, null));
             budgetService.unregisterArena(handle);
             arenas.remove(handle.id());
             executorManager.compute().execute(() -> queueService.tryMatch(handle.mode()).ifPresent(plan ->
