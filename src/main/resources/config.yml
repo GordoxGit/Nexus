@@ -59,6 +59,12 @@ queue:
   tick_hz: 5
   vip_weight: 1
 
+analytics:
+  outbox:
+    enabled: false
+    flush_interval_seconds: 30
+    max_batch_size: 200
+
 holograms:
   update_hz: 5
   max_visible_per_instance: 80

@@ -1,5 +1,6 @@
 package com.heneria.nexus.config;
 
+import java.time.Duration;
 import java.time.ZoneId;
 import java.util.Locale;
 import java.util.Map;
@@ -23,6 +24,7 @@ public final class CoreConfig {
     private final DegradedModeSettings degradedModeSettings;
     private final QueueSettings queueSettings;
     private final HologramSettings hologramSettings;
+    private final AnalyticsSettings analyticsSettings;
     private final UiSettings uiSettings;
 
     public CoreConfig(String serverMode,
@@ -36,6 +38,7 @@ public final class CoreConfig {
                       DegradedModeSettings degradedModeSettings,
                       QueueSettings queueSettings,
                       HologramSettings hologramSettings,
+                      AnalyticsSettings analyticsSettings,
                       UiSettings uiSettings) {
         this.serverMode = Objects.requireNonNull(serverMode, "serverMode");
         this.language = Objects.requireNonNull(language, "language");
@@ -48,6 +51,7 @@ public final class CoreConfig {
         this.degradedModeSettings = Objects.requireNonNull(degradedModeSettings, "degradedModeSettings");
         this.queueSettings = Objects.requireNonNull(queueSettings, "queueSettings");
         this.hologramSettings = Objects.requireNonNull(hologramSettings, "hologramSettings");
+        this.analyticsSettings = Objects.requireNonNull(analyticsSettings, "analyticsSettings");
         this.uiSettings = Objects.requireNonNull(uiSettings, "uiSettings");
     }
 
@@ -93,6 +97,10 @@ public final class CoreConfig {
 
     public HologramSettings hologramSettings() {
         return hologramSettings;
+    }
+
+    public AnalyticsSettings analyticsSettings() {
+        return analyticsSettings;
     }
 
     public UiSettings uiSettings() {
@@ -168,6 +176,24 @@ public final class CoreConfig {
             if (viewRange <= 0D) throw new IllegalArgumentException("viewRange must be > 0");
             if (maxPooledTextDisplays < 0) throw new IllegalArgumentException("maxPooledTextDisplays must be >= 0");
             if (maxPooledInteractions < 0) throw new IllegalArgumentException("maxPooledInteractions must be >= 0");
+        }
+    }
+
+    public record AnalyticsSettings(OutboxSettings outbox) {
+        public AnalyticsSettings {
+            Objects.requireNonNull(outbox, "outbox");
+        }
+
+        public record OutboxSettings(boolean enabled, Duration flushInterval, int maxBatchSize) {
+            public OutboxSettings {
+                Objects.requireNonNull(flushInterval, "flushInterval");
+                if (flushInterval.isZero() || flushInterval.isNegative()) {
+                    throw new IllegalArgumentException("flushInterval must be > 0");
+                }
+                if (maxBatchSize <= 0) {
+                    throw new IllegalArgumentException("maxBatchSize must be > 0");
+                }
+            }
         }
     }
 

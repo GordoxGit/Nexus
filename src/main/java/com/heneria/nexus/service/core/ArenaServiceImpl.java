@@ -1,5 +1,7 @@
 package com.heneria.nexus.service.core;
 
+import com.heneria.nexus.analytics.AnalyticsService;
+import com.heneria.nexus.analytics.MatchCompletedEvent;
 import com.heneria.nexus.budget.BudgetService;
 import com.heneria.nexus.config.CoreConfig;
 import com.heneria.nexus.concurrent.ExecutorManager;
@@ -19,6 +21,7 @@ import com.heneria.nexus.util.NexusLogger;
 import com.heneria.nexus.watchdog.WatchdogService;
 import com.heneria.nexus.watchdog.WatchdogTimeoutException;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
@@ -50,6 +53,7 @@ public final class ArenaServiceImpl implements ArenaService {
     private final CopyOnWriteArrayList<ArenaListener> listeners = new CopyOnWriteArrayList<>();
     private final AtomicReference<CoreConfig.ArenaSettings> settingsRef;
     private final AtomicReference<CoreConfig.TimeoutSettings.WatchdogSettings> watchdogSettingsRef;
+    private final Optional<AnalyticsService> analyticsService;
 
     public ArenaServiceImpl(JavaPlugin plugin,
                             NexusLogger logger,
@@ -59,6 +63,7 @@ public final class ArenaServiceImpl implements ArenaService {
                             EconomyService economyService,
                             ExecutorManager executorManager,
                             BudgetService budgetService,
+                            Optional<AnalyticsService> analyticsService,
                             WatchdogService watchdogService,
                             CoreConfig config) {
         this.plugin = Objects.requireNonNull(plugin, "plugin");
@@ -69,6 +74,7 @@ public final class ArenaServiceImpl implements ArenaService {
         this.economyService = Objects.requireNonNull(economyService, "economyService");
         this.executorManager = Objects.requireNonNull(executorManager, "executorManager");
         this.budgetService = Objects.requireNonNull(budgetService, "budgetService");
+        this.analyticsService = Objects.requireNonNull(analyticsService, "analyticsService");
         this.watchdogService = Objects.requireNonNull(watchdogService, "watchdogService");
         this.settingsRef = new AtomicReference<>(config.arenaSettings());
         this.watchdogSettingsRef = new AtomicReference<>(config.timeoutSettings().watchdog());
@@ -129,6 +135,13 @@ public final class ArenaServiceImpl implements ArenaService {
             }
         } else if (nextPhase == ArenaPhase.END) {
             pluginManager.callEvent(new NexusArenaEndEvent(handle, null));
+            Instant completedAt = Instant.now();
+            analyticsService.ifPresent(service -> service.record(new MatchCompletedEvent(
+                    handle.id(),
+                    handle.mapId(),
+                    handle.mode().name(),
+                    handle.createdAt(),
+                    completedAt)));
             budgetService.unregisterArena(handle);
             arenas.remove(handle.id());
             executorManager.compute().execute(() -> queueService.tryMatch(handle.mode()).ifPresent(plan ->
