@@ -1,6 +1,6 @@
 package com.heneria.nexus.service.permissions;
 
-import com.heneria.nexus.service.api.ArenaMode;
+import com.heneria.nexus.api.ArenaMode;
 import com.heneria.nexus.util.NexusLogger;
 import java.util.Map;
 import java.util.Objects;

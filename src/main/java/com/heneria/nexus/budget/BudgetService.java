@@ -2,7 +2,7 @@ package com.heneria.nexus.budget;
 
 import com.heneria.nexus.config.CoreConfig;
 import com.heneria.nexus.service.LifecycleAware;
-import com.heneria.nexus.service.api.ArenaHandle;
+import com.heneria.nexus.api.ArenaHandle;
 import java.util.Collection;
 import java.util.Optional;
 import java.util.UUID;
