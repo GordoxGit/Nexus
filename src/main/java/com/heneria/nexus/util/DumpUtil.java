@@ -23,6 +23,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
@@ -86,6 +87,12 @@ public final class DumpUtil {
                 databaseEnabled ? NamedTextColor.GRAY : NamedTextColor.DARK_GRAY));
         lines.add(Component.text("Mode : " + (dbDiagnostics.degraded() ? "Dégradé" : "Normal"),
                 stateColor(!dbDiagnostics.degraded())));
+        boolean health = dbProvider.checkHealth(executorManager.io())
+                .orTimeout(3, TimeUnit.SECONDS)
+                .exceptionally(throwable -> false)
+                .join();
+        lines.add(Component.text("Health check : " + (health ? "OK" : "KO"),
+                health ? NamedTextColor.GRAY : NamedTextColor.RED));
         lines.add(Component.text("Connexions actives : " + formatNumber(dbDiagnostics.activeConnections()), NamedTextColor.GRAY));
         lines.add(Component.text("Connexions libres : " + formatNumber(dbDiagnostics.idleConnections()), NamedTextColor.GRAY));
         lines.add(Component.text("Connexions totales : " + formatNumber(dbDiagnostics.totalConnections()), NamedTextColor.GRAY));
