@@ -16,6 +16,8 @@ public final class PlayerProfile {
     private final Map<String, String> preferences;
     private final List<String> cosmetics;
     private Instant lastUpdate;
+    private int version;
+    private int persistedVersion;
 
     /**
      * Creates a new profile with the provided backing data.
@@ -30,12 +32,25 @@ public final class PlayerProfile {
                          Map<String, Long> statistics,
                          Map<String, String> preferences,
                          List<String> cosmetics,
-                         Instant lastUpdate) {
+                         Instant lastUpdate,
+                         int version) {
+        this(playerId, statistics, preferences, cosmetics, lastUpdate, version, version);
+    }
+
+    public PlayerProfile(UUID playerId,
+                         Map<String, Long> statistics,
+                         Map<String, String> preferences,
+                         List<String> cosmetics,
+                         Instant lastUpdate,
+                         int version,
+                         int persistedVersion) {
         this.playerId = Objects.requireNonNull(playerId, "playerId");
         this.statistics = Objects.requireNonNull(statistics, "statistics");
         this.preferences = Objects.requireNonNull(preferences, "preferences");
         this.cosmetics = Objects.requireNonNull(cosmetics, "cosmetics");
         this.lastUpdate = Objects.requireNonNullElse(lastUpdate, Instant.now());
+        this.version = version;
+        this.persistedVersion = persistedVersion;
     }
 
     /**
@@ -88,5 +103,54 @@ public final class PlayerProfile {
      */
     public void touch() {
         this.lastUpdate = Instant.now();
+    }
+
+    /**
+     * Returns the optimistic locking version associated with this profile.
+     *
+     * @return current profile version
+     */
+    public int getVersion() {
+        return version;
+    }
+
+    /**
+     * Returns the last persisted optimistic locking version.
+     *
+     * @return persisted profile version
+     */
+    public int getPersistedVersion() {
+        return persistedVersion;
+    }
+
+    /**
+     * Bumps the in-memory version to prepare for a new persistence cycle.
+     * <p>
+     * The version is incremented at most once between two persistence cycles
+     * in order to avoid desynchronizing the optimistic locking state when
+     * multiple save requests are coalesced.
+     */
+    public void incrementVersion() {
+        if (version == persistedVersion) {
+            version++;
+        }
+    }
+
+    /**
+     * Marks the profile as successfully persisted by aligning the persisted
+     * version with the current in-memory version.
+     */
+    public void markPersisted() {
+        this.persistedVersion = this.version;
+    }
+
+    /**
+     * Resets both the current and persisted versions to the provided value.
+     *
+     * @param version new version to apply
+     */
+    public void resetVersion(int version) {
+        this.version = version;
+        this.persistedVersion = version;
     }
 }
