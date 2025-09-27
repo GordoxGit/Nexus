@@ -17,9 +17,11 @@ import com.heneria.nexus.api.ProfileService;
 import com.heneria.nexus.api.QueueService;
 import com.heneria.nexus.api.events.NexusArenaEndEvent;
 import com.heneria.nexus.api.events.NexusArenaStartEvent;
+import com.heneria.nexus.db.repository.MatchRepository;
 import com.heneria.nexus.util.NexusLogger;
 import com.heneria.nexus.watchdog.WatchdogService;
 import com.heneria.nexus.watchdog.WatchdogTimeoutException;
+import com.heneria.nexus.match.MatchSnapshot;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Collection;
@@ -48,6 +50,7 @@ public final class ArenaServiceImpl implements ArenaService {
     private final EconomyService economyService;
     private final ExecutorManager executorManager;
     private final BudgetService budgetService;
+    private final MatchRepository matchRepository;
     private final WatchdogService watchdogService;
     private final ConcurrentHashMap<UUID, ArenaHandle> arenas = new ConcurrentHashMap<>();
     private final CopyOnWriteArrayList<ArenaListener> listeners = new CopyOnWriteArrayList<>();
@@ -63,6 +66,7 @@ public final class ArenaServiceImpl implements ArenaService {
                             EconomyService economyService,
                             ExecutorManager executorManager,
                             BudgetService budgetService,
+                            MatchRepository matchRepository,
                             Optional<AnalyticsService> analyticsService,
                             WatchdogService watchdogService,
                             CoreConfig config) {
@@ -74,6 +78,7 @@ public final class ArenaServiceImpl implements ArenaService {
         this.economyService = Objects.requireNonNull(economyService, "economyService");
         this.executorManager = Objects.requireNonNull(executorManager, "executorManager");
         this.budgetService = Objects.requireNonNull(budgetService, "budgetService");
+        this.matchRepository = Objects.requireNonNull(matchRepository, "matchRepository");
         this.analyticsService = Objects.requireNonNull(analyticsService, "analyticsService");
         this.watchdogService = Objects.requireNonNull(watchdogService, "watchdogService");
         this.settingsRef = new AtomicReference<>(config.arenaSettings());
@@ -142,6 +147,7 @@ public final class ArenaServiceImpl implements ArenaService {
                     handle.mode().name(),
                     handle.createdAt(),
                     completedAt)));
+            persistMatchSnapshot(handle, completedAt);
             budgetService.unregisterArena(handle);
             arenas.remove(handle.id());
             executorManager.compute().execute(() -> queueService.tryMatch(handle.mode()).ifPresent(plan ->
@@ -188,6 +194,28 @@ public final class ArenaServiceImpl implements ArenaService {
     public void applyWatchdogSettings(CoreConfig.TimeoutSettings.WatchdogSettings settings) {
         watchdogSettingsRef.set(Objects.requireNonNull(settings, "settings"));
         logger.info("Timeouts watchdog mis à jour: reset=" + settings.resetMs() + "ms paste=" + settings.pasteMs() + "ms");
+    }
+
+    private void persistMatchSnapshot(ArenaHandle handle, Instant completedAt) {
+        MatchSnapshot snapshot = buildSnapshot(handle, completedAt);
+        matchRepository.save(snapshot).whenComplete((ignored, throwable) -> {
+            if (throwable != null) {
+                logger.error("Impossible de persister le match " + handle.id(), throwable);
+            } else {
+                logger.debug(() -> "Snapshot du match " + handle.id() + " sauvegardé");
+            }
+        });
+    }
+
+    private MatchSnapshot buildSnapshot(ArenaHandle handle, Instant completedAt) {
+        return new MatchSnapshot(
+                handle.id(),
+                handle.mapId(),
+                handle.mode(),
+                handle.createdAt(),
+                completedAt,
+                Optional.empty(),
+                List.of());
     }
 
     private void scheduleReset(ArenaHandle handle) {
