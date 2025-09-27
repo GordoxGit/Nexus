@@ -14,6 +14,8 @@ import com.heneria.nexus.db.DatabaseMigrator;
 import com.heneria.nexus.db.DbProvider;
 import com.heneria.nexus.db.repository.EconomyRepository;
 import com.heneria.nexus.db.repository.EconomyRepositoryImpl;
+import com.heneria.nexus.db.repository.MatchRepository;
+import com.heneria.nexus.db.repository.MatchRepositoryImpl;
 import com.heneria.nexus.db.repository.ProfileRepository;
 import com.heneria.nexus.db.repository.ProfileRepositoryImpl;
 import com.heneria.nexus.hologram.HoloService;
@@ -637,6 +639,7 @@ public final class NexusPlugin extends JavaPlugin {
         serviceRegistry.registerService(MapService.class, MapServiceImpl.class);
         serviceRegistry.registerService(ProfileRepository.class, ProfileRepositoryImpl.class);
         serviceRegistry.registerService(EconomyRepository.class, EconomyRepositoryImpl.class);
+        serviceRegistry.registerService(MatchRepository.class, MatchRepositoryImpl.class);
         serviceRegistry.registerService(PersistenceService.class, PersistenceServiceImpl.class);
         serviceRegistry.registerService(ProfileService.class, ProfileServiceImpl.class);
         serviceRegistry.registerService(QueueService.class, QueueServiceImpl.class);
