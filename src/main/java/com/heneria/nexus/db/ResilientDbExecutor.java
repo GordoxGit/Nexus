@@ -1,6 +1,7 @@
 package com.heneria.nexus.db;
 
 import com.heneria.nexus.config.CoreConfig;
+import com.heneria.nexus.util.NamedThreadFactory;
 import com.heneria.nexus.util.NexusLogger;
 import io.github.resilience4j.circuitbreaker.CircuitBreaker;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerConfig;
@@ -20,6 +21,8 @@ import java.util.concurrent.CompletionException;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
 
@@ -34,6 +37,7 @@ public final class ResilientDbExecutor {
     private final NexusLogger logger;
     private final DbProvider dbProvider;
     private final Executor ioExecutor;
+    private final ScheduledExecutorService retryScheduler;
     private final AtomicReference<Retry> retryRef = new AtomicReference<>();
     private final AtomicReference<CircuitBreaker> circuitBreakerRef = new AtomicReference<>();
 
@@ -44,6 +48,8 @@ public final class ResilientDbExecutor {
         this.logger = Objects.requireNonNull(logger, "logger");
         this.dbProvider = Objects.requireNonNull(dbProvider, "dbProvider");
         this.ioExecutor = Objects.requireNonNull(ioExecutor, "ioExecutor");
+        this.retryScheduler = Executors.newSingleThreadScheduledExecutor(
+                new NamedThreadFactory("Nexus-DB-Retry", true, logger));
         configure(databaseSettings);
     }
 
@@ -86,7 +92,7 @@ public final class ResilientDbExecutor {
         Supplier<CompletionStage<T>> supplier = () -> dbProvider.execute(queryIdentifier, task, ioExecutor);
         Supplier<CompletionStage<T>> decorated = Decorators.ofCompletionStage(supplier)
                 .withCircuitBreaker(circuitBreakerRef.get())
-                .withRetry(retryRef.get())
+                .withRetry(retryRef.get(), retryScheduler)
                 .decorate();
         try {
             return decorated.get().toCompletableFuture();

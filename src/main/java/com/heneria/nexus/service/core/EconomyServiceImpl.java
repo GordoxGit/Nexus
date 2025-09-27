@@ -431,11 +431,7 @@ public final class EconomyServiceImpl implements EconomyService {
                         .toArray(CompletableFuture[]::new);
                 applyFuture = CompletableFuture.allOf(loads)
                         .thenCompose(ignored -> executorManager.runIo(() -> applyDeltasFallback(deltas)))
-                        .thenApply(ignored -> {
-                            clearForcedFallback();
-                            return null;
-                        })
-                        .toCompletableFuture();
+                        .thenRun(EconomyServiceImpl.this::clearForcedFallback);
             }
             return applyFuture.thenRun(() -> markDirtyForTransaction(deltas))
                     .exceptionallyCompose(EconomyServiceImpl.this::propagateEconomyFailure);
