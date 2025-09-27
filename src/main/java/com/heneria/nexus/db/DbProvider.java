@@ -104,6 +104,10 @@ public final class DbProvider implements LifecycleAware {
         return degraded;
     }
 
+    public boolean isReady() {
+        return dataSourceRef.get() != null && !degraded;
+    }
+
     public Connection getConnection() throws SQLException {
         HikariDataSource dataSource = dataSourceRef.get();
         if (dataSource == null) {

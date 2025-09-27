@@ -74,6 +74,7 @@ public final class DailyStatsAggregatorService implements LifecycleAware {
     private final Object chainLock = new Object();
 
     private final AtomicReference<Throwable> lastError = new AtomicReference<>();
+    private final AtomicReference<BukkitTask> readinessTask = new AtomicReference<>();
     private final AtomicReference<BukkitTask> scheduledTask = new AtomicReference<>();
     private volatile CompletableFuture<Void> tail = CompletableFuture.completedFuture(null);
 
@@ -98,19 +99,18 @@ public final class DailyStatsAggregatorService implements LifecycleAware {
             logger.info("Agrégation quotidienne désactivée (base de données inopérante)");
             return CompletableFuture.completedFuture(null);
         }
-        scheduleNextRun();
-        LocalDate yesterday = LocalDate.now(zoneId).minusDays(1);
-        aggregateFor(yesterday).whenComplete((ignored, throwable) -> {
-            if (throwable != null) {
-                logger.warn("Agrégation quotidienne initiale en échec", unwrap(throwable));
-            }
-        });
-        logger.info("Agrégateur de statistiques quotidiennes initialisé");
+        if (!isDatabaseReady()) {
+            logger.info("Agrégateur quotidien en attente de la disponibilité de la base de données");
+            scheduleDatabaseAvailabilityCheck();
+            return CompletableFuture.completedFuture(null);
+        }
+        startAggregationLifecycle();
         return CompletableFuture.completedFuture(null);
     }
 
     @Override
     public CompletableFuture<Void> stop() {
+        cancelReadinessTask();
         cancelScheduledTask();
         CompletableFuture<Void> pending;
         synchronized (chainLock) {
@@ -155,6 +155,18 @@ public final class DailyStatsAggregatorService implements LifecycleAware {
      */
     public CompletableFuture<Void> aggregateYesterday() {
         return aggregateFor(LocalDate.now(zoneId).minusDays(1));
+    }
+
+    private void startAggregationLifecycle() {
+        cancelReadinessTask();
+        scheduleNextRun();
+        LocalDate yesterday = LocalDate.now(zoneId).minusDays(1);
+        aggregateFor(yesterday).whenComplete((ignored, throwable) -> {
+            if (throwable != null) {
+                logger.warn("Agrégation quotidienne initiale en échec", unwrap(throwable));
+            }
+        });
+        logger.info("Agrégateur de statistiques quotidiennes initialisé");
     }
 
     private CompletableFuture<Void> performAggregation(LocalDate targetDate) {
@@ -236,6 +248,29 @@ public final class DailyStatsAggregatorService implements LifecycleAware {
         return 0L;
     }
 
+    private void scheduleDatabaseAvailabilityCheck() {
+        if (readinessTask.get() != null) {
+            return;
+        }
+        BukkitTask task = plugin.getServer().getScheduler().runTaskTimer(plugin, () -> {
+            if (!plugin.isEnabled() || !enabled) {
+                cancelReadinessTask();
+                return;
+            }
+            if (isDatabaseReady()) {
+                cancelReadinessTask();
+                startAggregationLifecycle();
+            }
+        }, 20L, 20L);
+        if (!readinessTask.compareAndSet(null, task)) {
+            task.cancel();
+        }
+    }
+
+    private boolean isDatabaseReady() {
+        return dbProvider.isReady();
+    }
+
     private void scheduleNextRun() {
         cancelScheduledTask();
         long delayTicks = Math.max(1L, (computeDelayToNextRun().toMillis() + 49L) / 50L);
@@ -268,6 +303,13 @@ public final class DailyStatsAggregatorService implements LifecycleAware {
             nextRun = nextRun.plusDays(1);
         }
         return Duration.between(now, nextRun);
+    }
+
+    private void cancelReadinessTask() {
+        BukkitTask task = readinessTask.getAndSet(null);
+        if (task != null) {
+            task.cancel();
+        }
     }
 
     private void cancelScheduledTask() {

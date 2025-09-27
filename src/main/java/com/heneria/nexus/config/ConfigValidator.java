@@ -495,7 +495,7 @@ public final class ConfigValidator {
 
         ConfigurationSection root = yaml;
         for (String key : root.getKeys(false)) {
-            if (key.equals("meta") || key.equals("prefix")) {
+            if (key.equals("meta") || key.equals("prefix") || key.equals("config-version")) {
                 continue;
             }
             Object value = root.get(key);
