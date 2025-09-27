@@ -445,7 +445,65 @@ public final class ConfigValidator {
         EconomyConfig.XpPerMatch xpPerMatch = new EconomyConfig.XpPerMatch(xpWin, xpLose);
         EconomyConfig.BattlePassSettings battlePassSettings = new EconomyConfig.BattlePassSettings(seasonDays, tiers, xpPerMatch);
 
-        return new EconomyConfig(coinsSettings, battlePassSettings);
+        Map<String, EconomyConfig.ClassEntry> classEntries = new LinkedHashMap<>();
+        ConfigurationSection classesSection = yaml.getConfigurationSection("shop.classes");
+        if (classesSection == null || classesSection.getKeys(false).isEmpty()) {
+            issues.warn("shop.classes", "Aucune classe définie dans la boutique");
+        } else {
+            for (String classId : classesSection.getKeys(false)) {
+                String path = "shop.classes." + classId;
+                long cost = classesSection.getLong(classId, 0L);
+                if (!classesSection.isSet(classId)) {
+                    issues.warn(path, "Valeur manquante, utilisation de 0");
+                }
+                if (cost < 0L) {
+                    issues.error(path, "Le coût doit être >= 0");
+                    cost = 0L;
+                }
+                try {
+                    classEntries.put(classId, new EconomyConfig.ClassEntry(cost));
+                } catch (IllegalArgumentException exception) {
+                    issues.error(path, exception.getMessage());
+                }
+            }
+        }
+
+        Map<String, EconomyConfig.CosmeticEntry> cosmeticEntries = new LinkedHashMap<>();
+        ConfigurationSection cosmeticsSection = yaml.getConfigurationSection("shop.cosmetics");
+        if (cosmeticsSection == null || cosmeticsSection.getKeys(false).isEmpty()) {
+            issues.warn("shop.cosmetics", "Aucun cosmétique défini dans la boutique");
+        } else {
+            for (String cosmeticId : cosmeticsSection.getKeys(false)) {
+                ConfigurationSection cosmeticSection = cosmeticsSection.getConfigurationSection(cosmeticId);
+                String basePath = "shop.cosmetics." + cosmeticId;
+                if (cosmeticSection == null) {
+                    issues.error(basePath, "Configuration invalide, section attendue");
+                    continue;
+                }
+                long cost = cosmeticSection.getLong("cost", 0L);
+                if (!cosmeticSection.isSet("cost")) {
+                    issues.warn(basePath + ".cost", "Valeur manquante, utilisation de 0");
+                }
+                if (cost < 0L) {
+                    issues.error(basePath + ".cost", "Le coût doit être >= 0");
+                    cost = 0L;
+                }
+                String type = cosmeticSection.getString("type");
+                if (type == null || type.isBlank()) {
+                    issues.error(basePath + ".type", "Type obligatoire pour le cosmétique");
+                    continue;
+                }
+                try {
+                    cosmeticEntries.put(cosmeticId, new EconomyConfig.CosmeticEntry(type, cost));
+                } catch (IllegalArgumentException exception) {
+                    issues.error(basePath, exception.getMessage());
+                }
+            }
+        }
+
+        EconomyConfig.ShopSettings shopSettings = new EconomyConfig.ShopSettings(classEntries, cosmeticEntries);
+
+        return new EconomyConfig(coinsSettings, battlePassSettings, shopSettings);
     }
 
     private Locale parseLocale(String tag, String path, IssueCollector issues) {
