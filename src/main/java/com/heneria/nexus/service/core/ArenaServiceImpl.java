@@ -2,6 +2,9 @@ package com.heneria.nexus.service.core;
 
 import com.heneria.nexus.analytics.AnalyticsService;
 import com.heneria.nexus.analytics.MatchCompletedEvent;
+import com.heneria.nexus.audit.AuditActionType;
+import com.heneria.nexus.audit.AuditEntry;
+import com.heneria.nexus.audit.AuditService;
 import com.heneria.nexus.budget.BudgetService;
 import com.heneria.nexus.config.CoreConfig;
 import com.heneria.nexus.concurrent.ExecutorManager;
@@ -57,6 +60,7 @@ public final class ArenaServiceImpl implements ArenaService {
     private final AtomicReference<CoreConfig.ArenaSettings> settingsRef;
     private final AtomicReference<CoreConfig.TimeoutSettings.WatchdogSettings> watchdogSettingsRef;
     private final Optional<AnalyticsService> analyticsService;
+    private final AuditService auditService;
 
     public ArenaServiceImpl(JavaPlugin plugin,
                             NexusLogger logger,
@@ -69,6 +73,7 @@ public final class ArenaServiceImpl implements ArenaService {
                             MatchRepository matchRepository,
                             Optional<AnalyticsService> analyticsService,
                             WatchdogService watchdogService,
+                            AuditService auditService,
                             CoreConfig config) {
         this.plugin = Objects.requireNonNull(plugin, "plugin");
         this.logger = Objects.requireNonNull(logger, "logger");
@@ -81,6 +86,7 @@ public final class ArenaServiceImpl implements ArenaService {
         this.matchRepository = Objects.requireNonNull(matchRepository, "matchRepository");
         this.analyticsService = Objects.requireNonNull(analyticsService, "analyticsService");
         this.watchdogService = Objects.requireNonNull(watchdogService, "watchdogService");
+        this.auditService = Objects.requireNonNull(auditService, "auditService");
         this.settingsRef = new AtomicReference<>(config.arenaSettings());
         this.watchdogSettingsRef = new AtomicReference<>(config.timeoutSettings().watchdog());
     }
@@ -223,14 +229,18 @@ public final class ArenaServiceImpl implements ArenaService {
         Duration timeout = Duration.ofMillis(Math.max(1L, settings.resetMs()));
         String taskName = "arena-reset-" + handle.id();
         watchdogService.registerFallback(taskName, throwable -> forceEnd(handle, throwable));
+        logArenaReset(handle, "reset-start", null);
         watchdogService.monitor(taskName, timeout, () -> performReset(handle)).whenComplete((unused, throwable) -> {
             if (throwable == null) {
+                logArenaReset(handle, "reset-complete", null);
                 return;
             }
-            if (throwable instanceof WatchdogTimeoutException) {
+            if (throwable instanceof WatchdogTimeoutException timeoutException) {
+                logArenaReset(handle, "reset-timeout", timeoutException);
                 return;
             }
             logger.warn("Reset de l'arène " + handle.id() + " terminé avec une erreur", throwable);
+            logArenaReset(handle, "reset-error", throwable);
             forceEnd(handle, throwable);
         });
     }
@@ -257,10 +267,32 @@ public final class ArenaServiceImpl implements ArenaService {
             }
             if (cause != null) {
                 logger.warn("Arène " + handle.id() + " forcée en phase END suite à un incident de reset.", cause);
+                logArenaReset(handle, "reset-force-end", cause);
             } else {
                 logger.warn("Arène " + handle.id() + " forcée en phase END suite à un incident de reset.");
+                logArenaReset(handle, "reset-force-end", null);
             }
             transition(handle, ArenaPhase.END);
         });
+    }
+
+    private void logArenaReset(ArenaHandle handle, String event, Throwable cause) {
+        StringBuilder details = new StringBuilder();
+        details.append("event=").append(event)
+                .append("; arena=").append(handle.id())
+                .append("; map=").append(handle.mapId())
+                .append("; mode=").append(handle.mode().name());
+        if (cause != null) {
+            String message = cause.getMessage();
+            details.append("; reason=")
+                    .append(message != null && !message.isBlank() ? message : cause.getClass().getSimpleName());
+        }
+        auditService.log(new AuditEntry(
+                null,
+                null,
+                AuditActionType.SYSTEM_EVENT,
+                handle.id(),
+                null,
+                details.toString()));
     }
 }

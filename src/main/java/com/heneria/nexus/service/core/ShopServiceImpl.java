@@ -1,5 +1,8 @@
 package com.heneria.nexus.service.core;
 
+import com.heneria.nexus.audit.AuditActionType;
+import com.heneria.nexus.audit.AuditEntry;
+import com.heneria.nexus.audit.AuditService;
 import com.heneria.nexus.api.EconomyException;
 import com.heneria.nexus.api.EconomyService;
 import com.heneria.nexus.api.EconomyTransaction;
@@ -28,17 +31,20 @@ public final class ShopServiceImpl implements ShopService {
     private final PlayerClassRepository playerClassRepository;
     private final PlayerCosmeticRepository playerCosmeticRepository;
     private final AtomicReference<EconomyConfig.ShopSettings> shopSettings;
+    private final AuditService auditService;
 
     public ShopServiceImpl(NexusLogger logger,
                            EconomyService economyService,
                            EconomyConfig economyConfig,
                            PlayerClassRepository playerClassRepository,
-                           PlayerCosmeticRepository playerCosmeticRepository) {
+                           PlayerCosmeticRepository playerCosmeticRepository,
+                           AuditService auditService) {
         this.logger = Objects.requireNonNull(logger, "logger");
         this.economyService = Objects.requireNonNull(economyService, "economyService");
         this.playerClassRepository = Objects.requireNonNull(playerClassRepository, "playerClassRepository");
         this.playerCosmeticRepository = Objects.requireNonNull(playerCosmeticRepository, "playerCosmeticRepository");
         this.shopSettings = new AtomicReference<>(Objects.requireNonNull(economyConfig, "economyConfig").shop());
+        this.auditService = Objects.requireNonNull(auditService, "auditService");
     }
 
     @Override
@@ -135,7 +141,10 @@ public final class ShopServiceImpl implements ShopService {
         }
         return playerClassRepository.unlock(playerId, classId)
                 .thenCompose(ignored -> transaction.commit())
-                .thenApply(ignored -> PurchaseResult.SUCCESS)
+                .thenApply(ignored -> {
+                    logPurchase(player, "CLASS", classId, cost);
+                    return PurchaseResult.SUCCESS;
+                })
                 .exceptionallyCompose(throwable -> handleTransactionalFailure(transaction, player, "classe", classId, throwable));
     }
 
@@ -152,7 +161,10 @@ public final class ShopServiceImpl implements ShopService {
         }
         return playerCosmeticRepository.unlock(playerId, cosmeticId, entry.type())
                 .thenCompose(ignored -> transaction.commit())
-                .thenApply(ignored -> PurchaseResult.SUCCESS)
+                .thenApply(ignored -> {
+                    logPurchase(player, "COSMETIC:" + entry.type().name(), cosmeticId, entry.cost());
+                    return PurchaseResult.SUCCESS;
+                })
                 .exceptionallyCompose(throwable -> handleTransactionalFailure(transaction, player, "cosmétique", cosmeticId, throwable));
     }
 
@@ -206,5 +218,16 @@ public final class ShopServiceImpl implements ShopService {
             return unwrap(throwable.getCause());
         }
         return throwable;
+    }
+
+    private void logPurchase(Player player, String category, String itemId, long cost) {
+        String details = "category=" + category + "; item=" + itemId + "; cost=" + cost;
+        auditService.log(new AuditEntry(
+                player.getUniqueId(),
+                player.getName(),
+                AuditActionType.PLAYER_PURCHASE,
+                player.getUniqueId(),
+                player.getName(),
+                details));
     }
 }

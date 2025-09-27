@@ -14,6 +14,7 @@ help:
     dump: "<gray>/nexus dump</gray> <dark_gray>-</dark_gray> <yellow>Affiche l'état courant (threads, DB, scheduler).</yellow>"
     budget: "<gray>/nexus budget [arène]</gray> <dark_gray>-</dark_gray> <yellow>Inspecte les budgets en cours.</yellow>"
     player: "<gray>/nexus admin player <joueur> <export|import></gray> <dark_gray>-</dark_gray> <yellow>Export/import des données joueurs.</yellow>"
+    audit: "<gray>/nexus admin audit log <joueur|*></gray> <dark_gray>-</dark_gray> <yellow>Consulte les actions sensibles enregistrées.</yellow>"
     holo: "<gray>/nexus holo <create|remove|move|list|reload></gray> <dark_gray>-</dark_gray> <yellow>Gère les hologrammes.</yellow>"
 
 errors:
@@ -49,6 +50,15 @@ admin:
       none: "<red>Aucun import en attente. Préparez d'abord un fichier.</red>"
       mismatch: "<red>Ce fichier ne correspond pas à la demande d'import en attente.</red>"
       expired: "<red>La demande d'import a expiré. Recommencez la validation.</red>"
+  audit:
+    usage: "<gray>Usage :</gray> <yellow>/nexus admin audit log <joueur|*> [page]</yellow>"
+    unavailable: "<red>Le journal d'audit est indisponible actuellement.</red>"
+    invalid_page: "<red>Page invalide : <page>.</red>"
+    header: "<gold>Logs d'audit (<scope>) — page <page></gold>"
+    empty: "<gray>Aucune entrée ne correspond à ce filtre.</gray>"
+    entry: "<gray>[<id>]</gray> <white><timestamp></white> <aqua><type></aqua> <yellow><actor></yellow> <dark_gray>→</dark_gray> <green><target></green> <gray>-</gray> <white><details></white>"
+    more: "<gray>Page suivante :</gray> <yellow><command></yellow>"
+    error: "<red>Impossible de récupérer les logs : <reason>.</red>"
 
 titles:
   round_start:

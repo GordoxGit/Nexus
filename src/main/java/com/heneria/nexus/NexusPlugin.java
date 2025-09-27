@@ -10,6 +10,12 @@ import com.heneria.nexus.admin.PlayerEconomySnapshot;
 import com.heneria.nexus.admin.PlayerProfileSnapshot;
 import com.heneria.nexus.analytics.AnalyticsRepository;
 import com.heneria.nexus.analytics.AnalyticsService;
+import com.heneria.nexus.audit.AuditActionType;
+import com.heneria.nexus.audit.AuditEntry;
+import com.heneria.nexus.audit.AuditLogQuery;
+import com.heneria.nexus.audit.AuditLogRecord;
+import com.heneria.nexus.audit.AuditService;
+import com.heneria.nexus.audit.AuditServiceImpl;
 import com.heneria.nexus.analytics.daily.DailyStatsAggregatorService;
 import com.heneria.nexus.analytics.daily.DailyStatsRepository;
 import com.heneria.nexus.budget.BudgetService;
@@ -27,6 +33,8 @@ import com.heneria.nexus.db.repository.EconomyRepository;
 import com.heneria.nexus.db.repository.EconomyRepositoryImpl;
 import com.heneria.nexus.db.repository.MatchRepository;
 import com.heneria.nexus.db.repository.MatchRepositoryImpl;
+import com.heneria.nexus.db.repository.AuditLogRepository;
+import com.heneria.nexus.db.repository.AuditLogRepositoryImpl;
 import com.heneria.nexus.db.repository.PlayerClassRepository;
 import com.heneria.nexus.db.repository.PlayerClassRepositoryImpl;
 import com.heneria.nexus.db.repository.PlayerCosmeticRepository;
@@ -74,6 +82,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -81,6 +90,7 @@ import java.util.EnumSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
@@ -111,6 +121,8 @@ import net.luckperms.api.LuckPermsProvider;
 public final class NexusPlugin extends JavaPlugin {
 
     private static final String LOG_PREFIX = "[NEXUS] ";
+    private static final int AUDIT_LOG_PAGE_SIZE = 10;
+    private static final int AUDIT_DETAILS_MAX_LENGTH = 160;
 
     private NexusLogger logger;
     private ConfigManager configManager;
@@ -131,6 +143,8 @@ public final class NexusPlugin extends JavaPlugin {
     private PlayerDataImporter playerDataImporter;
     private Path exportsDirectory;
     private Path importsDirectory;
+    private AuditService auditService;
+    private DateTimeFormatter auditTimestampFormatter;
 
     @Override
     public void onLoad() {
@@ -181,6 +195,9 @@ public final class NexusPlugin extends JavaPlugin {
             // Démarrage des services
             serviceRegistry.startAll(Duration.ofMillis(bundle.core().timeoutSettings().startMs()));
             initializePlayerDataTools();
+            this.auditService = serviceRegistry.get(AuditService.class);
+            this.auditTimestampFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
+                    .withZone(bundle.core().timezone());
 
         } catch (Exception exception) {
             logger.error("Impossible d'initialiser ou de démarrer le registre de services", exception);
@@ -632,15 +649,15 @@ public final class NexusPlugin extends JavaPlugin {
 
     public void handleAdmin(CommandSender sender, String[] args) {
         if (args.length < 2) {
-            sendAdminPlayerUsage(sender);
+            sendAdminUsage(sender);
             return;
         }
         String sub = args[1].toLowerCase(Locale.ROOT);
-        if ("player".equals(sub)) {
-            handleAdminPlayer(sender, args);
-            return;
+        switch (sub) {
+            case "player" -> handleAdminPlayer(sender, args);
+            case "audit" -> handleAdminAudit(sender, args);
+            default -> sendAdminUsage(sender);
         }
-        sendAdminPlayerUsage(sender);
     }
 
     private void handleAdminPlayer(CommandSender sender, String[] args) {
@@ -665,6 +682,69 @@ public final class NexusPlugin extends JavaPlugin {
         }
     }
 
+    private void handleAdminAudit(CommandSender sender, String[] args) {
+        if (!sender.hasPermission("nexus.admin.audit.view")) {
+            messageFacade.send(sender, "errors.no_permission");
+            return;
+        }
+        if (auditService == null) {
+            messageFacade.send(sender, "admin.audit.unavailable");
+            return;
+        }
+        if (args.length < 3 || !args[2].equalsIgnoreCase("log")) {
+            sendAdminAuditUsage(sender);
+            return;
+        }
+        if (args.length < 4) {
+            sendAdminAuditUsage(sender);
+            return;
+        }
+        String token = args[3];
+        boolean global = token.equals("*") || token.equalsIgnoreCase("all");
+        ResolvedPlayer resolved = global ? null : resolvePlayer(token);
+        int page = 1;
+        if (args.length >= 5) {
+            try {
+                page = Integer.parseInt(args[4]);
+            } catch (NumberFormatException exception) {
+                messageFacade.send(sender, "admin.audit.invalid_page", Placeholder.unparsed("page", args[4]));
+                return;
+            }
+            if (page <= 0) {
+                messageFacade.send(sender, "admin.audit.invalid_page", Placeholder.unparsed("page", args[4]));
+                return;
+            }
+        }
+        Optional<UUID> subjectUuid = Optional.empty();
+        Optional<String> subjectName = Optional.empty();
+        String scopeLabel;
+        String commandToken;
+        if (global) {
+            scopeLabel = "toutes les actions";
+            commandToken = "*";
+        } else if (resolved != null) {
+            scopeLabel = resolved.displayName();
+            commandToken = resolved.displayName();
+            subjectUuid = Optional.of(resolved.uuid());
+            subjectName = optionalAuditName(resolved.displayName());
+        } else {
+            String trimmed = token.trim();
+            scopeLabel = trimmed.isEmpty() ? token : trimmed;
+            commandToken = scopeLabel;
+            subjectName = optionalAuditName(scopeLabel);
+        }
+        AuditLogQuery query = new AuditLogQuery(page, AUDIT_LOG_PAGE_SIZE, subjectUuid, subjectName);
+        executorManager.thenMain(auditService.query(query), auditPage ->
+                        sendAuditLogResults(sender, scopeLabel, commandToken, auditPage))
+                .exceptionally(throwable -> {
+                    Throwable cause = unwrap(throwable);
+                    logger.warn("Impossible de récupérer les logs d'audit", cause);
+                    messageFacade.send(sender, "admin.audit.error",
+                            Placeholder.unparsed("reason", describeError(cause)));
+                    return null;
+                });
+    }
+
     private void handlePlayerExport(CommandSender sender, ResolvedPlayer target, String[] args) {
         if (!sender.hasPermission("nexus.admin.player.export")) {
             messageFacade.send(sender, "errors.no_permission");
@@ -687,6 +767,10 @@ public final class NexusPlugin extends JavaPlugin {
                 return;
             }
         }
+        String commandLine = "/nexus " + String.join(" ", args);
+        logAdminCommand(sender, AuditActionType.ADMIN_COMMAND, target,
+                "command=" + commandLine
+                        + "; action=export; format=" + format.name().toLowerCase(Locale.ROOT));
         messageFacade.send(sender, "admin.player.export.start",
                 Placeholder.unparsed("player", target.displayName()),
                 Placeholder.unparsed("uuid", target.uuid().toString()),
@@ -721,6 +805,9 @@ public final class NexusPlugin extends JavaPlugin {
         String fileName = args[4];
         String actorKey = senderKey(sender);
         if (args.length >= 6 && args[5].equalsIgnoreCase("confirm")) {
+            String commandLine = "/nexus " + String.join(" ", args);
+            logAdminCommand(sender, AuditActionType.ADMIN_COMMAND, target,
+                    "command=" + commandLine + "; action=import-confirm; file=" + fileName);
             messageFacade.send(sender, "admin.player.import.start",
                     Placeholder.unparsed("player", target.displayName()),
                     Placeholder.unparsed("file", fileName));
@@ -734,6 +821,9 @@ public final class NexusPlugin extends JavaPlugin {
             return;
         }
         CompletableFuture<ImportPreparation> future = playerDataImporter.prepareImport(actorKey, target.uuid(), fileName);
+        String commandLine = "/nexus " + String.join(" ", args);
+        logAdminCommand(sender, AuditActionType.ADMIN_COMMAND, target,
+                "command=" + commandLine + "; action=import-preview; file=" + fileName);
         executorManager.thenMain(future, preparation -> {
                     PlayerProfileSnapshot profile = preparation.snapshot().profile();
                     PlayerEconomySnapshot economy = preparation.snapshot().economy();
@@ -789,6 +879,96 @@ public final class NexusPlugin extends JavaPlugin {
 
     private void sendAdminPlayerUsage(CommandSender sender) {
         messageFacade.send(sender, "admin.player.usage");
+    }
+
+    private void sendAdminAuditUsage(CommandSender sender) {
+        messageFacade.send(sender, "admin.audit.usage");
+    }
+
+    private void sendAdminUsage(CommandSender sender) {
+        sendAdminPlayerUsage(sender);
+        sendAdminAuditUsage(sender);
+    }
+
+    private Optional<String> optionalAuditName(String value) {
+        if (value == null) {
+            return Optional.empty();
+        }
+        String trimmed = value.trim();
+        if (trimmed.isEmpty()) {
+            return Optional.empty();
+        }
+        return Optional.of(trimmed.length() > 16 ? trimmed.substring(0, 16) : trimmed);
+    }
+
+    private void sendAuditLogResults(CommandSender sender,
+                                     String scopeLabel,
+                                     String commandToken,
+                                     AuditService.AuditLogPage page) {
+        messageFacade.prefix(sender).ifPresent(sender::sendMessage);
+        messageFacade.send(sender, "admin.audit.header",
+                Placeholder.unparsed("scope", scopeLabel),
+                Placeholder.unparsed("page", Integer.toString(page.page())));
+        if (page.entries().isEmpty()) {
+            messageFacade.send(sender, "admin.audit.empty");
+        } else {
+            for (AuditLogRecord record : page.entries()) {
+                messageFacade.send(sender, "admin.audit.entry",
+                        Placeholder.unparsed("id", Long.toString(record.id())),
+                        Placeholder.unparsed("timestamp", auditTimestampFormatter.format(record.timestamp())),
+                        Placeholder.unparsed("type", record.actionType().displayName()),
+                        Placeholder.unparsed("actor", formatAuditSubject(record.actorUuid(), record.actorName(), "Système")),
+                        Placeholder.unparsed("target", formatAuditSubject(record.targetUuid(), record.targetName(), "-")),
+                        Placeholder.unparsed("details", truncate(record.details(), AUDIT_DETAILS_MAX_LENGTH)));
+            }
+        }
+        if (page.hasNext()) {
+            int nextPage = page.page() + 1;
+            String command = "/nexus admin audit log " + commandToken + " " + nextPage;
+            messageFacade.send(sender, "admin.audit.more", Placeholder.unparsed("command", command));
+        }
+    }
+
+    private String formatAuditSubject(UUID uuid, String name, String defaultValue) {
+        if (name != null && !name.isBlank()) {
+            return name;
+        }
+        if (uuid != null) {
+            return uuid.toString();
+        }
+        return defaultValue;
+    }
+
+    private String truncate(String value, int maxLength) {
+        if (value == null) {
+            return "";
+        }
+        String trimmed = value.trim();
+        if (trimmed.length() <= maxLength) {
+            return trimmed;
+        }
+        return trimmed.substring(0, Math.max(0, maxLength - 3)) + "...";
+    }
+
+    private void logAdminCommand(CommandSender sender, AuditActionType actionType, ResolvedPlayer target, String details) {
+        if (auditService == null) {
+            return;
+        }
+        AuditActor actor = resolveAuditActor(sender);
+        auditService.log(new AuditEntry(
+                actor.uuid(),
+                actor.name(),
+                actionType,
+                target != null ? target.uuid() : null,
+                target != null ? target.displayName() : null,
+                details));
+    }
+
+    private AuditActor resolveAuditActor(CommandSender sender) {
+        if (sender instanceof Player player) {
+            return new AuditActor(player.getUniqueId(), player.getName());
+        }
+        return new AuditActor(null, sender.getName());
     }
 
     private ResolvedPlayer resolvePlayer(String token) {
@@ -911,6 +1091,9 @@ public final class NexusPlugin extends JavaPlugin {
     private record ResolvedPlayer(UUID uuid, String displayName) {
     }
 
+    private record AuditActor(UUID uuid, String name) {
+    }
+
     public MessageFacade messages() {
         return messageFacade;
     }
@@ -996,6 +1179,8 @@ public final class NexusPlugin extends JavaPlugin {
         serviceRegistry.registerService(MatchRepository.class, MatchRepositoryImpl.class);
         serviceRegistry.registerService(DataPurgeService.class, DataPurgeService.class);
         serviceRegistry.registerService(RewardClaimRepository.class, RewardClaimRepositoryImpl.class);
+        serviceRegistry.registerService(AuditLogRepository.class, AuditLogRepositoryImpl.class);
+        serviceRegistry.registerService(AuditService.class, AuditServiceImpl.class);
         serviceRegistry.registerService(PersistenceService.class, PersistenceServiceImpl.class);
         serviceRegistry.registerService(ProfileService.class, ProfileServiceImpl.class);
         serviceRegistry.registerService(QueueService.class, QueueServiceImpl.class);
