@@ -348,7 +348,7 @@ public final class EconomyServiceImpl implements EconomyService {
                     }
                     return null;
                 })
-                .toCompletableFuture();
+                .thenApply(ignored -> null);
     }
 
     private CompletableFuture<Void> logTransactionBatch(Map<UUID, List<PendingLogEntry>> entries,
