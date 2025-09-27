@@ -2,10 +2,15 @@
 -- This script defines the initial schema for the Nexus plugin persistent storage.
 
 CREATE TABLE IF NOT EXISTS nexus_schema_version (
-    version INT NOT NULL PRIMARY KEY,
+    installed_rank INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    version VARCHAR(50) NOT NULL UNIQUE,
+    description VARCHAR(200) NOT NULL,
+    script VARCHAR(1000) NOT NULL,
+    checksum INT,
+    installed_by VARCHAR(100) NOT NULL,
     installed_on TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    description VARCHAR(255)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    success BOOLEAN NOT NULL
+) ENGINE=InnoDB CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS nexus_players (
     player_uuid CHAR(36) NOT NULL PRIMARY KEY,

@@ -10,6 +10,7 @@ import com.heneria.nexus.config.ConfigBundle;
 import com.heneria.nexus.config.ConfigManager;
 import com.heneria.nexus.config.CoreConfig;
 import com.heneria.nexus.config.ReloadReport;
+import com.heneria.nexus.db.DatabaseMigrator;
 import com.heneria.nexus.db.DbProvider;
 import com.heneria.nexus.hologram.HoloService;
 import com.heneria.nexus.hologram.HoloServiceImpl;
@@ -49,6 +50,7 @@ import java.util.Locale;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.CompletionStage;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
@@ -82,6 +84,7 @@ public final class NexusPlugin extends JavaPlugin {
     private ExecutorManager executorManager;
     private RingScheduler ringScheduler;
     private DbProvider dbProvider;
+    private DatabaseMigrator databaseMigrator;
     private LuckPerms luckPermsApi;
     private NexusContextManager contextManager;
     private boolean bootstrapFailed;
@@ -119,6 +122,7 @@ public final class NexusPlugin extends JavaPlugin {
         this.executorManager = new ExecutorManager(this, logger, bundle.core().executorSettings());
         this.serviceRegistry = new ServiceRegistry(logger);
         this.dbProvider = new DbProvider(logger, this);
+        this.databaseMigrator = new DatabaseMigrator(logger, this, dbProvider);
 
         registerSingletons();
         setupEconomy();
@@ -129,6 +133,7 @@ public final class NexusPlugin extends JavaPlugin {
             serviceRegistry.wire(Duration.ofMillis(bundle.core().timeoutSettings().startMs()));
             this.ringScheduler = serviceRegistry.get(RingScheduler.class);
             this.dbProvider = serviceRegistry.get(DbProvider.class);
+            this.databaseMigrator = serviceRegistry.get(DatabaseMigrator.class);
             ringScheduler.applyPerfSettings(bundle.core().arenaSettings());
 
             // Démarrage des services
@@ -184,21 +189,36 @@ public final class NexusPlugin extends JavaPlugin {
     }
 
     private void configureDatabase(CoreConfig.DatabaseSettings settings) {
-        CompletionStage<Boolean> future = executorManager.withTimeout(
+        CompletionStage<Boolean> stage = executorManager.withTimeout(
                 dbProvider.applyConfiguration(settings, executorManager.io()),
                 Duration.ofMillis(bundle.core().timeoutSettings().startMs()));
+        CompletableFuture<Boolean> future = stage.toCompletableFuture();
+        boolean success;
         try {
-            future.whenComplete((success, throwable) -> {
-                if (throwable != null) {
-                    logger.warn("Configuration MariaDB impossible", throwable);
-                    return;
-                }
-                if (!success && bundle.core().degradedModeSettings().enabled()) {
-                    logger.warn("Mode dégradé activé : MariaDB indisponible");
-                }
-            }).toCompletableFuture().join();
-        } catch (Exception exception) {
-            logger.warn("Configuration MariaDB impossible", exception);
+            success = future.join();
+        } catch (CompletionException exception) {
+            Throwable cause = exception.getCause() != null ? exception.getCause() : exception;
+            logger.warn("Configuration MariaDB impossible", cause);
+            return;
+        }
+
+        if (!success) {
+            if (bundle.core().degradedModeSettings().enabled()) {
+                logger.warn("Mode dégradé activé : MariaDB indisponible");
+            }
+            return;
+        }
+
+        if (!settings.enabled()) {
+            return;
+        }
+
+        try {
+            databaseMigrator.migrate();
+        } catch (DatabaseMigrator.MigrationException exception) {
+            logger.error("Échec de l'application des migrations MariaDB", exception);
+            bootstrapFailed = true;
+            getServer().getPluginManager().disablePlugin(this);
         }
     }
 
@@ -552,6 +572,7 @@ public final class NexusPlugin extends JavaPlugin {
         serviceRegistry.registerSingleton(CoreConfig.class, bundle.core());
         serviceRegistry.registerSingleton(ExecutorManager.class, executorManager);
         serviceRegistry.registerSingleton(DbProvider.class, dbProvider);
+        serviceRegistry.registerSingleton(DatabaseMigrator.class, databaseMigrator);
         serviceRegistry.registerSingleton(Boolean.class, placeholderApiAvailable);
     }
 

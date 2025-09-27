@@ -103,6 +103,14 @@ public final class DbProvider implements LifecycleAware {
         return degraded;
     }
 
+    public Connection getConnection() throws SQLException {
+        HikariDataSource dataSource = dataSourceRef.get();
+        if (dataSource == null) {
+            throw new SQLException("Database not available");
+        }
+        return dataSource.getConnection();
+    }
+
     public <T> CompletableFuture<T> execute(QueryTask<T> task, Executor executor) {
         HikariDataSource dataSource = dataSourceRef.get();
         if (dataSource == null) {
