@@ -7,6 +7,7 @@ import com.heneria.nexus.util.NexusLogger;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
@@ -63,13 +64,13 @@ public final class RateLimiterServiceImpl implements RateLimiterService {
         Objects.requireNonNull(cooldown, "cooldown");
         ServiceConfiguration configuration = configurationRef.get();
         if (!configuration.enabled() || !configuration.databaseEnabled() || cooldown.isZero() || cooldown.isNegative()) {
-            return CompletableFuture.completedFuture(RateLimitResult.allowed());
+            return CompletableFuture.completedFuture(new RateLimitResult(true, Optional.empty()));
         }
         return repository.checkAndRecord(playerUuid, actionKey, cooldown)
                 .exceptionally(throwable -> {
                     Throwable cause = unwrap(throwable);
                     logger.warn("Vérification de rate limit en échec pour " + actionKey, cause);
-                    return RateLimitResult.allowed();
+                    return new RateLimitResult(true, Optional.empty());
                 });
     }
 

@@ -246,7 +246,7 @@ public final class ShopServiceImpl implements ShopService {
         }
         return rateLimiterService.check(player.getUniqueId(), actionKey, cooldown)
                 .thenApply(result -> {
-                    if (result.isAllowed()) {
+                    if (result.allowed()) {
                         return true;
                     }
                     Duration remaining = result.timeRemaining().orElse(cooldown);

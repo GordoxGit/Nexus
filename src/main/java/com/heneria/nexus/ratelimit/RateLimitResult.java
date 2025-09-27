@@ -21,15 +21,6 @@ public record RateLimitResult(boolean allowed, Optional<Duration> timeRemaining)
         });
     }
 
-    @Override
-    public boolean allowed() {
-        return allowed;
-    }
-
-    public boolean isAllowed() {
-        return allowed;
-    }
-
     public static RateLimitResult allowed() {
         return new RateLimitResult(true, Optional.empty());
     }
