@@ -153,7 +153,7 @@ public final class PersistenceServiceImpl implements PersistenceService {
                 Supplier<PlayerProfile> profileSupplier = entry.profileSupplier;
                 if (profileSupplier != null) {
                     PlayerProfile profile = invokeProfileSupplier(uuid, profileSupplier);
-                    if (profile != null) {
+                    if (profile != null && profile.getVersion() != profile.getPersistedVersion()) {
                         profiles.add(profile);
                     }
                 }

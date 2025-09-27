@@ -7,6 +7,7 @@ import com.heneria.nexus.api.ProfileService;
 import com.heneria.nexus.concurrent.ExecutorManager;
 import com.heneria.nexus.config.CoreConfig;
 import com.heneria.nexus.db.DbProvider;
+import com.heneria.nexus.db.OptimisticLockException;
 import com.heneria.nexus.db.repository.ProfileRepository;
 import com.heneria.nexus.util.NexusLogger;
 import java.time.Duration;
@@ -119,10 +120,53 @@ public final class ProfileServiceImpl implements ProfileService {
     @Override
     public CompletableFuture<Void> saveAsync(PlayerProfile profile) {
         Objects.requireNonNull(profile, "profile");
+        profile.incrementVersion();
         PlayerProfile snapshot = copyProfile(profile);
         snapshotLocally(snapshot);
-        persistenceService.markProfileDirty(profile.playerId(), () -> persistenceSnapshot(profile.playerId()));
-        return CompletableFuture.completedFuture(null);
+
+        boolean providerDegraded = dbProvider.isDegraded();
+        refreshDegradedState(providerDegraded);
+        if (providerDegraded) {
+            persistenceService.markProfileDirty(profile.playerId(), () -> persistenceSnapshot(profile.playerId()));
+            return CompletableFuture.completedFuture(null);
+        }
+        if (forcedFallback.get()) {
+            triggerHealthProbe();
+            persistenceService.markProfileDirty(profile.playerId(), () -> persistenceSnapshot(profile.playerId()));
+            return CompletableFuture.completedFuture(null);
+        }
+
+        return profileRepository.createOrUpdate(snapshot)
+                .thenRun(() -> {
+                    snapshot.markPersisted();
+                    clearForcedFallback();
+                })
+                .exceptionallyCompose(throwable -> {
+                    Throwable cause = unwrap(throwable);
+                    if (cause instanceof OptimisticLockException) {
+                        logger.warn(
+                                "Conflit de verrouillage optimiste pour %s, tentative de rechargement ultérieur"
+                                        .formatted(profile.playerId()),
+                                cause);
+                        return profileRepository.findByUuid(profile.playerId())
+                                .thenCompose(optional -> {
+                                    optional.ifPresent(this::snapshotLocally);
+                                    if (optional.isEmpty()) {
+                                        persistentStore.remove(profile.playerId());
+                                        profileCache.invalidate(profile.playerId());
+                                    }
+                                    return CompletableFuture.completedFuture(null);
+                                })
+                                .exceptionally(inner -> {
+                                    logger.warn(
+                                            "Impossible de recharger le profil %s après conflit"
+                                                    .formatted(profile.playerId()),
+                                            unwrap(inner));
+                                    return null;
+                                });
+                    }
+                    return fallbackSave(snapshot, throwable);
+                });
     }
 
     @Override
@@ -167,7 +211,7 @@ public final class ProfileServiceImpl implements ProfileService {
         statistics.put(STAT_TOTAL_WINS, 0L);
         statistics.put(STAT_TOTAL_LOSSES, 0L);
         statistics.put(STAT_MATCHES_PLAYED, 0L);
-        return new PlayerProfile(playerId, statistics, new ConcurrentHashMap<>(), new ArrayList<>(), Instant.now());
+        return new PlayerProfile(playerId, statistics, new ConcurrentHashMap<>(), new ArrayList<>(), Instant.now(), 0);
     }
 
     private PlayerProfile copyProfile(PlayerProfile profile) {
@@ -176,7 +220,9 @@ public final class ProfileServiceImpl implements ProfileService {
                 new ConcurrentHashMap<>(profile.statistics()),
                 new ConcurrentHashMap<>(profile.preferences()),
                 new ArrayList<>(profile.cosmetics()),
-                profile.lastUpdate());
+                profile.lastUpdate(),
+                profile.getVersion(),
+                profile.getPersistedVersion());
     }
 
     private PlayerProfile snapshotAndCopy(PlayerProfile profile) {
@@ -203,18 +249,22 @@ public final class ProfileServiceImpl implements ProfileService {
     }
 
     private void snapshotLocally(PlayerProfile profile) {
-        PlayerProfile canonical = copyProfile(profile);
-        persistentStore.put(profile.playerId(), canonical);
-        profileCache.put(profile.playerId(), copyProfile(canonical));
+        persistentStore.put(profile.playerId(), profile);
+        profileCache.put(profile.playerId(), copyProfile(profile));
     }
 
     PlayerProfile persistenceSnapshot(UUID playerId) {
         PlayerProfile canonical = persistentStore.get(playerId);
         if (canonical != null) {
-            return copyProfile(canonical);
+            return canonical;
         }
         PlayerProfile cached = profileCache.getIfPresent(playerId);
-        return cached != null ? copyProfile(cached) : null;
+        if (cached == null) {
+            return null;
+        }
+        PlayerProfile restored = copyProfile(cached);
+        persistentStore.put(playerId, restored);
+        return restored;
     }
 
     private CompletableFuture<PlayerProfile> fallbackLoad(UUID playerId, Throwable throwable) {
