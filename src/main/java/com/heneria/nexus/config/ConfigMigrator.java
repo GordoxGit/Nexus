@@ -1,10 +1,10 @@
 package com.heneria.nexus.config;
 
+import com.heneria.nexus.config.BackupService.BackupMetadata;
 import com.heneria.nexus.util.NexusLogger;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -12,6 +12,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
+import java.util.concurrent.CompletionException;
 import java.util.function.Consumer;
 import org.bukkit.configuration.file.YamlConfiguration;
 
@@ -25,10 +27,12 @@ public final class ConfigMigrator {
     private static final long MIN_VERSION = 1L;
 
     private final NexusLogger logger;
+    private final BackupService backupService;
     private final Map<String, List<MigrationStep>> migrations;
 
-    public ConfigMigrator(NexusLogger logger) {
+    public ConfigMigrator(NexusLogger logger, BackupService backupService) {
         this.logger = Objects.requireNonNull(logger, "logger");
+        this.backupService = Objects.requireNonNull(backupService, "backupService");
         this.migrations = initialiseMigrations();
     }
 
@@ -74,10 +78,15 @@ public final class ConfigMigrator {
         }
 
         Path filePath = dataDirectory.resolve(resourceName);
-        Path backupPath = null;
         long fromVersion = hasExplicitVersion ? userVersion : MIN_VERSION;
+        Optional<BackupMetadata> backupMetadata = Optional.empty();
         if (Files.exists(filePath)) {
-            backupPath = createBackup(filePath, fromVersion);
+            try {
+                backupMetadata = backupService.createBackup(filePath).join();
+            } catch (CompletionException exception) {
+                Throwable cause = exception.getCause() != null ? exception.getCause() : exception;
+                throw new IOException("Impossible de créer une sauvegarde avant la migration de '" + resourceName + "'", cause);
+            }
         }
 
         applySteps(resourceName, configuration, fromVersion, targetVersion);
@@ -92,7 +101,7 @@ public final class ConfigMigrator {
             }
             configuration.save(filePath.toFile());
         } catch (IOException exception) {
-            restoreBackup(filePath, backupPath);
+            backupMetadata.ifPresent(metadata -> restoreBackup(metadata, filePath));
             throw new IOException("Impossible de sauvegarder le fichier migré '" + resourceName + "'", exception);
         }
 
@@ -104,8 +113,8 @@ public final class ConfigMigrator {
             message = "Le fichier '" + resourceName + "' a été migré de la version "
                     + fromVersion + " à la version " + targetVersion + ".";
         }
-        if (backupPath != null) {
-            message += " Sauvegarde: " + backupPath.getFileName();
+        if (backupMetadata.isPresent()) {
+            message += " Sauvegarde: " + backupMetadata.get().backupFileName();
         }
         logger.info(message);
     }
@@ -168,25 +177,17 @@ public final class ConfigMigrator {
         }
     }
 
-    private Path createBackup(Path filePath, long version) throws IOException {
-        Path backupPath = filePath.resolveSibling(
-                filePath.getFileName().toString() + ".v" + Math.max(version, MIN_VERSION) + ".bak");
-        Path parent = backupPath.getParent();
-        if (parent != null) {
-            Files.createDirectories(parent);
-        }
-        Files.move(filePath, backupPath, StandardCopyOption.REPLACE_EXISTING);
-        return backupPath;
-    }
-
-    private void restoreBackup(Path filePath, Path backupPath) {
-        if (backupPath == null) {
-            return;
-        }
+    private void restoreBackup(BackupMetadata metadata, Path destination) {
         try {
-            Files.move(backupPath, filePath, StandardCopyOption.REPLACE_EXISTING);
+            Path parent = destination.getParent();
+            if (parent != null) {
+                Files.createDirectories(parent);
+            }
+            Files.copy(metadata.path(), destination,
+                    java.nio.file.StandardCopyOption.REPLACE_EXISTING,
+                    java.nio.file.StandardCopyOption.COPY_ATTRIBUTES);
         } catch (IOException exception) {
-            logger.error("Impossible de restaurer la sauvegarde '" + backupPath.getFileName()
+            logger.error("Impossible de restaurer la sauvegarde '" + metadata.backupFileName()
                     + "' après un échec de migration", exception);
         }
     }

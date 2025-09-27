@@ -50,13 +50,13 @@ public final class ConfigManager implements AutoCloseable {
     private final ConfigHotSwap hotSwap = new ConfigHotSwap();
     private final ConfigMigrator migrator;
 
-    public ConfigManager(JavaPlugin plugin, NexusLogger logger) {
+    public ConfigManager(JavaPlugin plugin, NexusLogger logger, BackupService backupService) {
         this.plugin = Objects.requireNonNull(plugin, "plugin");
         this.logger = Objects.requireNonNull(logger, "logger");
         this.dataDirectory = plugin.getDataFolder().toPath();
         this.ioExecutor = Executors.newFixedThreadPool(Math.max(2, Runtime.getRuntime().availableProcessors() / 2),
                 new NamedThreadFactory("Nexus-Config", true, logger));
-        this.migrator = new ConfigMigrator(logger);
+        this.migrator = new ConfigMigrator(logger, Objects.requireNonNull(backupService, "backupService"));
     }
 
     public ReloadReport initialLoad() {
