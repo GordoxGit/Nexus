@@ -31,8 +31,9 @@
             Keep a fixed timestamp to guarantee that identical sources always produce identical
             shaded artifacts. CI can override reproducible.build.outputTimestamp (for example with
             SOURCE_DATE_EPOCH) when a deterministic but informative timestamp is required.
+            The earliest timestamp allowed by the JAR specification is 1980-01-01T00:00:02Z.
         -->
-        <reproducible.build.outputTimestamp>1970-01-01T00:00:00Z</reproducible.build.outputTimestamp>
+        <reproducible.build.outputTimestamp>1980-01-01T00:00:02Z</reproducible.build.outputTimestamp>
         <project.build.outputTimestamp>${reproducible.build.outputTimestamp}</project.build.outputTimestamp>
     </properties>
 
