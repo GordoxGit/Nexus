@@ -1,5 +1,7 @@
 package com.heneria.nexus.service.core;
 
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import com.heneria.nexus.api.PlayerProfile;
 import com.heneria.nexus.api.ProfileService;
 import com.heneria.nexus.concurrent.ExecutorManager;
@@ -24,7 +26,6 @@ import java.util.concurrent.atomic.AtomicReference;
  */
 public final class ProfileServiceImpl implements ProfileService {
 
-    private static final Duration CACHE_TTL = Duration.ofMinutes(10);
     private static final String STAT_ELO = "elo_rating";
     private static final String STAT_TOTAL_KILLS = "total_kills";
     private static final String STAT_TOTAL_DEATHS = "total_deaths";
@@ -37,7 +38,7 @@ public final class ProfileServiceImpl implements ProfileService {
     private final ExecutorManager executorManager;
     private final ProfileRepository profileRepository;
     private final PersistenceService persistenceService;
-    private final ConcurrentHashMap<UUID, CacheEntry> cache = new ConcurrentHashMap<>();
+    private final Cache<UUID, PlayerProfile> profileCache;
     private final ConcurrentHashMap<UUID, PlayerProfile> persistentStore = new ConcurrentHashMap<>();
     private final AtomicBoolean degraded = new AtomicBoolean();
     private final AtomicBoolean forcedFallback = new AtomicBoolean();
@@ -54,7 +55,27 @@ public final class ProfileServiceImpl implements ProfileService {
         this.executorManager = Objects.requireNonNull(executorManager, "executorManager");
         this.profileRepository = Objects.requireNonNull(profileRepository, "profileRepository");
         this.persistenceService = Objects.requireNonNull(persistenceService, "persistenceService");
+        this.profileCache = createCache(config);
         this.degradedSettings.set(config.degradedModeSettings());
+    }
+
+    private Cache<UUID, PlayerProfile> createCache(CoreConfig config) {
+        Objects.requireNonNull(config, "config");
+        long maxSize = 1000L;
+        Duration expireAfterAccess = Duration.ofMinutes(15L);
+        CoreConfig.DatabaseSettings databaseSettings = config.databaseSettings();
+        if (databaseSettings != null) {
+            CoreConfig.DatabaseSettings.CacheSettings cacheSettings = databaseSettings.cacheSettings();
+            if (cacheSettings != null && cacheSettings.profiles() != null) {
+                CoreConfig.DatabaseSettings.ProfileCacheSettings profileSettings = cacheSettings.profiles();
+                maxSize = profileSettings.maxSize();
+                expireAfterAccess = profileSettings.expireAfterAccess();
+            }
+        }
+        return Caffeine.newBuilder()
+                .maximumSize(maxSize)
+                .expireAfterAccess(expireAfterAccess)
+                .build();
     }
 
     @Override
@@ -65,9 +86,9 @@ public final class ProfileServiceImpl implements ProfileService {
     @Override
     public CompletableFuture<PlayerProfile> load(UUID playerId) {
         Objects.requireNonNull(playerId, "playerId");
-        CacheEntry cached = cache.get(playerId);
-        if (cached != null && !cached.isExpired()) {
-            return CompletableFuture.completedFuture(copyProfile(cached.profile()));
+        PlayerProfile cached = profileCache.getIfPresent(playerId);
+        if (cached != null) {
+            return CompletableFuture.completedFuture(copyProfile(cached));
         }
         boolean providerDegraded = dbProvider.isDegraded();
         refreshDegradedState(providerDegraded);
@@ -106,7 +127,7 @@ public final class ProfileServiceImpl implements ProfileService {
 
     @Override
     public void invalidate(UUID playerId) {
-        cache.remove(playerId);
+        profileCache.invalidate(playerId);
     }
 
     @Override
@@ -160,8 +181,8 @@ public final class ProfileServiceImpl implements ProfileService {
 
     private PlayerProfile snapshotAndCopy(PlayerProfile profile) {
         snapshotLocally(profile);
-        CacheEntry entry = cache.get(profile.playerId());
-        return entry != null ? copyProfile(entry.profile()) : copyProfile(profile);
+        PlayerProfile cached = profileCache.getIfPresent(profile.playerId());
+        return cached != null ? copyProfile(cached) : copyProfile(profile);
     }
 
     private PlayerProfile loadFromFallback(UUID playerId) {
@@ -173,18 +194,18 @@ public final class ProfileServiceImpl implements ProfileService {
             created[0] = true;
             return defaultProfile(id);
         });
-        CacheEntry entry = new CacheEntry(copyProfile(stored), Instant.now());
-        cache.put(playerId, entry);
+        PlayerProfile cached = copyProfile(stored);
+        profileCache.put(playerId, cached);
         if (created[0]) {
             persistenceService.markProfileDirty(playerId, () -> persistenceSnapshot(playerId));
         }
-        return copyProfile(entry.profile());
+        return copyProfile(cached);
     }
 
     private void snapshotLocally(PlayerProfile profile) {
         PlayerProfile canonical = copyProfile(profile);
         persistentStore.put(profile.playerId(), canonical);
-        cache.put(profile.playerId(), new CacheEntry(copyProfile(canonical), Instant.now()));
+        profileCache.put(profile.playerId(), copyProfile(canonical));
     }
 
     PlayerProfile persistenceSnapshot(UUID playerId) {
@@ -192,8 +213,8 @@ public final class ProfileServiceImpl implements ProfileService {
         if (canonical != null) {
             return copyProfile(canonical);
         }
-        CacheEntry entry = cache.get(playerId);
-        return entry != null ? copyProfile(entry.profile()) : null;
+        PlayerProfile cached = profileCache.getIfPresent(playerId);
+        return cached != null ? copyProfile(cached) : null;
     }
 
     private CompletableFuture<PlayerProfile> fallbackLoad(UUID playerId, Throwable throwable) {
@@ -247,9 +268,4 @@ public final class ProfileServiceImpl implements ProfileService {
         return throwable;
     }
 
-    private record CacheEntry(PlayerProfile profile, Instant loadedAt) {
-        boolean isExpired() {
-            return loadedAt.plus(CACHE_TTL).isBefore(Instant.now());
-        }
-    }
 }

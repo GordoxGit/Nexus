@@ -150,15 +150,35 @@ public final class CoreConfig {
     }
 
     public record DatabaseSettings(boolean enabled, String jdbcUrl, String username, String password,
-                                   PoolSettings poolSettings, Duration writeBehindInterval) {
+                                   PoolSettings poolSettings, Duration writeBehindInterval,
+                                   CacheSettings cacheSettings) {
         public DatabaseSettings {
             Objects.requireNonNull(jdbcUrl, "jdbcUrl");
             Objects.requireNonNull(username, "username");
             Objects.requireNonNull(password, "password");
             Objects.requireNonNull(poolSettings, "poolSettings");
             Objects.requireNonNull(writeBehindInterval, "writeBehindInterval");
+            Objects.requireNonNull(cacheSettings, "cacheSettings");
             if (writeBehindInterval.isZero() || writeBehindInterval.isNegative()) {
                 throw new IllegalArgumentException("writeBehindInterval must be > 0");
+            }
+        }
+
+        public record CacheSettings(ProfileCacheSettings profiles) {
+            public CacheSettings {
+                Objects.requireNonNull(profiles, "profiles");
+            }
+        }
+
+        public record ProfileCacheSettings(long maxSize, Duration expireAfterAccess) {
+            public ProfileCacheSettings {
+                if (maxSize <= 0L) {
+                    throw new IllegalArgumentException("maxSize must be > 0");
+                }
+                Objects.requireNonNull(expireAfterAccess, "expireAfterAccess");
+                if (expireAfterAccess.isZero() || expireAfterAccess.isNegative()) {
+                    throw new IllegalArgumentException("expireAfterAccess must be > 0");
+                }
             }
         }
     }

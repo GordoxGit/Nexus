@@ -41,6 +41,10 @@ database:
     minIdle: 2
     connTimeoutMs: 3000
   write_behind_interval_seconds: 60
+  cache:
+    profiles:
+      max_size: 1000
+      expire_after_access_minutes: 15
 
 services:
   expose-bukkit-services: false
