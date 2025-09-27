@@ -7,12 +7,16 @@ import com.heneria.nexus.api.EconomyTransferResult;
 import com.heneria.nexus.concurrent.ExecutorManager;
 import com.heneria.nexus.config.CoreConfig;
 import com.heneria.nexus.db.DbProvider;
+import com.heneria.nexus.db.repository.EconomyLogRepository;
 import com.heneria.nexus.db.repository.EconomyRepository;
 import com.heneria.nexus.util.NexusLogger;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.time.Instant;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.CompletionStage;
@@ -31,6 +35,7 @@ public final class EconomyServiceImpl implements EconomyService {
     private final DbProvider dbProvider;
     private final ExecutorManager executorManager;
     private final EconomyRepository economyRepository;
+    private final EconomyLogRepository economyLogRepository;
     private final PersistenceService persistenceService;
     private final ConcurrentHashMap<UUID, BalanceEntry> balances = new ConcurrentHashMap<>();
     private final AtomicBoolean degraded = new AtomicBoolean();
@@ -42,11 +47,13 @@ public final class EconomyServiceImpl implements EconomyService {
                               ExecutorManager executorManager,
                               CoreConfig config,
                               EconomyRepository economyRepository,
+                              EconomyLogRepository economyLogRepository,
                               PersistenceService persistenceService) {
         this.logger = Objects.requireNonNull(logger, "logger");
         this.dbProvider = Objects.requireNonNull(dbProvider, "dbProvider");
         this.executorManager = Objects.requireNonNull(executorManager, "executorManager");
         this.economyRepository = Objects.requireNonNull(economyRepository, "economyRepository");
+        this.economyLogRepository = Objects.requireNonNull(economyLogRepository, "economyLogRepository");
         this.persistenceService = Objects.requireNonNull(persistenceService, "persistenceService");
         this.degradedSettings.set(config.degradedModeSettings());
     }
@@ -110,6 +117,8 @@ public final class EconomyServiceImpl implements EconomyService {
         }
         return loadBalanceIfNeeded(accountId)
                 .thenCompose(ignored -> executorManager.supplyIo(() -> applyDeltaInFallback(accountId, amount)))
+                .thenCompose(balance -> logEconomyChange(accountId, amount, balance, TransactionType.CREDIT, reason)
+                        .thenApply(ignored -> balance))
                 .thenApply(balance -> {
                     clearForcedFallback();
                     persistenceService.markEconomyDirty(accountId, () -> persistenceSnapshot(accountId));
@@ -148,6 +157,8 @@ public final class EconomyServiceImpl implements EconomyService {
         }
         return loadBalanceIfNeeded(accountId)
                 .thenCompose(ignored -> executorManager.supplyIo(() -> applyDeltaInFallback(accountId, -amount)))
+                .thenCompose(balance -> logEconomyChange(accountId, -amount, balance, TransactionType.DEBIT, reason)
+                        .thenApply(ignored -> balance))
                 .thenApply(balance -> {
                     clearForcedFallback();
                     persistenceService.markEconomyDirty(accountId, () -> persistenceSnapshot(accountId));
@@ -191,6 +202,9 @@ public final class EconomyServiceImpl implements EconomyService {
         CompletableFuture<Long> loadTo = loadBalanceIfNeeded(to).toCompletableFuture();
         return CompletableFuture.allOf(loadFrom, loadTo)
                 .thenCompose(ignored -> executorManager.supplyIo(() -> performFallbackTransfer(from, to, amount)))
+                .thenCompose(result -> logEconomyChange(from, -amount, result.fromBalance(), TransactionType.DEBIT, reason)
+                        .thenCompose(ignored -> logEconomyChange(to, amount, result.toBalance(), TransactionType.CREDIT, reason)
+                                .thenApply(ignored2 -> result)))
                 .thenApply(result -> {
                     clearForcedFallback();
                     persistenceService.markEconomyDirty(from, () -> persistenceSnapshot(from));
@@ -318,6 +332,59 @@ public final class EconomyServiceImpl implements EconomyService {
         }
     }
 
+    private CompletableFuture<Void> logEconomyChange(UUID accountId,
+                                                      long amount,
+                                                      long balanceAfter,
+                                                      TransactionType type,
+                                                      String reason) {
+        if (!shouldLogTransactions()) {
+            return CompletableFuture.completedFuture(null);
+        }
+        String normalizedReason = normalizeReason(reason);
+        return economyLogRepository.insert(accountId, amount, balanceAfter, type.name(), normalizedReason)
+                .handle((ignored, throwable) -> {
+                    if (throwable != null) {
+                        logger.warn("Échec de la journalisation %s pour %s".formatted(type, accountId), unwrap(throwable));
+                    }
+                    return null;
+                })
+                .toCompletableFuture();
+    }
+
+    private CompletableFuture<Void> logTransactionBatch(Map<UUID, List<PendingLogEntry>> entries,
+                                                        Map<UUID, Long> deltaSnapshot) {
+        if (entries.isEmpty() || !shouldLogTransactions()) {
+            return CompletableFuture.completedFuture(null);
+        }
+        ArrayList<CompletableFuture<Void>> futures = new ArrayList<>();
+        for (Map.Entry<UUID, List<PendingLogEntry>> entry : entries.entrySet()) {
+            UUID account = entry.getKey();
+            long finalBalance = persistenceSnapshot(account);
+            long runningBalance = finalBalance - deltaSnapshot.getOrDefault(account, 0L);
+            for (PendingLogEntry logEntry : entry.getValue()) {
+                runningBalance += logEntry.amount();
+                long balanceAfter = runningBalance;
+                futures.add(logEconomyChange(account, logEntry.amount(), balanceAfter, logEntry.type(), logEntry.reason()));
+            }
+        }
+        if (futures.isEmpty()) {
+            return CompletableFuture.completedFuture(null);
+        }
+        return CompletableFuture.allOf(futures.toArray(CompletableFuture[]::new));
+    }
+
+    private boolean shouldLogTransactions() {
+        return !dbProvider.isDegraded() && !forcedFallback.get();
+    }
+
+    private String normalizeReason(String reason) {
+        if (reason == null) {
+            return null;
+        }
+        String trimmed = reason.trim();
+        return trimmed.isEmpty() ? null : trimmed;
+    }
+
     private void activateFallback(String action, Throwable throwable) {
         Throwable cause = unwrap(throwable);
         if (forcedFallback.compareAndSet(false, true)) {
@@ -381,12 +448,21 @@ public final class EconomyServiceImpl implements EconomyService {
         return entry != null ? entry.balance() : 0L;
     }
 
+    private enum TransactionType {
+        CREDIT,
+        DEBIT
+    }
+
+    private record PendingLogEntry(long amount, TransactionType type, String reason) {
+    }
+
     private record BalanceEntry(long balance, Instant updatedAt) {
     }
 
     private final class RepositoryAwareTransaction implements EconomyTransaction {
 
         private final Map<UUID, Long> deltas = new ConcurrentHashMap<>();
+        private final Map<UUID, List<PendingLogEntry>> logEntries = new ConcurrentHashMap<>();
         private volatile boolean closed;
 
         @Override
@@ -396,6 +472,11 @@ public final class EconomyServiceImpl implements EconomyService {
                 throw new IllegalArgumentException("Montant négatif");
             }
             deltas.merge(account, amount, Long::sum);
+            logEntries.compute(account, (id, entries) -> {
+                List<PendingLogEntry> list = entries != null ? entries : new ArrayList<>();
+                list.add(new PendingLogEntry(amount, TransactionType.CREDIT, reason));
+                return list;
+            });
         }
 
         @Override
@@ -405,6 +486,11 @@ public final class EconomyServiceImpl implements EconomyService {
                 throw new EconomyException("Montant négatif");
             }
             deltas.merge(account, -amount, Long::sum);
+            logEntries.compute(account, (id, entries) -> {
+                List<PendingLogEntry> list = entries != null ? entries : new ArrayList<>();
+                list.add(new PendingLogEntry(-amount, TransactionType.DEBIT, reason));
+                return list;
+            });
         }
 
         @Override
@@ -433,7 +519,16 @@ public final class EconomyServiceImpl implements EconomyService {
                         .thenCompose(ignored -> executorManager.runIo(() -> applyDeltasFallback(deltas)))
                         .thenRun(EconomyServiceImpl.this::clearForcedFallback);
             }
-            return applyFuture.thenRun(() -> markDirtyForTransaction(deltas))
+            Map<UUID, List<PendingLogEntry>> entriesSnapshot = new HashMap<>();
+            logEntries.forEach((uuid, entries) -> entriesSnapshot.put(uuid, List.copyOf(entries)));
+            logEntries.clear();
+            Map<UUID, Long> deltaSnapshot = new HashMap<>(deltas);
+            return applyFuture
+                    .thenCompose(ignored -> logTransactionBatch(entriesSnapshot, deltaSnapshot))
+                    .thenRun(() -> {
+                        markDirtyForTransaction(deltas);
+                        deltas.clear();
+                    })
                     .exceptionallyCompose(EconomyServiceImpl.this::propagateEconomyFailure);
         }
 
@@ -441,6 +536,7 @@ public final class EconomyServiceImpl implements EconomyService {
         public void rollback() {
             closed = true;
             deltas.clear();
+            logEntries.clear();
         }
     }
 }
