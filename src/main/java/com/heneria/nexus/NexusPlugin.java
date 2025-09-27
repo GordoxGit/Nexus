@@ -61,6 +61,7 @@ import com.heneria.nexus.service.core.RewardServiceImpl;
 import com.heneria.nexus.service.core.ShopServiceImpl;
 import com.heneria.nexus.service.core.TimerServiceImpl;
 import com.heneria.nexus.service.core.VaultEconomyService;
+import com.heneria.nexus.service.maintenance.DataPurgeService;
 import com.heneria.nexus.service.permissions.NexusContextManager;
 import com.heneria.nexus.util.DumpUtil;
 import com.heneria.nexus.util.MessageFacade;
@@ -424,6 +425,7 @@ public final class NexusPlugin extends JavaPlugin {
         serviceRegistry.updateSingleton(CoreConfig.class, newBundle.core());
         serviceRegistry.updateSingleton(EconomyConfig.class, newBundle.economy());
         configureDatabase(newBundle.core().databaseSettings());
+        serviceRegistry.get(DataPurgeService.class).applyConfiguration(newBundle.core());
         serviceRegistry.get(QueueService.class).applySettings(newBundle.core().queueSettings());
         serviceRegistry.get(ArenaService.class).applyArenaSettings(newBundle.core().arenaSettings());
         serviceRegistry.get(ArenaService.class).applyWatchdogSettings(newBundle.core().timeoutSettings().watchdog());
@@ -990,6 +992,7 @@ public final class NexusPlugin extends JavaPlugin {
         serviceRegistry.registerService(PlayerCosmeticRepository.class, PlayerCosmeticRepositoryImpl.class);
         serviceRegistry.registerService(EconomyRepository.class, EconomyRepositoryImpl.class);
         serviceRegistry.registerService(MatchRepository.class, MatchRepositoryImpl.class);
+        serviceRegistry.registerService(DataPurgeService.class, DataPurgeService.class);
         serviceRegistry.registerService(RewardClaimRepository.class, RewardClaimRepositoryImpl.class);
         serviceRegistry.registerService(PersistenceService.class, PersistenceServiceImpl.class);
         serviceRegistry.registerService(ProfileService.class, ProfileServiceImpl.class);

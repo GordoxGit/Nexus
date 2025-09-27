@@ -8,6 +8,7 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.sql.Timestamp;
+import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
@@ -26,6 +27,11 @@ public final class MatchRepositoryImpl implements MatchRepository {
             "INSERT INTO nexus_match_participants (match_id, player_uuid, team, kills, deaths, elo_change) " +
                     "VALUES (?, ?, ?, ?, ?, ?)";
 
+    private static final String PURGE_MATCHES_SQL =
+            "DELETE FROM nexus_matches WHERE end_timestamp IS NOT NULL AND end_timestamp < ? LIMIT ?";
+
+    private static final int PURGE_BATCH_SIZE = 1_000;
+
     private final DbProvider dbProvider;
     private final Executor ioExecutor;
 
@@ -38,6 +44,12 @@ public final class MatchRepositoryImpl implements MatchRepository {
     public CompletableFuture<Void> save(MatchSnapshot snapshot) {
         Objects.requireNonNull(snapshot, "snapshot");
         return dbProvider.execute(connection -> persistSnapshot(connection, snapshot), ioExecutor);
+    }
+
+    @Override
+    public CompletableFuture<Integer> purgeOldMatches(Instant olderThan) {
+        Objects.requireNonNull(olderThan, "olderThan");
+        return dbProvider.execute(connection -> purgeMatches(connection, olderThan), ioExecutor);
     }
 
     private Void persistSnapshot(Connection connection, MatchSnapshot snapshot) throws SQLException {
@@ -91,6 +103,23 @@ public final class MatchRepositoryImpl implements MatchRepository {
             }
             statement.executeBatch();
         }
+    }
+
+    private int purgeMatches(Connection connection, Instant olderThan) throws SQLException {
+        Timestamp cutoff = Timestamp.from(olderThan);
+        int totalDeleted = 0;
+        try (PreparedStatement statement = connection.prepareStatement(PURGE_MATCHES_SQL)) {
+            while (true) {
+                statement.setTimestamp(1, cutoff);
+                statement.setInt(2, PURGE_BATCH_SIZE);
+                int deleted = statement.executeUpdate();
+                totalDeleted += deleted;
+                if (deleted < PURGE_BATCH_SIZE) {
+                    break;
+                }
+            }
+        }
+        return totalDeleted;
     }
 
     private boolean getAutoCommit(Connection connection) {

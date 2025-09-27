@@ -83,6 +83,7 @@ public final class ConfigValidator {
         long writeBehindSeconds = positiveLong(yaml, "database.write_behind_interval_seconds", 60L, issues, true);
         long profileCacheMaxSize = positiveLong(yaml, "database.cache.profiles.max_size", 1000L, issues, true);
         long profileCacheExpireMinutes = positiveLong(yaml, "database.cache.profiles.expire_after_access_minutes", 15L, issues, true);
+        int matchHistoryDays = nonNegativeInt(yaml, "database.retention_policy.match_history_days", 90, issues);
 
         boolean exposeServices = yaml.getBoolean("services.expose-bukkit-services", false);
         long timeoutStart = positiveLong(yaml, "timeouts.startMs", 5000L, issues, true);
@@ -218,9 +219,16 @@ public final class ConfigValidator {
             profileCacheSettings = new CoreConfig.DatabaseSettings.ProfileCacheSettings(1000L, java.time.Duration.ofMinutes(15L));
         }
         CoreConfig.DatabaseSettings.CacheSettings cacheSettings = new CoreConfig.DatabaseSettings.CacheSettings(profileCacheSettings);
+        CoreConfig.DatabaseSettings.DataRetentionSettings retentionSettings;
+        try {
+            retentionSettings = new CoreConfig.DatabaseSettings.DataRetentionSettings(Math.max(0, matchHistoryDays));
+        } catch (IllegalArgumentException exception) {
+            issues.error("database.retention_policy.match_history_days", exception.getMessage());
+            retentionSettings = new CoreConfig.DatabaseSettings.DataRetentionSettings(90);
+        }
 
         databaseSettings = new CoreConfig.DatabaseSettings(databaseEnabled, jdbc, user, password, poolSettings,
-                java.time.Duration.ofSeconds(Math.max(1L, writeBehindSeconds)), cacheSettings);
+                java.time.Duration.ofSeconds(Math.max(1L, writeBehindSeconds)), cacheSettings, retentionSettings);
 
         CoreConfig.TimeoutSettings.WatchdogSettings watchdogSettings;
         try {
