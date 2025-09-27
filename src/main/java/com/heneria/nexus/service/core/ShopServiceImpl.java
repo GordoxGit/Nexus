@@ -8,10 +8,16 @@ import com.heneria.nexus.api.EconomyService;
 import com.heneria.nexus.api.EconomyTransaction;
 import com.heneria.nexus.api.PurchaseResult;
 import com.heneria.nexus.api.ShopService;
+import com.heneria.nexus.concurrent.ExecutorManager;
+import com.heneria.nexus.config.CoreConfig;
 import com.heneria.nexus.config.EconomyConfig;
 import com.heneria.nexus.db.repository.PlayerClassRepository;
 import com.heneria.nexus.db.repository.PlayerCosmeticRepository;
+import com.heneria.nexus.ratelimit.RateLimitedActionKeys;
+import com.heneria.nexus.service.ratelimit.RateLimiterService;
+import com.heneria.nexus.util.MessageFacade;
 import com.heneria.nexus.util.NexusLogger;
+import java.time.Duration;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
@@ -19,6 +25,7 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.atomic.AtomicReference;
+import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
 import org.bukkit.entity.Player;
 
 /**
@@ -32,19 +39,32 @@ public final class ShopServiceImpl implements ShopService {
     private final PlayerCosmeticRepository playerCosmeticRepository;
     private final AtomicReference<EconomyConfig.ShopSettings> shopSettings;
     private final AuditService auditService;
+    private final RateLimiterService rateLimiterService;
+    private final MessageFacade messageFacade;
+    private final ExecutorManager executorManager;
+    private final AtomicReference<RateLimitConfiguration> rateLimitSettings;
 
     public ShopServiceImpl(NexusLogger logger,
                            EconomyService economyService,
                            EconomyConfig economyConfig,
                            PlayerClassRepository playerClassRepository,
                            PlayerCosmeticRepository playerCosmeticRepository,
-                           AuditService auditService) {
+                           AuditService auditService,
+                           RateLimiterService rateLimiterService,
+                           MessageFacade messageFacade,
+                           ExecutorManager executorManager,
+                           CoreConfig coreConfig) {
         this.logger = Objects.requireNonNull(logger, "logger");
         this.economyService = Objects.requireNonNull(economyService, "economyService");
         this.playerClassRepository = Objects.requireNonNull(playerClassRepository, "playerClassRepository");
         this.playerCosmeticRepository = Objects.requireNonNull(playerCosmeticRepository, "playerCosmeticRepository");
         this.shopSettings = new AtomicReference<>(Objects.requireNonNull(economyConfig, "economyConfig").shop());
         this.auditService = Objects.requireNonNull(auditService, "auditService");
+        this.rateLimiterService = Objects.requireNonNull(rateLimiterService, "rateLimiterService");
+        this.messageFacade = Objects.requireNonNull(messageFacade, "messageFacade");
+        this.executorManager = Objects.requireNonNull(executorManager, "executorManager");
+        Objects.requireNonNull(coreConfig, "coreConfig");
+        this.rateLimitSettings = new AtomicReference<>(RateLimitConfiguration.from(coreConfig.rateLimitSettings()));
     }
 
     @Override
@@ -57,23 +77,30 @@ public final class ShopServiceImpl implements ShopService {
             return CompletableFuture.completedFuture(PurchaseResult.ERROR);
         }
         UUID playerId = player.getUniqueId();
-        return playerClassRepository.isUnlocked(playerId, trimmedClassId)
-                .thenCompose(alreadyOwned -> {
-                    if (alreadyOwned) {
-                        return CompletableFuture.completedFuture(PurchaseResult.ALREADY_OWNED);
+        Duration cooldown = rateLimitSettings.get().classPurchaseCooldown();
+        return ensureRateLimit(player, RateLimitedActionKeys.SHOP_PURCHASE_CLASS, cooldown)
+                .thenCompose(allowed -> {
+                    if (!allowed) {
+                        return CompletableFuture.completedFuture(PurchaseResult.RATE_LIMITED);
                     }
-                    EconomyConfig.ClassEntry classEntry = resolveClassEntry(trimmedClassId);
-                    if (classEntry == null) {
-                        logger.error("Aucun tarif défini pour la classe '" + trimmedClassId + "'.");
-                        return CompletableFuture.completedFuture(PurchaseResult.ERROR);
-                    }
-                    long cost = classEntry.cost();
-                    return economyService.getBalance(playerId)
-                            .thenCompose(balance -> {
-                                if (balance < cost) {
-                                    return CompletableFuture.completedFuture(PurchaseResult.INSUFFICIENT_FUNDS);
+                    return playerClassRepository.isUnlocked(playerId, trimmedClassId)
+                            .thenCompose(alreadyOwned -> {
+                                if (alreadyOwned) {
+                                    return CompletableFuture.completedFuture(PurchaseResult.ALREADY_OWNED);
                                 }
-                                return executeClassPurchase(player, playerId, trimmedClassId, cost);
+                                EconomyConfig.ClassEntry classEntry = resolveClassEntry(trimmedClassId);
+                                if (classEntry == null) {
+                                    logger.error("Aucun tarif défini pour la classe '" + trimmedClassId + "'.");
+                                    return CompletableFuture.completedFuture(PurchaseResult.ERROR);
+                                }
+                                long cost = classEntry.cost();
+                                return economyService.getBalance(playerId)
+                                        .thenCompose(balance -> {
+                                            if (balance < cost) {
+                                                return CompletableFuture.completedFuture(PurchaseResult.INSUFFICIENT_FUNDS);
+                                            }
+                                            return executeClassPurchase(player, playerId, trimmedClassId, cost);
+                                        });
                             });
                 })
                 .exceptionally(throwable -> handleUnexpectedFailure(player, "classe", trimmedClassId, throwable))
@@ -90,23 +117,30 @@ public final class ShopServiceImpl implements ShopService {
             return CompletableFuture.completedFuture(PurchaseResult.ERROR);
         }
         UUID playerId = player.getUniqueId();
-        return playerCosmeticRepository.isUnlocked(playerId, trimmedCosmeticId)
-                .thenCompose(alreadyOwned -> {
-                    if (alreadyOwned) {
-                        return CompletableFuture.completedFuture(PurchaseResult.ALREADY_OWNED);
+        Duration cooldown = rateLimitSettings.get().cosmeticPurchaseCooldown();
+        return ensureRateLimit(player, RateLimitedActionKeys.SHOP_PURCHASE_COSMETIC, cooldown)
+                .thenCompose(allowed -> {
+                    if (!allowed) {
+                        return CompletableFuture.completedFuture(PurchaseResult.RATE_LIMITED);
                     }
-                    EconomyConfig.CosmeticEntry cosmeticEntry = resolveCosmeticEntry(trimmedCosmeticId);
-                    if (cosmeticEntry == null) {
-                        logger.error("Aucun tarif défini pour le cosmétique '" + trimmedCosmeticId + "'.");
-                        return CompletableFuture.completedFuture(PurchaseResult.ERROR);
-                    }
-                    long cost = cosmeticEntry.cost();
-                    return economyService.getBalance(playerId)
-                            .thenCompose(balance -> {
-                                if (balance < cost) {
-                                    return CompletableFuture.completedFuture(PurchaseResult.INSUFFICIENT_FUNDS);
+                    return playerCosmeticRepository.isUnlocked(playerId, trimmedCosmeticId)
+                            .thenCompose(alreadyOwned -> {
+                                if (alreadyOwned) {
+                                    return CompletableFuture.completedFuture(PurchaseResult.ALREADY_OWNED);
                                 }
-                                return executeCosmeticPurchase(player, playerId, trimmedCosmeticId, cosmeticEntry);
+                                EconomyConfig.CosmeticEntry cosmeticEntry = resolveCosmeticEntry(trimmedCosmeticId);
+                                if (cosmeticEntry == null) {
+                                    logger.error("Aucun tarif défini pour le cosmétique '" + trimmedCosmeticId + "'.");
+                                    return CompletableFuture.completedFuture(PurchaseResult.ERROR);
+                                }
+                                long cost = cosmeticEntry.cost();
+                                return economyService.getBalance(playerId)
+                                        .thenCompose(balance -> {
+                                            if (balance < cost) {
+                                                return CompletableFuture.completedFuture(PurchaseResult.INSUFFICIENT_FUNDS);
+                                            }
+                                            return executeCosmeticPurchase(player, playerId, trimmedCosmeticId, cosmeticEntry);
+                                        });
                             });
                 })
                 .exceptionally(throwable -> handleUnexpectedFailure(player, "cosmétique", trimmedCosmeticId, throwable))
@@ -116,6 +150,12 @@ public final class ShopServiceImpl implements ShopService {
     @Override
     public void applyCatalog(EconomyConfig.ShopSettings shopSettings) {
         this.shopSettings.set(Objects.requireNonNull(shopSettings, "shopSettings"));
+    }
+
+    @Override
+    public void applyRateLimitSettings(CoreConfig.RateLimitSettings rateLimitSettings) {
+        Objects.requireNonNull(rateLimitSettings, "rateLimitSettings");
+        this.rateLimitSettings.set(RateLimitConfiguration.from(rateLimitSettings));
     }
 
     private EconomyConfig.ClassEntry resolveClassEntry(String classId) {
@@ -198,6 +238,52 @@ public final class ShopServiceImpl implements ShopService {
         }
         logger.error("Erreur inattendue lors de l'achat de " + itemType + " '" + itemId + "' pour " + player.getName(), cause);
         return PurchaseResult.ERROR;
+    }
+
+    private CompletableFuture<Boolean> ensureRateLimit(Player player, String actionKey, Duration cooldown) {
+        if (!isRateLimitActive(cooldown)) {
+            return CompletableFuture.completedFuture(true);
+        }
+        return rateLimiterService.check(player.getUniqueId(), actionKey, cooldown)
+                .thenApply(result -> {
+                    if (result.allowed()) {
+                        return true;
+                    }
+                    Duration remaining = result.timeRemaining().orElse(cooldown);
+                    long seconds = secondsRemaining(remaining);
+                    executorManager.mainThread().runNow(() ->
+                            messageFacade.send(player, "shop.rate_limited",
+                                    Placeholder.unparsed("seconds", Long.toString(seconds))));
+                    return false;
+                });
+    }
+
+    private boolean isRateLimitActive(Duration cooldown) {
+        return cooldown != null && !cooldown.isZero() && !cooldown.isNegative();
+    }
+
+    private long secondsRemaining(Duration duration) {
+        if (duration == null) {
+            return 1L;
+        }
+        long millis = Math.max(0L, duration.toMillis());
+        return Math.max(1L, (millis + 999L) / 1000L);
+    }
+
+    private record RateLimitConfiguration(Duration classPurchaseCooldown,
+                                          Duration cosmeticPurchaseCooldown) {
+        static RateLimitConfiguration from(CoreConfig.RateLimitSettings settings) {
+            Objects.requireNonNull(settings, "settings");
+            return new RateLimitConfiguration(normalise(settings.cooldownFor(RateLimitedActionKeys.SHOP_PURCHASE_CLASS)),
+                    normalise(settings.cooldownFor(RateLimitedActionKeys.SHOP_PURCHASE_COSMETIC)));
+        }
+
+        private static Duration normalise(Duration value) {
+            if (value == null || value.isNegative()) {
+                return Duration.ZERO;
+            }
+            return value;
+        }
     }
 
     private boolean isInsufficientFunds(EconomyException exception) {

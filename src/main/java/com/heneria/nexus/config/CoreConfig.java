@@ -3,6 +3,7 @@ package com.heneria.nexus.config;
 import java.time.Duration;
 import java.time.ZoneId;
 import java.util.Locale;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -19,6 +20,7 @@ public final class CoreConfig {
     private final ArenaSettings arenaSettings;
     private final ExecutorSettings executorSettings;
     private final DatabaseSettings databaseSettings;
+    private final RateLimitSettings rateLimitSettings;
     private final ServiceSettings serviceSettings;
     private final TimeoutSettings timeoutSettings;
     private final DegradedModeSettings degradedModeSettings;
@@ -33,6 +35,7 @@ public final class CoreConfig {
                       ArenaSettings arenaSettings,
                       ExecutorSettings executorSettings,
                       DatabaseSettings databaseSettings,
+                      RateLimitSettings rateLimitSettings,
                       ServiceSettings serviceSettings,
                       TimeoutSettings timeoutSettings,
                       DegradedModeSettings degradedModeSettings,
@@ -46,6 +49,7 @@ public final class CoreConfig {
         this.arenaSettings = Objects.requireNonNull(arenaSettings, "arenaSettings");
         this.executorSettings = Objects.requireNonNull(executorSettings, "executorSettings");
         this.databaseSettings = Objects.requireNonNull(databaseSettings, "databaseSettings");
+        this.rateLimitSettings = Objects.requireNonNull(rateLimitSettings, "rateLimitSettings");
         this.serviceSettings = Objects.requireNonNull(serviceSettings, "serviceSettings");
         this.timeoutSettings = Objects.requireNonNull(timeoutSettings, "timeoutSettings");
         this.degradedModeSettings = Objects.requireNonNull(degradedModeSettings, "degradedModeSettings");
@@ -77,6 +81,10 @@ public final class CoreConfig {
 
     public DatabaseSettings databaseSettings() {
         return databaseSettings;
+    }
+
+    public RateLimitSettings rateLimitSettings() {
+        return rateLimitSettings;
     }
 
     public ServiceSettings serviceSettings() {
@@ -189,6 +197,48 @@ public final class CoreConfig {
                     throw new IllegalArgumentException("matchHistoryDays must be >= 0");
                 }
             }
+        }
+    }
+
+    public record RateLimitSettings(boolean enabled,
+                                    Map<String, Duration> cooldowns,
+                                    Duration cleanupInterval,
+                                    Duration retentionDuration) {
+        public RateLimitSettings {
+            Objects.requireNonNull(cooldowns, "cooldowns");
+            Objects.requireNonNull(cleanupInterval, "cleanupInterval");
+            Objects.requireNonNull(retentionDuration, "retentionDuration");
+            if (cleanupInterval.isZero() || cleanupInterval.isNegative()) {
+                throw new IllegalArgumentException("cleanupInterval must be > 0");
+            }
+            if (retentionDuration.isZero() || retentionDuration.isNegative()) {
+                throw new IllegalArgumentException("retentionDuration must be > 0");
+            }
+            Map<String, Duration> validated = new LinkedHashMap<>();
+            for (Map.Entry<String, Duration> entry : cooldowns.entrySet()) {
+                Duration value = Objects.requireNonNull(entry.getValue(),
+                        "cooldown for action '%s' cannot be null".formatted(entry.getKey()));
+                if (value.isNegative()) {
+                    throw new IllegalArgumentException(
+                            "cooldown for action '%s' must be >= 0".formatted(entry.getKey()));
+                }
+                validated.put(entry.getKey(), value);
+            }
+            cooldowns = Map.copyOf(validated);
+        }
+
+        public Duration cooldownFor(String actionKey) {
+            return cooldowns.getOrDefault(actionKey, Duration.ZERO);
+        }
+
+        public Duration maxConfiguredCooldown() {
+            Duration max = Duration.ZERO;
+            for (Duration value : cooldowns.values()) {
+                if (value.compareTo(max) > 0) {
+                    max = value;
+                }
+            }
+            return max;
         }
     }
 

@@ -1,5 +1,6 @@
 package com.heneria.nexus.config;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.util.ArrayList;
@@ -268,9 +269,118 @@ public final class ConfigValidator {
         }
         CoreConfig.AnalyticsSettings analyticsSettings = new CoreConfig.AnalyticsSettings(outboxSettings);
 
+        CoreConfig.RateLimitSettings rateLimitSettings = parseRateLimitSettingsSafe(yaml, issues);
+
         return new CoreConfig(mode, locale, zone, arenaSettings, executorSettings, databaseSettings,
-                serviceSettings, timeoutSettings, degradedModeSettings, queueSettings, hologramSettings,
-                analyticsSettings, uiSettings);
+                rateLimitSettings, serviceSettings, timeoutSettings, degradedModeSettings, queueSettings,
+                hologramSettings, analyticsSettings, uiSettings);
+    }
+
+    private CoreConfig.RateLimitSettings parseRateLimitSettingsSafe(YamlConfiguration yaml, IssueCollector issues) {
+        try {
+            return parseRateLimitSettings(yaml, issues);
+        } catch (IllegalArgumentException exception) {
+            issues.error("rate-limits", exception.getMessage());
+            return new CoreConfig.RateLimitSettings(true, defaultRateLimitCooldowns(),
+                    Duration.ofMinutes(60), Duration.ofMinutes(1440));
+        }
+    }
+
+    private CoreConfig.RateLimitSettings parseRateLimitSettings(YamlConfiguration yaml, IssueCollector issues) {
+        Map<String, Duration> defaults = defaultRateLimitCooldowns();
+        Map<String, Duration> cooldowns = new LinkedHashMap<>();
+        boolean enabled = true;
+        Duration cleanupInterval = Duration.ofMinutes(60);
+        Duration retention = Duration.ofMinutes(1440);
+
+        ConfigurationSection section = yaml.getConfigurationSection("rate-limits");
+        if (section != null) {
+            enabled = section.getBoolean("enabled", true);
+            ConfigurationSection cleanupSection = section.getConfigurationSection("cleanup");
+            if (cleanupSection != null) {
+                long intervalMinutes = cleanupSection.getLong("interval_minutes", 60L);
+                if (intervalMinutes <= 0L) {
+                    issues.warn("rate-limits.cleanup.interval_minutes",
+                            "Valeur <= 0, utilisation de 60");
+                    intervalMinutes = 60L;
+                }
+                cleanupInterval = Duration.ofMinutes(intervalMinutes);
+
+                long retentionMinutes = cleanupSection.getLong("retention_minutes", 1440L);
+                if (retentionMinutes <= 0L) {
+                    issues.warn("rate-limits.cleanup.retention_minutes",
+                            "Valeur <= 0, utilisation de 1440");
+                    retentionMinutes = 1440L;
+                }
+                retention = Duration.ofMinutes(retentionMinutes);
+            } else {
+                issues.warn("rate-limits.cleanup", "Section manquante, utilisation des valeurs par défaut");
+            }
+
+            ConfigurationSection actionsSection = section.getConfigurationSection("actions");
+            if (actionsSection != null) {
+                for (String key : actionsSection.getKeys(false)) {
+                    String path = "rate-limits.actions." + key;
+                    Duration fallback = defaults.getOrDefault(key, Duration.ZERO);
+                    Duration value = parseActionCooldown(actionsSection.get(key), fallback, path, issues);
+                    cooldowns.put(key, value);
+                }
+            } else {
+                issues.warn("rate-limits.actions", "Section manquante, utilisation des valeurs par défaut");
+            }
+        } else {
+            issues.warn("rate-limits", "Section manquante, activation des valeurs par défaut");
+        }
+
+        if (cooldowns.isEmpty()) {
+            cooldowns.putAll(defaults);
+            issues.warn("rate-limits.actions", "Aucune action définie, utilisation des valeurs par défaut");
+        } else {
+            defaults.forEach(cooldowns::putIfAbsent);
+        }
+
+        if (retention.compareTo(cleanupInterval) < 0) {
+            issues.warn("rate-limits.cleanup.retention_minutes",
+                    "Doit être >= à interval_minutes, utilisation de " + cleanupInterval.toMinutes());
+            retention = cleanupInterval;
+        }
+
+        return new CoreConfig.RateLimitSettings(enabled, cooldowns, cleanupInterval, retention);
+    }
+
+    private Duration parseActionCooldown(Object raw, Duration fallback, String path, IssueCollector issues) {
+        if (raw == null) {
+            issues.warn(path, "Valeur manquante, utilisation de " + fallback.toSeconds());
+            return fallback;
+        }
+        long seconds;
+        if (raw instanceof Number number) {
+            seconds = number.longValue();
+        } else if (raw instanceof String string) {
+            try {
+                seconds = Long.parseLong(string.trim());
+            } catch (NumberFormatException exception) {
+                issues.warn(path, "Valeur invalide, utilisation de " + fallback.toSeconds());
+                return fallback;
+            }
+        } else {
+            issues.warn(path, "Type invalide, utilisation de " + fallback.toSeconds());
+            return fallback;
+        }
+        if (seconds < 0L) {
+            issues.warn(path, "Valeur négative, utilisation de " + fallback.toSeconds());
+            return fallback;
+        }
+        return Duration.ofSeconds(seconds);
+    }
+
+    private Map<String, Duration> defaultRateLimitCooldowns() {
+        Map<String, Duration> defaults = new LinkedHashMap<>();
+        defaults.put("purchase:class", Duration.ofSeconds(3L));
+        defaults.put("purchase:cosmetic", Duration.ofSeconds(3L));
+        defaults.put("shop:refresh", Duration.ofSeconds(60L));
+        defaults.put("quest:reroll_daily", Duration.ofSeconds(300L));
+        return defaults;
     }
 
     public MessageBundle validateMessages(YamlConfiguration yaml, Locale expectedLocale, IssueCollector issues) {

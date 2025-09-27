@@ -20,6 +20,9 @@ help:
 errors:
   no_permission: "<red>Vous n'avez pas la permission requise.</red>"
 
+shop:
+  rate_limited: "<red>Veuillez patienter encore <seconds> seconde(s) avant de réessayer.</red>"
+
 admin:
   reload:
     start: "<yellow>Rechargement en cours...</yellow>"

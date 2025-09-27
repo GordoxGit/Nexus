@@ -7,5 +7,6 @@ public enum PurchaseResult {
     SUCCESS,
     INSUFFICIENT_FUNDS,
     ALREADY_OWNED,
+    RATE_LIMITED,
     ERROR
 }
