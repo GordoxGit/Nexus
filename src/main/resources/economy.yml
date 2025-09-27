@@ -15,3 +15,16 @@ battlepass:
   xp_per_match:
     win: 120
     lose: 60
+
+shop:
+  classes:
+    warrior: 500
+    archer: 750
+    mage: 900
+  cosmetics:
+    flame_trail:
+      cost: 300
+      type: "ARROW_TRAIL"
+    emerald_aura:
+      cost: 450
+      type: "KILL_EFFECT"
