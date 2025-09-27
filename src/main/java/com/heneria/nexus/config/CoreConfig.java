@@ -22,6 +22,7 @@ public final class CoreConfig {
     private final DatabaseSettings databaseSettings;
     private final RateLimitSettings rateLimitSettings;
     private final ServiceSettings serviceSettings;
+    private final BackupSettings backupSettings;
     private final TimeoutSettings timeoutSettings;
     private final DegradedModeSettings degradedModeSettings;
     private final QueueSettings queueSettings;
@@ -37,6 +38,7 @@ public final class CoreConfig {
                       DatabaseSettings databaseSettings,
                       RateLimitSettings rateLimitSettings,
                       ServiceSettings serviceSettings,
+                      BackupSettings backupSettings,
                       TimeoutSettings timeoutSettings,
                       DegradedModeSettings degradedModeSettings,
                       QueueSettings queueSettings,
@@ -51,6 +53,7 @@ public final class CoreConfig {
         this.databaseSettings = Objects.requireNonNull(databaseSettings, "databaseSettings");
         this.rateLimitSettings = Objects.requireNonNull(rateLimitSettings, "rateLimitSettings");
         this.serviceSettings = Objects.requireNonNull(serviceSettings, "serviceSettings");
+        this.backupSettings = Objects.requireNonNull(backupSettings, "backupSettings");
         this.timeoutSettings = Objects.requireNonNull(timeoutSettings, "timeoutSettings");
         this.degradedModeSettings = Objects.requireNonNull(degradedModeSettings, "degradedModeSettings");
         this.queueSettings = Objects.requireNonNull(queueSettings, "queueSettings");
@@ -91,6 +94,10 @@ public final class CoreConfig {
         return serviceSettings;
     }
 
+    public BackupSettings backupSettings() {
+        return backupSettings;
+    }
+
     public TimeoutSettings timeoutSettings() {
         return timeoutSettings;
     }
@@ -113,6 +120,14 @@ public final class CoreConfig {
 
     public UiSettings uiSettings() {
         return uiSettings;
+    }
+
+    public record BackupSettings(int maxBackupsPerFile) {
+        public BackupSettings {
+            if (maxBackupsPerFile < 0) {
+                throw new IllegalArgumentException("maxBackupsPerFile must be >= 0");
+            }
+        }
     }
 
     public record ArenaSettings(int hudHz, int scoreboardHz, int particlesSoftCap, int particlesHardCap,

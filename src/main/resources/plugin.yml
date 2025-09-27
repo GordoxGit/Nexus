@@ -34,6 +34,9 @@ permissions:
   nexus.admin.audit.view:
     description: Consulter les logs d'audit Nexus.
     default: op
+  nexus.admin.config.manage_backups:
+    description: Gérer les sauvegardes de configuration Nexus.
+    default: op
   nexus.admin.*:
     description: Accès complet aux commandes d'administration Nexus.
     default: op
@@ -44,6 +47,7 @@ permissions:
       nexus.admin.player.export: true
       nexus.admin.player.import: true
       nexus.admin.audit.view: true
+      nexus.admin.config.manage_backups: true
   nexus.holo.manage:
     description: Gérer les hologrammes Nexus via /nexus holo.
     default: op

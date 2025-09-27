@@ -87,6 +87,7 @@ public final class ConfigValidator {
         int matchHistoryDays = nonNegativeInt(yaml, "database.retention_policy.match_history_days", 90, issues);
 
         boolean exposeServices = yaml.getBoolean("services.expose-bukkit-services", false);
+        int maxBackupsPerFile = nonNegativeInt(yaml, "config.backups.max_backups_per_file", 10, issues);
         long timeoutStart = positiveLong(yaml, "timeouts.startMs", 5000L, issues, true);
         long timeoutStop = positiveLong(yaml, "timeouts.stopMs", 3000L, issues, true);
         long watchdogReset = positiveLong(yaml, "timeouts.watchdog.reset_ms", 10_000L, issues, true);
@@ -162,6 +163,7 @@ public final class ConfigValidator {
         CoreConfig.PoolSettings poolSettings;
         CoreConfig.DatabaseSettings databaseSettings;
         CoreConfig.ServiceSettings serviceSettings = new CoreConfig.ServiceSettings(exposeServices);
+        CoreConfig.BackupSettings backupSettings;
         CoreConfig.TimeoutSettings timeoutSettings;
         CoreConfig.DegradedModeSettings degradedModeSettings = new CoreConfig.DegradedModeSettings(degradedEnabled, degradedBanner);
         CoreConfig.QueueSettings queueSettings;
@@ -203,6 +205,13 @@ public final class ConfigValidator {
             schedulerSettings = new CoreConfig.ExecutorSettings.SchedulerSettings(1);
         }
         executorSettings = new CoreConfig.ExecutorSettings(ioSettings, computeSettings, shutdownSettings, schedulerSettings);
+
+        try {
+            backupSettings = new CoreConfig.BackupSettings(Math.max(0, maxBackupsPerFile));
+        } catch (IllegalArgumentException exception) {
+            issues.error("config.backups.max_backups_per_file", exception.getMessage());
+            backupSettings = new CoreConfig.BackupSettings(10);
+        }
 
         try {
             poolSettings = new CoreConfig.PoolSettings(poolMax, poolMin, poolTimeout);
@@ -272,7 +281,7 @@ public final class ConfigValidator {
         CoreConfig.RateLimitSettings rateLimitSettings = parseRateLimitSettingsSafe(yaml, issues);
 
         return new CoreConfig(mode, locale, zone, arenaSettings, executorSettings, databaseSettings,
-                rateLimitSettings, serviceSettings, timeoutSettings, degradedModeSettings, queueSettings,
+                rateLimitSettings, serviceSettings, backupSettings, timeoutSettings, degradedModeSettings, queueSettings,
                 hologramSettings, analyticsSettings, uiSettings);
     }
 

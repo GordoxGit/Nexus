@@ -22,6 +22,8 @@ import com.heneria.nexus.budget.BudgetService;
 import com.heneria.nexus.budget.BudgetServiceImpl;
 import com.heneria.nexus.budget.BudgetSnapshot;
 import com.heneria.nexus.command.NexusCommand;
+import com.heneria.nexus.config.BackupService;
+import com.heneria.nexus.config.BackupServiceImpl;
 import com.heneria.nexus.config.ConfigBundle;
 import com.heneria.nexus.config.ConfigManager;
 import com.heneria.nexus.config.CoreConfig;
@@ -86,6 +88,8 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.time.Instant;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -93,6 +97,7 @@ import java.util.Collection;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
@@ -100,6 +105,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ConcurrentHashMap;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
@@ -131,6 +137,7 @@ public final class NexusPlugin extends JavaPlugin {
     private NexusLogger logger;
     private ConfigManager configManager;
     private ConfigBundle bundle;
+    private BackupService backupService;
     private MessageFacade messageFacade;
     private boolean placeholderApiAvailable;
     private ServiceRegistry serviceRegistry;
@@ -149,11 +156,13 @@ public final class NexusPlugin extends JavaPlugin {
     private Path importsDirectory;
     private AuditService auditService;
     private DateTimeFormatter auditTimestampFormatter;
+    private final Map<String, PendingConfigRestore> pendingConfigRestores = new ConcurrentHashMap<>();
 
     @Override
     public void onLoad() {
         this.logger = new NexusLogger(getLogger(), LOG_PREFIX);
-        this.configManager = new ConfigManager(this, logger);
+        this.backupService = new BackupServiceImpl(getDataFolder().toPath(), logger);
+        this.configManager = new ConfigManager(this, logger, backupService);
         ReloadReport report = configManager.initialLoad();
         if (!report.success()) {
             report.errors().forEach(error -> logger.error(formatIssue(error)));
@@ -162,6 +171,7 @@ public final class NexusPlugin extends JavaPlugin {
         }
         report.warnings().forEach(warning -> logger.warn(formatIssue(warning)));
         this.bundle = configManager.currentBundle();
+        backupService.updateRetentionLimit(bundle.core().backupSettings().maxBackupsPerFile());
     }
 
     @Override
@@ -253,6 +263,9 @@ public final class NexusPlugin extends JavaPlugin {
         }
         if (configManager != null) {
             configManager.close();
+        }
+        if (backupService != null) {
+            backupService.close();
         }
         logger.info("Nexus désactivé proprement");
     }
@@ -444,6 +457,7 @@ public final class NexusPlugin extends JavaPlugin {
         ringScheduler.applyPerfSettings(newBundle.core().arenaSettings());
         messageFacade.update(newBundle.messages());
         this.bundle = newBundle;
+        backupService.updateRetentionLimit(newBundle.core().backupSettings().maxBackupsPerFile());
         serviceRegistry.updateSingleton(ConfigBundle.class, newBundle);
         serviceRegistry.updateSingleton(CoreConfig.class, newBundle.core());
         serviceRegistry.updateSingleton(EconomyConfig.class, newBundle.economy());
@@ -662,6 +676,7 @@ public final class NexusPlugin extends JavaPlugin {
         switch (sub) {
             case "player" -> handleAdminPlayer(sender, args);
             case "audit" -> handleAdminAudit(sender, args);
+            case "config" -> handleAdminConfig(sender, args);
             default -> sendAdminUsage(sender);
         }
     }
@@ -746,6 +761,131 @@ public final class NexusPlugin extends JavaPlugin {
                     Throwable cause = unwrap(throwable);
                     logger.warn("Impossible de récupérer les logs d'audit", cause);
                     messageFacade.send(sender, "admin.audit.error",
+                            Placeholder.unparsed("reason", describeError(cause)));
+                    return null;
+                });
+    }
+
+    private void handleAdminConfig(CommandSender sender, String[] args) {
+        if (!sender.hasPermission("nexus.admin.config.manage_backups")) {
+            messageFacade.send(sender, "errors.no_permission");
+            return;
+        }
+        if (args.length < 3) {
+            sendAdminConfigUsage(sender);
+            return;
+        }
+        String action = args[2].toLowerCase(Locale.ROOT);
+        switch (action) {
+            case "backups" -> handleAdminConfigBackups(sender, args);
+            case "restore" -> handleAdminConfigRestore(sender, args);
+            default -> sendAdminConfigUsage(sender);
+        }
+    }
+
+    private void handleAdminConfigBackups(CommandSender sender, String[] args) {
+        if (args.length < 4 || !args[3].equalsIgnoreCase("list")) {
+            messageFacade.send(sender, "admin.config.backups.usage");
+            return;
+        }
+        String filter = args.length >= 5 ? normalizeBackupToken(args[4]) : null;
+        String commandLine = "/nexus " + String.join(" ", args);
+        logAdminCommand(sender, AuditActionType.ADMIN_COMMAND, null,
+                "command=" + commandLine + "; action=config-backups-list; filter=" + (filter != null ? filter : "*"));
+        CompletableFuture<List<BackupService.BackupMetadata>> future = backupService.listBackups(filter);
+        executorManager.thenMain(future, backups -> {
+            if (backups.isEmpty()) {
+                if (filter != null) {
+                    messageFacade.send(sender, "admin.config.backups.empty_filtered",
+                            Placeholder.unparsed("file", filter));
+                } else {
+                    messageFacade.send(sender, "admin.config.backups.empty");
+                }
+                return;
+            }
+            messageFacade.send(sender, "admin.config.backups.header",
+                    Placeholder.unparsed("count", Integer.toString(backups.size())),
+                    Placeholder.unparsed("scope", filter != null ? filter : "*"));
+            backups.stream()
+                    .sorted((left, right) -> right.createdAt().compareTo(left.createdAt()))
+                    .forEach(metadata -> messageFacade.send(sender, "admin.config.backups.entry",
+                            Placeholder.unparsed("backup", metadata.backupFileName()),
+                            Placeholder.unparsed("file", metadata.baseFileName()),
+                            Placeholder.unparsed("created_at", formatBackupTimestamp(metadata.createdAt())),
+                            Placeholder.unparsed("size", formatSize(metadata.sizeBytes()))));
+        }).exceptionally(throwable -> {
+            Throwable cause = unwrap(throwable);
+            logger.warn("Impossible de lister les sauvegardes de configuration", cause);
+            messageFacade.send(sender, "admin.config.backups.error",
+                    Placeholder.unparsed("reason", describeError(cause)));
+            return null;
+        });
+    }
+
+    private void handleAdminConfigRestore(CommandSender sender, String[] args) {
+        if (args.length < 4) {
+            messageFacade.send(sender, "admin.config.restore.usage");
+            return;
+        }
+        String actorKey = senderKey(sender);
+        if (args[3].equalsIgnoreCase("confirm")) {
+            PendingConfigRestore pending = pendingConfigRestores.remove(actorKey);
+            if (pending == null) {
+                messageFacade.send(sender, "admin.config.restore.none");
+                return;
+            }
+            if (Instant.now().isAfter(pending.expiresAt())) {
+                messageFacade.send(sender, "admin.config.restore.expired");
+                return;
+            }
+            String commandLine = "/nexus " + String.join(" ", args);
+            logAdminCommand(sender, AuditActionType.ADMIN_COMMAND, null,
+                    "command=" + commandLine + "; action=config-restore-confirm; backup=" + pending.backupFileName());
+            CompletableFuture<BackupService.RestoreResult> future = backupService.restoreBackup(pending.backupFileName());
+            executorManager.thenMain(future, result -> {
+                        messageFacade.send(sender, "admin.config.restore.success",
+                                Placeholder.unparsed("backup", result.restoredBackup().backupFileName()),
+                                Placeholder.unparsed("file", result.restoredBackup().baseFileName()));
+                        result.preRestoreBackup().ifPresent(preBackup -> messageFacade.send(sender,
+                                "admin.config.restore.safety_backup",
+                                Placeholder.unparsed("backup", preBackup.backupFileName())));
+                        messageFacade.send(sender, "admin.config.restore.reload_hint");
+                    })
+                    .exceptionally(throwable -> {
+                        Throwable cause = unwrap(throwable);
+                        logger.warn("Restauration de configuration impossible", cause);
+                        messageFacade.send(sender, "admin.config.restore.error",
+                                Placeholder.unparsed("reason", describeError(cause)));
+                        return null;
+                    });
+            return;
+        }
+
+        String backupName = args[3];
+        CompletableFuture<Optional<BackupService.BackupMetadata>> future = backupService.getBackup(backupName);
+        executorManager.thenMain(future, metadata -> {
+                    if (metadata.isEmpty()) {
+                        messageFacade.send(sender, "admin.config.restore.missing",
+                                Placeholder.unparsed("backup", backupName));
+                        return;
+                    }
+                    BackupService.BackupMetadata backup = metadata.get();
+                    Instant expiresAt = Instant.now().plusSeconds(60L);
+                    pendingConfigRestores.put(actorKey,
+                            new PendingConfigRestore(backup.backupFileName(), backup.baseFileName(), expiresAt));
+                    String commandLine = "/nexus " + String.join(" ", args);
+                    logAdminCommand(sender, AuditActionType.ADMIN_COMMAND, null,
+                            "command=" + commandLine + "; action=config-restore-request; backup=" + backup.backupFileName());
+                    long remaining = Math.max(5L, Duration.between(Instant.now(), expiresAt).getSeconds());
+                    messageFacade.send(sender, "admin.config.restore.pending",
+                            Placeholder.unparsed("backup", backup.backupFileName()),
+                            Placeholder.unparsed("file", backup.baseFileName()),
+                            Placeholder.unparsed("seconds", Long.toString(remaining)));
+                })
+                .exceptionally(throwable -> {
+                    Throwable cause = unwrap(throwable);
+                    logger.warn("Impossible de préparer la restauration de configuration", cause);
+                    messageFacade.send(sender, "admin.config.restore.error",
                             Placeholder.unparsed("reason", describeError(cause)));
                     return null;
                 });
@@ -883,6 +1023,33 @@ public final class NexusPlugin extends JavaPlugin {
         return " (en attente: " + pending + ")";
     }
 
+    private String normalizeBackupToken(String token) {
+        String normalized = token.trim().replace('\\', '/');
+        while (normalized.startsWith("./")) {
+            normalized = normalized.substring(2);
+        }
+        while (normalized.startsWith("/")) {
+            normalized = normalized.substring(1);
+        }
+        return normalized.isEmpty() ? null : normalized;
+    }
+
+    private String formatBackupTimestamp(Instant instant) {
+        ZoneId zone = bundle != null ? bundle.core().timezone() : ZoneId.systemDefault();
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss").withZone(zone);
+        return formatter.format(instant);
+    }
+
+    private String formatSize(long bytes) {
+        if (bytes < 1024L) {
+            return bytes + " B";
+        }
+        int exp = (int) (Math.log(bytes) / Math.log(1024));
+        char unit = "KMGTPE".charAt(Math.min(exp - 1, 5));
+        double value = bytes / Math.pow(1024, exp);
+        return String.format(Locale.ROOT, "%.1f %sB", value, unit);
+    }
+
     private void sendAdminPlayerUsage(CommandSender sender) {
         messageFacade.send(sender, "admin.player.usage");
     }
@@ -891,9 +1058,14 @@ public final class NexusPlugin extends JavaPlugin {
         messageFacade.send(sender, "admin.audit.usage");
     }
 
+    private void sendAdminConfigUsage(CommandSender sender) {
+        messageFacade.send(sender, "admin.config.usage");
+    }
+
     private void sendAdminUsage(CommandSender sender) {
         sendAdminPlayerUsage(sender);
         sendAdminAuditUsage(sender);
+        sendAdminConfigUsage(sender);
     }
 
     private Optional<String> optionalAuditName(String value) {
@@ -1100,6 +1272,9 @@ public final class NexusPlugin extends JavaPlugin {
     private record AuditActor(UUID uuid, String name) {
     }
 
+    private record PendingConfigRestore(String backupFileName, String baseFileName, Instant expiresAt) {
+    }
+
     public MessageFacade messages() {
         return messageFacade;
     }
@@ -1124,6 +1299,7 @@ public final class NexusPlugin extends JavaPlugin {
         serviceRegistry.registerSingleton(ConfigBundle.class, bundle);
         serviceRegistry.registerSingleton(CoreConfig.class, bundle.core());
         serviceRegistry.registerSingleton(EconomyConfig.class, bundle.economy());
+        serviceRegistry.registerSingleton(BackupService.class, backupService);
         serviceRegistry.registerSingleton(ExecutorManager.class, executorManager);
         serviceRegistry.registerSingleton(MessageFacade.class, messageFacade);
         serviceRegistry.registerSingleton(DbProvider.class, dbProvider);

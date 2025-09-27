@@ -17,9 +17,11 @@ public final class NexusCommand implements CommandExecutor, TabCompleter {
 
     private static final List<String> SUB_COMMANDS = List.of("help", "reload", "dump", "budget", "holo", "admin");
     private static final List<String> HOLO_SUB = List.of("create", "remove", "move", "list", "reload");
-    private static final List<String> ADMIN_SUB = List.of("player", "audit");
+    private static final List<String> ADMIN_SUB = List.of("player", "audit", "config");
     private static final List<String> ADMIN_PLAYER_ACTIONS = List.of("export", "import");
     private static final List<String> ADMIN_AUDIT_ACTIONS = List.of("log");
+    private static final List<String> ADMIN_CONFIG_ACTIONS = List.of("backups", "restore");
+    private static final List<String> ADMIN_CONFIG_BACKUPS = List.of("list");
 
     private final NexusPlugin plugin;
 
@@ -106,6 +108,15 @@ public final class NexusCommand implements CommandExecutor, TabCompleter {
                         .filter(action -> action.startsWith(prefix))
                         .toList();
             }
+            if (args.length == 3 && args[1].equalsIgnoreCase("config")) {
+                if (!sender.hasPermission("nexus.admin.config.manage_backups")) {
+                    return Collections.emptyList();
+                }
+                String prefix = args[2].toLowerCase(Locale.ROOT);
+                return ADMIN_CONFIG_ACTIONS.stream()
+                        .filter(action -> action.startsWith(prefix))
+                        .toList();
+            }
             if (args.length == 4 && args[1].equalsIgnoreCase("player")) {
                 String prefix = args[3].toLowerCase(Locale.ROOT);
                 return ADMIN_PLAYER_ACTIONS.stream()
@@ -122,6 +133,22 @@ public final class NexusCommand implements CommandExecutor, TabCompleter {
                     }
                 }
                 return suggestions;
+            }
+            if (args.length == 4 && args[1].equalsIgnoreCase("config") && args[2].equalsIgnoreCase("backups")) {
+                if (!sender.hasPermission("nexus.admin.config.manage_backups")) {
+                    return Collections.emptyList();
+                }
+                String prefix = args[3].toLowerCase(Locale.ROOT);
+                return ADMIN_CONFIG_BACKUPS.stream()
+                        .filter(action -> action.startsWith(prefix))
+                        .toList();
+            }
+            if (args.length == 4 && args[1].equalsIgnoreCase("config") && args[2].equalsIgnoreCase("restore")) {
+                if (!sender.hasPermission("nexus.admin.config.manage_backups")) {
+                    return Collections.emptyList();
+                }
+                String prefix = args[3].toLowerCase(Locale.ROOT);
+                return "confirm".startsWith(prefix) ? List.of("confirm") : List.of();
             }
             if (args.length == 5 && args[1].equalsIgnoreCase("audit") && args[2].equalsIgnoreCase("log")) {
                 String prefix = args[4].toLowerCase(Locale.ROOT);
@@ -189,6 +216,7 @@ public final class NexusCommand implements CommandExecutor, TabCompleter {
                 || sender.hasPermission("nexus.admin.reload")
                 || sender.hasPermission("nexus.admin.dump")
                 || sender.hasPermission("nexus.admin.budget")
-                || sender.hasPermission("nexus.admin.audit.view");
+                || sender.hasPermission("nexus.admin.audit.view")
+                || sender.hasPermission("nexus.admin.config.manage_backups");
     }
 }
