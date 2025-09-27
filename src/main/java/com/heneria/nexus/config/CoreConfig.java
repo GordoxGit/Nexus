@@ -174,8 +174,8 @@ public final class CoreConfig {
 
     public record DatabaseSettings(boolean enabled, String jdbcUrl, String username, String password,
                                    PoolSettings poolSettings, Duration writeBehindInterval,
-                                   CacheSettings cacheSettings, DataRetentionSettings retentionPolicy,
-                                   ResilienceSettings resilience) {
+                                   CacheSettings cacheSettings, MonitoringSettings monitoring,
+                                   DataRetentionSettings retentionPolicy, ResilienceSettings resilience) {
         public DatabaseSettings {
             Objects.requireNonNull(jdbcUrl, "jdbcUrl");
             Objects.requireNonNull(username, "username");
@@ -183,6 +183,7 @@ public final class CoreConfig {
             Objects.requireNonNull(poolSettings, "poolSettings");
             Objects.requireNonNull(writeBehindInterval, "writeBehindInterval");
             Objects.requireNonNull(cacheSettings, "cacheSettings");
+            Objects.requireNonNull(monitoring, "monitoring");
             Objects.requireNonNull(retentionPolicy, "retentionPolicy");
             Objects.requireNonNull(resilience, "resilience");
             if (writeBehindInterval.isZero() || writeBehindInterval.isNegative()) {
@@ -193,6 +194,14 @@ public final class CoreConfig {
         public record CacheSettings(ProfileCacheSettings profiles) {
             public CacheSettings {
                 Objects.requireNonNull(profiles, "profiles");
+            }
+        }
+
+        public record MonitoringSettings(boolean enableSqlTracing, long slowQueryThresholdMs) {
+            public MonitoringSettings {
+                if (slowQueryThresholdMs < 0L) {
+                    throw new IllegalArgumentException("slowQueryThresholdMs must be >= 0");
+                }
             }
         }
 

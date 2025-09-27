@@ -80,9 +80,10 @@ public final class ResilientDbExecutor {
         circuitBreakerRef.set(circuitBreaker);
     }
 
-    public <T> CompletableFuture<T> execute(DbProvider.QueryTask<T> task) {
+    public <T> CompletableFuture<T> execute(String queryIdentifier, DbProvider.QueryTask<T> task) {
+        Objects.requireNonNull(queryIdentifier, "queryIdentifier");
         Objects.requireNonNull(task, "task");
-        Supplier<CompletionStage<T>> supplier = () -> dbProvider.execute(task, ioExecutor);
+        Supplier<CompletionStage<T>> supplier = () -> dbProvider.execute(queryIdentifier, task, ioExecutor);
         Supplier<CompletionStage<T>> decorated = Decorators.ofCompletionStage(supplier)
                 .withCircuitBreaker(circuitBreakerRef.get())
                 .withRetry(retryRef.get())

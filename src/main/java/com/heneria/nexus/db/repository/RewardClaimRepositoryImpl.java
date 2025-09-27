@@ -27,7 +27,7 @@ public final class RewardClaimRepositoryImpl implements RewardClaimRepository {
     public CompletableFuture<Boolean> tryClaim(UUID playerUuid, String rewardKey) {
         Objects.requireNonNull(playerUuid, "playerUuid");
         Objects.requireNonNull(rewardKey, "rewardKey");
-        return dbExecutor.execute(connection -> {
+        return dbExecutor.execute("RewardClaimRepository::tryClaim", connection -> {
             try (PreparedStatement statement = connection.prepareStatement(INSERT_CLAIM_SQL)) {
                 statement.setString(1, playerUuid.toString());
                 statement.setString(2, rewardKey);

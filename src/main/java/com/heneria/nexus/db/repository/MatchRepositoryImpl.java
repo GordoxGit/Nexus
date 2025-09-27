@@ -39,13 +39,13 @@ public final class MatchRepositoryImpl implements MatchRepository {
     @Override
     public CompletableFuture<Void> save(MatchSnapshot snapshot) {
         Objects.requireNonNull(snapshot, "snapshot");
-        return dbExecutor.execute(connection -> persistSnapshot(connection, snapshot));
+        return dbExecutor.execute("MatchRepository::save", connection -> persistSnapshot(connection, snapshot));
     }
 
     @Override
     public CompletableFuture<Integer> purgeOldMatches(Instant olderThan) {
         Objects.requireNonNull(olderThan, "olderThan");
-        return dbExecutor.execute(connection -> purgeMatches(connection, olderThan));
+        return dbExecutor.execute("MatchRepository::purgeOldMatches", connection -> purgeMatches(connection, olderThan));
     }
 
     private Void persistSnapshot(Connection connection, MatchSnapshot snapshot) throws SQLException {

@@ -37,7 +37,7 @@ public final class EconomyRepositoryImpl implements EconomyRepository {
     @Override
     public CompletableFuture<Long> getBalance(UUID playerUuid) {
         Objects.requireNonNull(playerUuid, "playerUuid");
-        return dbExecutor.execute(connection -> {
+        return dbExecutor.execute("EconomyRepository::getBalance", connection -> {
             try (PreparedStatement statement = connection.prepareStatement(SELECT_BALANCE_SQL)) {
                 statement.setString(1, playerUuid.toString());
                 try (ResultSet resultSet = statement.executeQuery()) {
@@ -56,7 +56,7 @@ public final class EconomyRepositoryImpl implements EconomyRepository {
         if (balance < 0L) {
             throw new IllegalArgumentException("balance must be >= 0");
         }
-        return dbExecutor.execute(connection -> {
+        return dbExecutor.execute("EconomyRepository::setBalance", connection -> {
             try (PreparedStatement update = connection.prepareStatement(UPDATE_BALANCE_SQL)) {
                 update.setLong(1, balance);
                 update.setString(2, playerUuid.toString());
@@ -76,7 +76,7 @@ public final class EconomyRepositoryImpl implements EconomyRepository {
     @Override
     public CompletableFuture<Long> addToBalance(UUID playerUuid, long amount) {
         Objects.requireNonNull(playerUuid, "playerUuid");
-        return dbExecutor.execute(connection -> adjustBalance(connection, playerUuid, amount));
+        return dbExecutor.execute("EconomyRepository::addToBalance", connection -> adjustBalance(connection, playerUuid, amount));
     }
 
     @Override
@@ -86,7 +86,7 @@ public final class EconomyRepositoryImpl implements EconomyRepository {
         if (amount < 0L) {
             throw new IllegalArgumentException("amount must be >= 0");
         }
-        return dbExecutor.execute(connection -> transferInternal(connection, from, to, amount));
+        return dbExecutor.execute("EconomyRepository::transfer", connection -> transferInternal(connection, from, to, amount));
     }
 
     @Override
@@ -95,7 +95,7 @@ public final class EconomyRepositoryImpl implements EconomyRepository {
         if (balances.isEmpty()) {
             return CompletableFuture.completedFuture(null);
         }
-        return dbExecutor.execute(connection -> {
+        return dbExecutor.execute("EconomyRepository::saveAll", connection -> {
             try (PreparedStatement statement = connection.prepareStatement(UPSERT_BALANCE_SQL)) {
                 for (Map.Entry<UUID, Long> entry : balances.entrySet()) {
                     statement.setString(1, entry.getKey().toString());

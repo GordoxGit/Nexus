@@ -48,7 +48,7 @@ public final class ProfileRepositoryImpl implements ProfileRepository {
     @Override
     public CompletableFuture<Optional<PlayerProfile>> findByUuid(UUID playerUuid) {
         Objects.requireNonNull(playerUuid, "playerUuid");
-        return dbExecutor.execute(connection -> {
+        return dbExecutor.execute("ProfileRepository::findByUuid", connection -> {
             try (PreparedStatement statement = connection.prepareStatement(SELECT_PROFILE_SQL)) {
                 statement.setString(1, playerUuid.toString());
                 try (ResultSet resultSet = statement.executeQuery()) {
@@ -82,7 +82,7 @@ public final class ProfileRepositoryImpl implements ProfileRepository {
         if (profile.getVersion() == profile.getPersistedVersion()) {
             return CompletableFuture.completedFuture(null);
         }
-        return dbExecutor.execute(connection -> {
+        return dbExecutor.execute("ProfileRepository::createOrUpdate", connection -> {
             try {
                 if (profile.getPersistedVersion() == 0) {
                     try (PreparedStatement statement = connection.prepareStatement(INSERT_PROFILE_SQL)) {
@@ -114,7 +114,7 @@ public final class ProfileRepositoryImpl implements ProfileRepository {
         if (profiles.isEmpty()) {
             return CompletableFuture.completedFuture(null);
         }
-        return dbExecutor.execute(connection -> {
+        return dbExecutor.execute("ProfileRepository::saveAll", connection -> {
             try (PreparedStatement insertStatement = connection.prepareStatement(INSERT_PROFILE_SQL);
                  PreparedStatement updateStatement = connection.prepareStatement(UPDATE_PROFILE_SQL)) {
                 for (PlayerProfile profile : profiles) {

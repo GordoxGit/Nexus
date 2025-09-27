@@ -93,6 +93,8 @@ public final class ConfigValidator {
         long writeBehindSeconds = positiveLong(yaml, "database.write_behind_interval_seconds", 60L, issues, true);
         long profileCacheMaxSize = positiveLong(yaml, "database.cache.profiles.max_size", 1000L, issues, true);
         long profileCacheExpireMinutes = positiveLong(yaml, "database.cache.profiles.expire_after_access_minutes", 15L, issues, true);
+        boolean enableSqlTracing = yaml.getBoolean("database.monitoring.enable_sql_tracing", false);
+        long slowQueryThresholdMs = nonNegativeLong(yaml, "database.monitoring.slow_query_threshold_ms", 500L, issues, true);
         int matchHistoryDays = nonNegativeInt(yaml, "database.retention_policy.match_history_days", 90, issues);
         int retryMaxAttempts = positiveInt(yaml, "database.resilience.retry.max_attempts", DEFAULT_RETRY_MAX_ATTEMPTS, issues,
                 true);
@@ -265,6 +267,13 @@ public final class ConfigValidator {
             profileCacheSettings = new CoreConfig.DatabaseSettings.ProfileCacheSettings(1000L, java.time.Duration.ofMinutes(15L));
         }
         CoreConfig.DatabaseSettings.CacheSettings cacheSettings = new CoreConfig.DatabaseSettings.CacheSettings(profileCacheSettings);
+        CoreConfig.DatabaseSettings.MonitoringSettings monitoringSettings;
+        try {
+            monitoringSettings = new CoreConfig.DatabaseSettings.MonitoringSettings(enableSqlTracing, slowQueryThresholdMs);
+        } catch (IllegalArgumentException exception) {
+            issues.error("database.monitoring.slow_query_threshold_ms", exception.getMessage());
+            monitoringSettings = new CoreConfig.DatabaseSettings.MonitoringSettings(enableSqlTracing, Math.max(0L, slowQueryThresholdMs));
+        }
         CoreConfig.DatabaseSettings.DataRetentionSettings retentionSettings;
         try {
             retentionSettings = new CoreConfig.DatabaseSettings.DataRetentionSettings(Math.max(0, matchHistoryDays));
@@ -309,8 +318,8 @@ public final class ConfigValidator {
                 new CoreConfig.DatabaseSettings.ResilienceSettings(retrySettings, circuitBreakerSettings);
 
         databaseSettings = new CoreConfig.DatabaseSettings(databaseEnabled, jdbc, user, password, poolSettings,
-                java.time.Duration.ofSeconds(Math.max(1L, writeBehindSeconds)), cacheSettings, retentionSettings,
-                resilienceSettings);
+                java.time.Duration.ofSeconds(Math.max(1L, writeBehindSeconds)), cacheSettings, monitoringSettings,
+                retentionSettings, resilienceSettings);
 
         CoreConfig.TimeoutSettings.WatchdogSettings watchdogSettings;
         try {
@@ -816,6 +825,18 @@ public final class ConfigValidator {
         if (value <= 0L) {
             issues.error(path, "Doit être > 0");
             return Math.max(1L, value);
+        }
+        return value;
+    }
+
+    private long nonNegativeLong(YamlConfiguration yaml, String path, long def, IssueCollector issues, boolean warnOnMissing) {
+        long value = yaml.getLong(path, def);
+        if (!yaml.isSet(path) && warnOnMissing) {
+            issues.warn(path, "Valeur manquante, utilisation de " + def);
+        }
+        if (value < 0L) {
+            issues.error(path, "Doit être >= 0");
+            return Math.max(0L, value);
         }
         return value;
     }

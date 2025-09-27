@@ -158,7 +158,8 @@ public final class DailyStatsAggregatorService implements LifecycleAware {
     }
 
     private CompletableFuture<Void> performAggregation(LocalDate targetDate) {
-        return dbProvider.execute(connection -> computeSnapshot(connection, targetDate), ioExecutor)
+        return dbProvider.execute("DailyStatsAggregatorService::computeSnapshot",
+                connection -> computeSnapshot(connection, targetDate), ioExecutor)
                 .thenCompose(repository::saveOrUpdate)
                 .whenComplete((ignored, throwable) -> {
                     if (throwable != null) {

@@ -37,7 +37,7 @@ public final class RateLimitRepositoryImpl implements RateLimitRepository {
         Objects.requireNonNull(playerUuid, "playerUuid");
         Objects.requireNonNull(actionKey, "actionKey");
         Objects.requireNonNull(cooldown, "cooldown");
-        return dbExecutor.execute(connection -> executeCheck(connection, playerUuid, actionKey, cooldown));
+        return dbExecutor.execute("RateLimitRepository::checkAndRecord", connection -> executeCheck(connection, playerUuid, actionKey, cooldown));
     }
 
     private RateLimitResult executeCheck(Connection connection,
@@ -94,7 +94,7 @@ public final class RateLimitRepositoryImpl implements RateLimitRepository {
     @Override
     public CompletableFuture<Integer> purgeOlderThan(Instant cutoff) {
         Objects.requireNonNull(cutoff, "cutoff");
-        return dbExecutor.execute(connection -> {
+        return dbExecutor.execute("RateLimitRepository::purgeOlderThan", connection -> {
             try (PreparedStatement statement = connection.prepareStatement(DELETE_OLDER_THAN_SQL)) {
                 statement.setTimestamp(1, Timestamp.from(cutoff));
                 return statement.executeUpdate();
