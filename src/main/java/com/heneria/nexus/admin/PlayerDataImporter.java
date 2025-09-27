@@ -6,6 +6,7 @@ import com.heneria.nexus.db.repository.EconomyRepository;
 import com.heneria.nexus.db.repository.ProfileRepository;
 import com.heneria.nexus.util.NexusLogger;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.Connection;
@@ -81,7 +82,14 @@ public final class PlayerDataImporter {
         Objects.requireNonNull(playerId, "playerId");
         Objects.requireNonNull(fileName, "fileName");
         purgeExpired();
-        return executorManager.supplyIo(() -> loadSnapshot(fileName))
+        return executorManager.supplyIo(() -> {
+                    try {
+                        return loadSnapshot(fileName);
+                    } catch (IOException exception) {
+                        logger.warn("Échec du chargement du fichier d'import '" + fileName + "'", exception);
+                        throw new UncheckedIOException(exception);
+                    }
+                })
                 .thenCompose(loaded -> profileRepository.findByUuid(playerId)
                         .thenCombine(economyRepository.getBalance(playerId), (maybeProfile, balance) -> {
                             validateSnapshot(loaded.snapshot(), playerId);
