@@ -23,6 +23,8 @@ import com.heneria.nexus.db.repository.PlayerCosmeticRepository;
 import com.heneria.nexus.db.repository.PlayerCosmeticRepositoryImpl;
 import com.heneria.nexus.db.repository.ProfileRepository;
 import com.heneria.nexus.db.repository.ProfileRepositoryImpl;
+import com.heneria.nexus.db.repository.RewardClaimRepository;
+import com.heneria.nexus.db.repository.RewardClaimRepositoryImpl;
 import com.heneria.nexus.hologram.HoloService;
 import com.heneria.nexus.hologram.HoloServiceImpl;
 import com.heneria.nexus.hologram.Hologram;
@@ -36,6 +38,7 @@ import com.heneria.nexus.api.ArenaService;
 import com.heneria.nexus.api.EconomyService;
 import com.heneria.nexus.api.MapService;
 import com.heneria.nexus.api.ProfileService;
+import com.heneria.nexus.api.RewardService;
 import com.heneria.nexus.api.QueueService;
 import com.heneria.nexus.api.ShopService;
 import com.heneria.nexus.api.service.TimerService;
@@ -46,6 +49,7 @@ import com.heneria.nexus.service.core.PersistenceService;
 import com.heneria.nexus.service.core.PersistenceServiceImpl;
 import com.heneria.nexus.service.core.ProfileServiceImpl;
 import com.heneria.nexus.service.core.QueueServiceImpl;
+import com.heneria.nexus.service.core.RewardServiceImpl;
 import com.heneria.nexus.service.core.ShopServiceImpl;
 import com.heneria.nexus.service.core.TimerServiceImpl;
 import com.heneria.nexus.service.core.VaultEconomyService;
@@ -652,6 +656,7 @@ public final class NexusPlugin extends JavaPlugin {
         serviceRegistry.registerService(PlayerCosmeticRepository.class, PlayerCosmeticRepositoryImpl.class);
         serviceRegistry.registerService(EconomyRepository.class, EconomyRepositoryImpl.class);
         serviceRegistry.registerService(MatchRepository.class, MatchRepositoryImpl.class);
+        serviceRegistry.registerService(RewardClaimRepository.class, RewardClaimRepositoryImpl.class);
         serviceRegistry.registerService(PersistenceService.class, PersistenceServiceImpl.class);
         serviceRegistry.registerService(ProfileService.class, ProfileServiceImpl.class);
         serviceRegistry.registerService(QueueService.class, QueueServiceImpl.class);
@@ -663,6 +668,7 @@ public final class NexusPlugin extends JavaPlugin {
         serviceRegistry.registerService(AnalyticsService.class, AnalyticsService.class);
         serviceRegistry.registerService(ArenaService.class, ArenaServiceImpl.class);
         serviceRegistry.registerService(HoloService.class, HoloServiceImpl.class);
+        serviceRegistry.registerService(RewardService.class, RewardServiceImpl.class);
     }
 
     private void maybeExposeServices() {
