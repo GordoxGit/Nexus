@@ -34,4 +34,11 @@ public interface ShopService extends LifecycleAware {
      * @param shopSettings shop settings loaded from configuration
      */
     void applyCatalog(EconomyConfig.ShopSettings shopSettings);
+
+    /**
+     * Applies updated rate limit settings after a configuration reload.
+     *
+     * @param rateLimitSettings rate limiter configuration from the core config
+     */
+    void applyRateLimitSettings(com.heneria.nexus.config.CoreConfig.RateLimitSettings rateLimitSettings);
 }

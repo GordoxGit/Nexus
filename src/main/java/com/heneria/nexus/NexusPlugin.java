@@ -41,6 +41,8 @@ import com.heneria.nexus.db.repository.PlayerCosmeticRepository;
 import com.heneria.nexus.db.repository.PlayerCosmeticRepositoryImpl;
 import com.heneria.nexus.db.repository.ProfileRepository;
 import com.heneria.nexus.db.repository.ProfileRepositoryImpl;
+import com.heneria.nexus.db.repository.RateLimitRepository;
+import com.heneria.nexus.db.repository.RateLimitRepositoryImpl;
 import com.heneria.nexus.db.repository.RewardClaimRepository;
 import com.heneria.nexus.db.repository.RewardClaimRepositoryImpl;
 import com.heneria.nexus.hologram.HoloService;
@@ -71,6 +73,8 @@ import com.heneria.nexus.service.core.RewardServiceImpl;
 import com.heneria.nexus.service.core.ShopServiceImpl;
 import com.heneria.nexus.service.core.TimerServiceImpl;
 import com.heneria.nexus.service.core.VaultEconomyService;
+import com.heneria.nexus.service.ratelimit.RateLimiterService;
+import com.heneria.nexus.service.ratelimit.RateLimiterServiceImpl;
 import com.heneria.nexus.service.maintenance.DataPurgeService;
 import com.heneria.nexus.service.permissions.NexusContextManager;
 import com.heneria.nexus.util.DumpUtil;
@@ -444,6 +448,7 @@ public final class NexusPlugin extends JavaPlugin {
         serviceRegistry.updateSingleton(CoreConfig.class, newBundle.core());
         serviceRegistry.updateSingleton(EconomyConfig.class, newBundle.economy());
         configureDatabase(newBundle.core().databaseSettings());
+        serviceRegistry.get(RateLimiterService.class).applyConfiguration(newBundle.core());
         serviceRegistry.get(DataPurgeService.class).applyConfiguration(newBundle.core());
         serviceRegistry.get(QueueService.class).applySettings(newBundle.core().queueSettings());
         serviceRegistry.get(ArenaService.class).applyArenaSettings(newBundle.core().arenaSettings());
@@ -451,6 +456,7 @@ public final class NexusPlugin extends JavaPlugin {
         serviceRegistry.get(BudgetService.class).applySettings(newBundle.core().arenaSettings());
         serviceRegistry.get(ProfileService.class).applyDegradedModeSettings(newBundle.core().degradedModeSettings());
         serviceRegistry.get(EconomyService.class).applyDegradedModeSettings(newBundle.core().degradedModeSettings());
+        serviceRegistry.get(ShopService.class).applyRateLimitSettings(newBundle.core().rateLimitSettings());
         serviceRegistry.get(ShopService.class).applyCatalog(newBundle.economy().shop());
         serviceRegistry.get(HoloService.class).applySettings(newBundle.core().hologramSettings());
         serviceRegistry.get(HoloService.class).loadFromConfig();
@@ -1119,6 +1125,7 @@ public final class NexusPlugin extends JavaPlugin {
         serviceRegistry.registerSingleton(CoreConfig.class, bundle.core());
         serviceRegistry.registerSingleton(EconomyConfig.class, bundle.economy());
         serviceRegistry.registerSingleton(ExecutorManager.class, executorManager);
+        serviceRegistry.registerSingleton(MessageFacade.class, messageFacade);
         serviceRegistry.registerSingleton(DbProvider.class, dbProvider);
         serviceRegistry.registerSingleton(DatabaseMigrator.class, databaseMigrator);
         serviceRegistry.registerSingleton(Boolean.class, placeholderApiAvailable);
@@ -1177,6 +1184,7 @@ public final class NexusPlugin extends JavaPlugin {
         serviceRegistry.registerService(PlayerCosmeticRepository.class, PlayerCosmeticRepositoryImpl.class);
         serviceRegistry.registerService(EconomyRepository.class, EconomyRepositoryImpl.class);
         serviceRegistry.registerService(MatchRepository.class, MatchRepositoryImpl.class);
+        serviceRegistry.registerService(RateLimitRepository.class, RateLimitRepositoryImpl.class);
         serviceRegistry.registerService(DataPurgeService.class, DataPurgeService.class);
         serviceRegistry.registerService(RewardClaimRepository.class, RewardClaimRepositoryImpl.class);
         serviceRegistry.registerService(AuditLogRepository.class, AuditLogRepositoryImpl.class);
@@ -1185,6 +1193,7 @@ public final class NexusPlugin extends JavaPlugin {
         serviceRegistry.registerService(ProfileService.class, ProfileServiceImpl.class);
         serviceRegistry.registerService(QueueService.class, QueueServiceImpl.class);
         serviceRegistry.registerService(TimerService.class, TimerServiceImpl.class);
+        serviceRegistry.registerService(RateLimiterService.class, RateLimiterServiceImpl.class);
         serviceRegistry.registerService(ShopService.class, ShopServiceImpl.class);
         serviceRegistry.registerService(BudgetService.class, BudgetServiceImpl.class);
         serviceRegistry.registerService(WatchdogService.class, WatchdogServiceImpl.class);

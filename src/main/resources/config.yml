@@ -3,7 +3,7 @@
 #  PaperMC 1.21.x — Java 21
 # =============================================
 
-config-version: 2
+config-version: 3
 
 server:
   mode: "nexus"
@@ -48,6 +48,17 @@ database:
   retention_policy:
     # Durée de conservation des historiques de matchs en jours. Mettre à 0 pour désactiver la purge.
     match_history_days: 90
+
+rate-limits:
+  enabled: true
+  cleanup:
+    interval_minutes: 60
+    retention_minutes: 1440
+  actions:
+    'purchase:class': 3
+    'purchase:cosmetic': 3
+    'shop:refresh': 60
+    'quest:reroll_daily': 300
 
 services:
   expose-bukkit-services: false

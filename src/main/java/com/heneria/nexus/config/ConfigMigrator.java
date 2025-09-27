@@ -36,6 +36,7 @@ public final class ConfigMigrator {
         Map<String, List<MigrationStep>> map = new HashMap<>();
         List<MigrationStep> configMigrations = new ArrayList<>();
         configMigrations.add(new MigrationStep(2, ConfigMigrator::migrateConfigToV2));
+        configMigrations.add(new MigrationStep(3, ConfigMigrator::migrateConfigToV3));
         map.put("config.yml", Collections.unmodifiableList(configMigrations));
         map.put("economy.yml", List.of());
         map.put("maps.yml", List.of());
@@ -226,6 +227,19 @@ public final class ConfigMigrator {
             configuration.set("threads.scheduler.main_check_interval_ticks", scheduler);
         }
         configuration.set("executors", null);
+    }
+
+    private static void migrateConfigToV3(YamlConfiguration configuration) {
+        if (configuration.contains("rate-limits")) {
+            return;
+        }
+        configuration.set("rate-limits.enabled", true);
+        configuration.set("rate-limits.cleanup.interval_minutes", 60);
+        configuration.set("rate-limits.cleanup.retention_minutes", 1440);
+        configuration.set("rate-limits.actions.purchase:class", 3);
+        configuration.set("rate-limits.actions.purchase:cosmetic", 3);
+        configuration.set("rate-limits.actions.shop:refresh", 60);
+        configuration.set("rate-limits.actions.quest:reroll_daily", 300);
     }
 
     private record MigrationStep(long targetVersion, Consumer<YamlConfiguration> action) {
