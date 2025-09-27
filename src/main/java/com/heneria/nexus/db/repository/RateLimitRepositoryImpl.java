@@ -1,7 +1,6 @@
 package com.heneria.nexus.db.repository;
 
-import com.heneria.nexus.concurrent.ExecutorManager;
-import com.heneria.nexus.db.DbProvider;
+import com.heneria.nexus.db.ResilientDbExecutor;
 import com.heneria.nexus.ratelimit.RateLimitResult;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -13,7 +12,6 @@ import java.time.Instant;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.Executor;
 
 /**
  * MariaDB implementation of {@link RateLimitRepository} using optimistic locking.
@@ -28,12 +26,10 @@ public final class RateLimitRepositoryImpl implements RateLimitRepository {
     private static final String DELETE_OLDER_THAN_SQL =
             "DELETE FROM nexus_rate_limits WHERE last_executed_at < ?";
 
-    private final DbProvider dbProvider;
-    private final Executor ioExecutor;
+    private final ResilientDbExecutor dbExecutor;
 
-    public RateLimitRepositoryImpl(DbProvider dbProvider, ExecutorManager executorManager) {
-        this.dbProvider = Objects.requireNonNull(dbProvider, "dbProvider");
-        this.ioExecutor = Objects.requireNonNull(executorManager, "executorManager").io();
+    public RateLimitRepositoryImpl(ResilientDbExecutor dbExecutor) {
+        this.dbExecutor = Objects.requireNonNull(dbExecutor, "dbExecutor");
     }
 
     @Override
@@ -41,7 +37,7 @@ public final class RateLimitRepositoryImpl implements RateLimitRepository {
         Objects.requireNonNull(playerUuid, "playerUuid");
         Objects.requireNonNull(actionKey, "actionKey");
         Objects.requireNonNull(cooldown, "cooldown");
-        return dbProvider.execute(connection -> executeCheck(connection, playerUuid, actionKey, cooldown), ioExecutor);
+        return dbExecutor.execute(connection -> executeCheck(connection, playerUuid, actionKey, cooldown));
     }
 
     private RateLimitResult executeCheck(Connection connection,
@@ -98,11 +94,11 @@ public final class RateLimitRepositoryImpl implements RateLimitRepository {
     @Override
     public CompletableFuture<Integer> purgeOlderThan(Instant cutoff) {
         Objects.requireNonNull(cutoff, "cutoff");
-        return dbProvider.execute(connection -> {
+        return dbExecutor.execute(connection -> {
             try (PreparedStatement statement = connection.prepareStatement(DELETE_OLDER_THAN_SQL)) {
                 statement.setTimestamp(1, Timestamp.from(cutoff));
                 return statement.executeUpdate();
             }
-        }, ioExecutor);
+        });
     }
 }

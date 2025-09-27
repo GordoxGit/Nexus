@@ -1,13 +1,11 @@
 package com.heneria.nexus.db.repository;
 
-import com.heneria.nexus.concurrent.ExecutorManager;
-import com.heneria.nexus.db.DbProvider;
+import com.heneria.nexus.db.ResilientDbExecutor;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.Executor;
 
 /**
  * Default MariaDB-backed implementation of {@link PlayerCosmeticRepository}.
@@ -21,19 +19,17 @@ public final class PlayerCosmeticRepositoryImpl implements PlayerCosmeticReposit
                     "VALUES (?, ?, ?) " +
                     "ON DUPLICATE KEY UPDATE cosmetic_type = VALUES(cosmetic_type)";
 
-    private final DbProvider dbProvider;
-    private final Executor ioExecutor;
+    private final ResilientDbExecutor dbExecutor;
 
-    public PlayerCosmeticRepositoryImpl(DbProvider dbProvider, ExecutorManager executorManager) {
-        this.dbProvider = Objects.requireNonNull(dbProvider, "dbProvider");
-        this.ioExecutor = Objects.requireNonNull(executorManager, "executorManager").io();
+    public PlayerCosmeticRepositoryImpl(ResilientDbExecutor dbExecutor) {
+        this.dbExecutor = Objects.requireNonNull(dbExecutor, "dbExecutor");
     }
 
     @Override
     public CompletableFuture<Boolean> isUnlocked(UUID playerUuid, String cosmeticId) {
         Objects.requireNonNull(playerUuid, "playerUuid");
         Objects.requireNonNull(cosmeticId, "cosmeticId");
-        return dbProvider.execute(connection -> {
+        return dbExecutor.execute(connection -> {
             try (PreparedStatement statement = connection.prepareStatement(SELECT_UNLOCK_SQL)) {
                 statement.setString(1, playerUuid.toString());
                 statement.setString(2, cosmeticId);
@@ -41,7 +37,7 @@ public final class PlayerCosmeticRepositoryImpl implements PlayerCosmeticReposit
                     return resultSet.next();
                 }
             }
-        }, ioExecutor);
+        });
     }
 
     @Override
@@ -49,7 +45,7 @@ public final class PlayerCosmeticRepositoryImpl implements PlayerCosmeticReposit
         Objects.requireNonNull(playerUuid, "playerUuid");
         Objects.requireNonNull(cosmeticId, "cosmeticId");
         Objects.requireNonNull(cosmeticType, "cosmeticType");
-        return dbProvider.execute(connection -> {
+        return dbExecutor.execute(connection -> {
             try (PreparedStatement statement = connection.prepareStatement(UPSERT_UNLOCK_SQL)) {
                 statement.setString(1, playerUuid.toString());
                 statement.setString(2, cosmeticId);
@@ -57,6 +53,6 @@ public final class PlayerCosmeticRepositoryImpl implements PlayerCosmeticReposit
                 statement.executeUpdate();
             }
             return null;
-        }, ioExecutor);
+        });
     }
 }

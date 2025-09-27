@@ -174,7 +174,8 @@ public final class CoreConfig {
 
     public record DatabaseSettings(boolean enabled, String jdbcUrl, String username, String password,
                                    PoolSettings poolSettings, Duration writeBehindInterval,
-                                   CacheSettings cacheSettings, DataRetentionSettings retentionPolicy) {
+                                   CacheSettings cacheSettings, DataRetentionSettings retentionPolicy,
+                                   ResilienceSettings resilience) {
         public DatabaseSettings {
             Objects.requireNonNull(jdbcUrl, "jdbcUrl");
             Objects.requireNonNull(username, "username");
@@ -183,6 +184,7 @@ public final class CoreConfig {
             Objects.requireNonNull(writeBehindInterval, "writeBehindInterval");
             Objects.requireNonNull(cacheSettings, "cacheSettings");
             Objects.requireNonNull(retentionPolicy, "retentionPolicy");
+            Objects.requireNonNull(resilience, "resilience");
             if (writeBehindInterval.isZero() || writeBehindInterval.isNegative()) {
                 throw new IllegalArgumentException("writeBehindInterval must be > 0");
             }
@@ -210,6 +212,61 @@ public final class CoreConfig {
             public DataRetentionSettings {
                 if (matchHistoryDays < 0) {
                     throw new IllegalArgumentException("matchHistoryDays must be >= 0");
+                }
+            }
+        }
+
+        public record ResilienceSettings(RetrySettings retry, CircuitBreakerSettings circuitBreaker) {
+            public ResilienceSettings {
+                Objects.requireNonNull(retry, "retry");
+                Objects.requireNonNull(circuitBreaker, "circuitBreaker");
+            }
+
+            public record RetrySettings(int maxAttempts, Duration initialInterval, Duration maxInterval, double multiplier) {
+                public RetrySettings {
+                    Objects.requireNonNull(initialInterval, "initialInterval");
+                    Objects.requireNonNull(maxInterval, "maxInterval");
+                    if (maxAttempts <= 0) {
+                        throw new IllegalArgumentException("maxAttempts must be > 0");
+                    }
+                    if (initialInterval.isZero() || initialInterval.isNegative()) {
+                        throw new IllegalArgumentException("initialInterval must be > 0");
+                    }
+                    if (maxInterval.isZero() || maxInterval.isNegative()) {
+                        throw new IllegalArgumentException("maxInterval must be > 0");
+                    }
+                    if (maxInterval.compareTo(initialInterval) < 0) {
+                        throw new IllegalArgumentException("maxInterval must be >= initialInterval");
+                    }
+                    if (multiplier < 1D) {
+                        throw new IllegalArgumentException("multiplier must be >= 1");
+                    }
+                }
+            }
+
+            public record CircuitBreakerSettings(double failureRateThreshold,
+                                                 int minimumNumberOfCalls,
+                                                 Duration slidingWindowDuration,
+                                                 Duration waitDurationInOpenState,
+                                                 int permittedCallsInHalfOpenState) {
+                public CircuitBreakerSettings {
+                    Objects.requireNonNull(slidingWindowDuration, "slidingWindowDuration");
+                    Objects.requireNonNull(waitDurationInOpenState, "waitDurationInOpenState");
+                    if (failureRateThreshold <= 0D || failureRateThreshold > 100D) {
+                        throw new IllegalArgumentException("failureRateThreshold must be in (0, 100]");
+                    }
+                    if (minimumNumberOfCalls <= 0) {
+                        throw new IllegalArgumentException("minimumNumberOfCalls must be > 0");
+                    }
+                    if (slidingWindowDuration.isZero() || slidingWindowDuration.isNegative()) {
+                        throw new IllegalArgumentException("slidingWindowDuration must be > 0");
+                    }
+                    if (waitDurationInOpenState.isZero() || waitDurationInOpenState.isNegative()) {
+                        throw new IllegalArgumentException("waitDurationInOpenState must be > 0");
+                    }
+                    if (permittedCallsInHalfOpenState <= 0) {
+                        throw new IllegalArgumentException("permittedCallsInHalfOpenState must be > 0");
+                    }
                 }
             }
         }

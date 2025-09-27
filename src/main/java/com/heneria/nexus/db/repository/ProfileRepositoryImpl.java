@@ -1,8 +1,7 @@
 package com.heneria.nexus.db.repository;
 
 import com.heneria.nexus.api.PlayerProfile;
-import com.heneria.nexus.concurrent.ExecutorManager;
-import com.heneria.nexus.db.DbProvider;
+import com.heneria.nexus.db.ResilientDbExecutor;
 import com.heneria.nexus.db.OptimisticLockException;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -17,7 +16,6 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.Executor;
 
 /**
  * Default MariaDB-backed implementation of {@link ProfileRepository}.
@@ -41,18 +39,16 @@ public final class ProfileRepositoryImpl implements ProfileRepository {
     private static final String STAT_TOTAL_LOSSES = "total_losses";
     private static final String STAT_MATCHES_PLAYED = "matches_played";
 
-    private final DbProvider dbProvider;
-    private final Executor ioExecutor;
+    private final ResilientDbExecutor dbExecutor;
 
-    public ProfileRepositoryImpl(DbProvider dbProvider, ExecutorManager executorManager) {
-        this.dbProvider = Objects.requireNonNull(dbProvider, "dbProvider");
-        this.ioExecutor = Objects.requireNonNull(executorManager, "executorManager").io();
+    public ProfileRepositoryImpl(ResilientDbExecutor dbExecutor) {
+        this.dbExecutor = Objects.requireNonNull(dbExecutor, "dbExecutor");
     }
 
     @Override
     public CompletableFuture<Optional<PlayerProfile>> findByUuid(UUID playerUuid) {
         Objects.requireNonNull(playerUuid, "playerUuid");
-        return dbProvider.execute(connection -> {
+        return dbExecutor.execute(connection -> {
             try (PreparedStatement statement = connection.prepareStatement(SELECT_PROFILE_SQL)) {
                 statement.setString(1, playerUuid.toString());
                 try (ResultSet resultSet = statement.executeQuery()) {
@@ -77,7 +73,7 @@ public final class ProfileRepositoryImpl implements ProfileRepository {
                     return Optional.of(profile);
                 }
             }
-        }, ioExecutor);
+        });
     }
 
     @Override
@@ -86,7 +82,7 @@ public final class ProfileRepositoryImpl implements ProfileRepository {
         if (profile.getVersion() == profile.getPersistedVersion()) {
             return CompletableFuture.completedFuture(null);
         }
-        return dbProvider.execute(connection -> {
+        return dbExecutor.execute(connection -> {
             try {
                 if (profile.getPersistedVersion() == 0) {
                     try (PreparedStatement statement = connection.prepareStatement(INSERT_PROFILE_SQL)) {
@@ -109,7 +105,7 @@ public final class ProfileRepositoryImpl implements ProfileRepository {
             }
             profile.markPersisted();
             return null;
-        }, ioExecutor);
+        });
     }
 
     @Override
@@ -118,7 +114,7 @@ public final class ProfileRepositoryImpl implements ProfileRepository {
         if (profiles.isEmpty()) {
             return CompletableFuture.completedFuture(null);
         }
-        return dbProvider.execute(connection -> {
+        return dbExecutor.execute(connection -> {
             try (PreparedStatement insertStatement = connection.prepareStatement(INSERT_PROFILE_SQL);
                  PreparedStatement updateStatement = connection.prepareStatement(UPDATE_PROFILE_SQL)) {
                 for (PlayerProfile profile : profiles) {
@@ -145,7 +141,7 @@ public final class ProfileRepositoryImpl implements ProfileRepository {
                 }
             }
             return null;
-        }, ioExecutor);
+        });
     }
 
     private void populateInsertStatement(PreparedStatement statement, PlayerProfile profile) throws SQLException {
