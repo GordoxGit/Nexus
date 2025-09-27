@@ -1,6 +1,7 @@
 package com.heneria.nexus.db.repository;
 
 import com.heneria.nexus.api.EconomyTransferResult;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
@@ -44,4 +45,12 @@ public interface EconomyRepository {
      * @return future yielding resulting balances for both accounts
      */
     CompletableFuture<EconomyTransferResult> transfer(UUID from, UUID to, long amount);
+
+    /**
+     * Persists the provided balances in a single batch.
+     *
+     * @param balances map of account identifiers to balances
+     * @return future completed once the batch has been executed
+     */
+    CompletableFuture<Void> saveAll(Map<UUID, Long> balances);
 }

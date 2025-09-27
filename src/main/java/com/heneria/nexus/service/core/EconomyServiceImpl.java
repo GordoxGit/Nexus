@@ -31,6 +31,7 @@ public final class EconomyServiceImpl implements EconomyService {
     private final DbProvider dbProvider;
     private final ExecutorManager executorManager;
     private final EconomyRepository economyRepository;
+    private final PersistenceService persistenceService;
     private final ConcurrentHashMap<UUID, BalanceEntry> balances = new ConcurrentHashMap<>();
     private final AtomicBoolean degraded = new AtomicBoolean();
     private final AtomicBoolean forcedFallback = new AtomicBoolean();
@@ -40,11 +41,13 @@ public final class EconomyServiceImpl implements EconomyService {
                               DbProvider dbProvider,
                               ExecutorManager executorManager,
                               CoreConfig config,
-                              EconomyRepository economyRepository) {
+                              EconomyRepository economyRepository,
+                              PersistenceService persistenceService) {
         this.logger = Objects.requireNonNull(logger, "logger");
         this.dbProvider = Objects.requireNonNull(dbProvider, "dbProvider");
         this.executorManager = Objects.requireNonNull(executorManager, "executorManager");
         this.economyRepository = Objects.requireNonNull(economyRepository, "economyRepository");
+        this.persistenceService = Objects.requireNonNull(persistenceService, "persistenceService");
         this.degradedSettings.set(config.degradedModeSettings());
     }
 
@@ -58,6 +61,10 @@ public final class EconomyServiceImpl implements EconomyService {
         Objects.requireNonNull(accountId, "accountId");
         boolean providerDegraded = dbProvider.isDegraded();
         refreshDegradedState(providerDegraded);
+        BalanceEntry cached = balances.get(accountId);
+        if (cached != null) {
+            return CompletableFuture.completedFuture(cached.balance());
+        }
         if (providerDegraded) {
             return executorManager.supplyIo(() -> getBalanceFromFallback(accountId));
         }
@@ -83,20 +90,33 @@ public final class EconomyServiceImpl implements EconomyService {
         boolean providerDegraded = dbProvider.isDegraded();
         refreshDegradedState(providerDegraded);
         if (providerDegraded) {
-            return executorManager.supplyIo(() -> applyDeltaInFallback(accountId, amount));
+            return executorManager.supplyIo(() -> applyDeltaInFallback(accountId, amount))
+                    .thenApply(balance -> {
+                        persistenceService.markEconomyDirty(accountId, () -> persistenceSnapshot(accountId));
+                        logger.debug(() -> "Crédit " + amount + " pour " + accountId + " (" + reason + ")");
+                        return balance;
+                    })
+                    .exceptionallyCompose(this::propagateEconomyFailure);
         }
         if (forcedFallback.get()) {
             triggerHealthProbe();
-            return executorManager.supplyIo(() -> applyDeltaInFallback(accountId, amount));
+            return executorManager.supplyIo(() -> applyDeltaInFallback(accountId, amount))
+                    .thenApply(balance -> {
+                        persistenceService.markEconomyDirty(accountId, () -> persistenceSnapshot(accountId));
+                        logger.debug(() -> "Crédit " + amount + " pour " + accountId + " (" + reason + ")");
+                        return balance;
+                    })
+                    .exceptionallyCompose(this::propagateEconomyFailure);
         }
-        return economyRepository.addToBalance(accountId, amount)
+        return loadBalanceIfNeeded(accountId)
+                .thenCompose(ignored -> executorManager.supplyIo(() -> applyDeltaInFallback(accountId, amount)))
                 .thenApply(balance -> {
                     clearForcedFallback();
-                    updateFallbackBalance(accountId, balance);
+                    persistenceService.markEconomyDirty(accountId, () -> persistenceSnapshot(accountId));
                     logger.debug(() -> "Crédit " + amount + " pour " + accountId + " (" + reason + ")");
                     return balance;
                 })
-                .exceptionallyCompose(throwable -> fallbackCredit(accountId, amount, throwable));
+                .exceptionallyCompose(this::propagateEconomyFailure);
     }
 
     @Override
@@ -109,21 +129,32 @@ public final class EconomyServiceImpl implements EconomyService {
         refreshDegradedState(providerDegraded);
         if (providerDegraded) {
             return executorManager.supplyIo(() -> applyDeltaInFallback(accountId, -amount))
+                    .thenApply(balance -> {
+                        persistenceService.markEconomyDirty(accountId, () -> persistenceSnapshot(accountId));
+                        logger.debug(() -> "Débit " + amount + " pour " + accountId + " (" + reason + ")");
+                        return balance;
+                    })
                     .exceptionallyCompose(this::propagateEconomyFailure);
         }
         if (forcedFallback.get()) {
             triggerHealthProbe();
             return executorManager.supplyIo(() -> applyDeltaInFallback(accountId, -amount))
+                    .thenApply(balance -> {
+                        persistenceService.markEconomyDirty(accountId, () -> persistenceSnapshot(accountId));
+                        logger.debug(() -> "Débit " + amount + " pour " + accountId + " (" + reason + ")");
+                        return balance;
+                    })
                     .exceptionallyCompose(this::propagateEconomyFailure);
         }
-        return economyRepository.addToBalance(accountId, -amount)
+        return loadBalanceIfNeeded(accountId)
+                .thenCompose(ignored -> executorManager.supplyIo(() -> applyDeltaInFallback(accountId, -amount)))
                 .thenApply(balance -> {
                     clearForcedFallback();
-                    updateFallbackBalance(accountId, balance);
+                    persistenceService.markEconomyDirty(accountId, () -> persistenceSnapshot(accountId));
                     logger.debug(() -> "Débit " + amount + " pour " + accountId + " (" + reason + ")");
                     return balance;
                 })
-                .exceptionallyCompose(throwable -> fallbackDebit(accountId, amount, throwable));
+                .exceptionallyCompose(this::propagateEconomyFailure);
     }
 
     @Override
@@ -137,22 +168,37 @@ public final class EconomyServiceImpl implements EconomyService {
         refreshDegradedState(providerDegraded);
         if (providerDegraded) {
             return executorManager.supplyIo(() -> performFallbackTransfer(from, to, amount))
+                    .thenApply(result -> {
+                        persistenceService.markEconomyDirty(from, () -> persistenceSnapshot(from));
+                        persistenceService.markEconomyDirty(to, () -> persistenceSnapshot(to));
+                        logger.debug(() -> "Transfert " + amount + " de " + from + " vers " + to + " (" + reason + ")");
+                        return result;
+                    })
                     .exceptionallyCompose(this::propagateEconomyFailure);
         }
         if (forcedFallback.get()) {
             triggerHealthProbe();
             return executorManager.supplyIo(() -> performFallbackTransfer(from, to, amount))
+                    .thenApply(result -> {
+                        persistenceService.markEconomyDirty(from, () -> persistenceSnapshot(from));
+                        persistenceService.markEconomyDirty(to, () -> persistenceSnapshot(to));
+                        logger.debug(() -> "Transfert " + amount + " de " + from + " vers " + to + " (" + reason + ")");
+                        return result;
+                    })
                     .exceptionallyCompose(this::propagateEconomyFailure);
         }
-        return economyRepository.transfer(from, to, amount)
+        CompletableFuture<Long> loadFrom = loadBalanceIfNeeded(from).toCompletableFuture();
+        CompletableFuture<Long> loadTo = loadBalanceIfNeeded(to).toCompletableFuture();
+        return CompletableFuture.allOf(loadFrom, loadTo)
+                .thenCompose(ignored -> executorManager.supplyIo(() -> performFallbackTransfer(from, to, amount)))
                 .thenApply(result -> {
                     clearForcedFallback();
-                    updateFallbackBalance(from, result.fromBalance());
-                    updateFallbackBalance(to, result.toBalance());
+                    persistenceService.markEconomyDirty(from, () -> persistenceSnapshot(from));
+                    persistenceService.markEconomyDirty(to, () -> persistenceSnapshot(to));
                     logger.debug(() -> "Transfert " + amount + " de " + from + " vers " + to + " (" + reason + ")");
                     return result;
                 })
-                .exceptionallyCompose(throwable -> fallbackTransfer(from, to, amount, throwable));
+                .exceptionallyCompose(this::propagateEconomyFailure);
     }
 
     @Override
@@ -194,6 +240,20 @@ public final class EconomyServiceImpl implements EconomyService {
         return entry != null ? entry.balance() : 0L;
     }
 
+    private CompletionStage<Long> loadBalanceIfNeeded(UUID accountId) {
+        BalanceEntry entry = balances.get(accountId);
+        if (entry != null) {
+            return CompletableFuture.completedFuture(entry.balance());
+        }
+        return economyRepository.getBalance(accountId)
+                .thenApply(balance -> {
+                    clearForcedFallback();
+                    updateFallbackBalance(accountId, balance);
+                    return balance;
+                })
+                .exceptionallyCompose(throwable -> fallbackBalance(accountId, throwable));
+    }
+
     private long applyDeltaInFallback(UUID accountId, long delta) {
         synchronized (balances) {
             BalanceEntry entry = balances.getOrDefault(accountId, new BalanceEntry(0L, Instant.now()));
@@ -231,26 +291,6 @@ public final class EconomyServiceImpl implements EconomyService {
                 () -> executorManager.supplyIo(() -> getBalanceFromFallback(accountId)));
     }
 
-    private CompletableFuture<Long> fallbackCredit(UUID accountId, long amount, Throwable throwable) {
-        return handleRepositoryFailure("crédit", throwable,
-                () -> executorManager.supplyIo(() -> applyDeltaInFallback(accountId, amount)));
-    }
-
-    private CompletableFuture<Long> fallbackDebit(UUID accountId, long amount, Throwable throwable) {
-        return handleRepositoryFailure("débit", throwable,
-                () -> executorManager.supplyIo(() -> applyDeltaInFallback(accountId, -amount)));
-    }
-
-    private CompletableFuture<EconomyTransferResult> fallbackTransfer(UUID from, UUID to, long amount, Throwable throwable) {
-        return handleRepositoryFailure("transfert", throwable,
-                () -> executorManager.supplyIo(() -> performFallbackTransfer(from, to, amount)));
-    }
-
-    private CompletableFuture<Void> fallbackTransaction(Map<UUID, Long> deltas, Throwable throwable) {
-        return handleRepositoryFailure("transaction", throwable,
-                () -> executorManager.runIo(() -> applyDeltasFallback(deltas)));
-    }
-
     private void applyDeltasFallback(Map<UUID, Long> deltas) {
         synchronized (balances) {
             for (Map.Entry<UUID, Long> entry : deltas.entrySet()) {
@@ -265,6 +305,16 @@ public final class EconomyServiceImpl implements EconomyService {
                 }
                 balances.put(entry.getKey(), new BalanceEntry(next, Instant.now()));
             }
+        }
+    }
+
+    private void markDirtyForTransaction(Map<UUID, Long> deltas) {
+        for (Map.Entry<UUID, Long> entry : deltas.entrySet()) {
+            if (entry.getValue() == 0L) {
+                continue;
+            }
+            UUID account = entry.getKey();
+            persistenceService.markEconomyDirty(account, () -> persistenceSnapshot(account));
         }
     }
 
@@ -326,6 +376,11 @@ public final class EconomyServiceImpl implements EconomyService {
         return throwable;
     }
 
+    long persistenceSnapshot(UUID accountId) {
+        BalanceEntry entry = balances.get(accountId);
+        return entry != null ? entry.balance() : 0L;
+    }
+
     private record BalanceEntry(long balance, Instant updatedAt) {
     }
 
@@ -363,26 +418,27 @@ public final class EconomyServiceImpl implements EconomyService {
             }
             boolean providerDegraded = dbProvider.isDegraded();
             refreshDegradedState(providerDegraded);
+            CompletableFuture<Void> applyFuture;
             if (providerDegraded) {
-                return executorManager.runIo(() -> applyDeltasFallback(deltas))
-                        .exceptionallyCompose(EconomyServiceImpl.this::propagateEconomyFailure);
+                applyFuture = executorManager.runIo(() -> applyDeltasFallback(deltas));
             }
-            if (forcedFallback.get()) {
+            else if (forcedFallback.get()) {
                 triggerHealthProbe();
-                return executorManager.runIo(() -> applyDeltasFallback(deltas))
-                        .exceptionallyCompose(EconomyServiceImpl.this::propagateEconomyFailure);
+                applyFuture = executorManager.runIo(() -> applyDeltasFallback(deltas));
+            } else {
+                CompletableFuture<?>[] loads = deltas.keySet().stream()
+                        .map(account -> loadBalanceIfNeeded(account).toCompletableFuture())
+                        .toArray(CompletableFuture[]::new);
+                applyFuture = CompletableFuture.allOf(loads)
+                        .thenCompose(ignored -> executorManager.runIo(() -> applyDeltasFallback(deltas)))
+                        .thenApply(ignored -> {
+                            clearForcedFallback();
+                            return null;
+                        })
+                        .toCompletableFuture();
             }
-            CompletableFuture<Void> chain = CompletableFuture.completedFuture(null);
-            for (Map.Entry<UUID, Long> entry : deltas.entrySet()) {
-                long delta = entry.getValue();
-                if (delta == 0L) {
-                    continue;
-                }
-                chain = chain.thenCompose(ignored -> economyRepository.addToBalance(entry.getKey(), delta)
-                        .thenAccept(balance -> updateFallbackBalance(entry.getKey(), balance)));
-            }
-            CompletableFuture<Void> persistent = chain.thenRun(EconomyServiceImpl.this::clearForcedFallback);
-            return persistent.exceptionallyCompose(throwable -> fallbackTransaction(deltas, throwable));
+            return applyFuture.thenRun(() -> markDirtyForTransaction(deltas))
+                    .exceptionallyCompose(EconomyServiceImpl.this::propagateEconomyFailure);
         }
 
         @Override

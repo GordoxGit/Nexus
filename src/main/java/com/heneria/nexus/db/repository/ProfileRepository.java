@@ -1,6 +1,7 @@
 package com.heneria.nexus.db.repository;
 
 import com.heneria.nexus.api.PlayerProfile;
+import java.util.Collection;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -25,4 +26,12 @@ public interface ProfileRepository {
      * @return future completed once the profile has been saved
      */
     CompletableFuture<Void> createOrUpdate(PlayerProfile profile);
+
+    /**
+     * Persists the provided collection of profiles in a single batch.
+     *
+     * @param profiles profiles to persist
+     * @return future completed once the batch has been executed
+     */
+    CompletableFuture<Void> saveAll(Collection<PlayerProfile> profiles);
 }

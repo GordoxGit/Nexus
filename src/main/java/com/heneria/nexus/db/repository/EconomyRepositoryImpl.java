@@ -7,6 +7,7 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -25,6 +26,9 @@ public final class EconomyRepositoryImpl implements EconomyRepository {
             "UPDATE nexus_economy SET balance = ? WHERE player_uuid = ?";
     private static final String INSERT_BALANCE_SQL =
             "INSERT INTO nexus_economy (player_uuid, balance) VALUES (?, ?)";
+    private static final String UPSERT_BALANCE_SQL =
+            "INSERT INTO nexus_economy (player_uuid, balance) VALUES (?, ?) " +
+                    "ON DUPLICATE KEY UPDATE balance = VALUES(balance)";
 
     private final DbProvider dbProvider;
     private final Executor ioExecutor;
@@ -87,6 +91,25 @@ public final class EconomyRepositoryImpl implements EconomyRepository {
             throw new IllegalArgumentException("amount must be >= 0");
         }
         return dbProvider.execute(connection -> transferInternal(connection, from, to, amount), ioExecutor);
+    }
+
+    @Override
+    public CompletableFuture<Void> saveAll(Map<UUID, Long> balances) {
+        Objects.requireNonNull(balances, "balances");
+        if (balances.isEmpty()) {
+            return CompletableFuture.completedFuture(null);
+        }
+        return dbProvider.execute(connection -> {
+            try (PreparedStatement statement = connection.prepareStatement(UPSERT_BALANCE_SQL)) {
+                for (Map.Entry<UUID, Long> entry : balances.entrySet()) {
+                    statement.setString(1, entry.getKey().toString());
+                    statement.setLong(2, entry.getValue());
+                    statement.addBatch();
+                }
+                statement.executeBatch();
+            }
+            return null;
+        }, ioExecutor);
     }
 
     private long adjustBalance(Connection connection, UUID playerUuid, long amount) throws SQLException {

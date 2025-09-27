@@ -149,12 +149,17 @@ public final class CoreConfig {
         }
     }
 
-    public record DatabaseSettings(boolean enabled, String jdbcUrl, String username, String password, PoolSettings poolSettings) {
+    public record DatabaseSettings(boolean enabled, String jdbcUrl, String username, String password,
+                                   PoolSettings poolSettings, Duration writeBehindInterval) {
         public DatabaseSettings {
             Objects.requireNonNull(jdbcUrl, "jdbcUrl");
             Objects.requireNonNull(username, "username");
             Objects.requireNonNull(password, "password");
             Objects.requireNonNull(poolSettings, "poolSettings");
+            Objects.requireNonNull(writeBehindInterval, "writeBehindInterval");
+            if (writeBehindInterval.isZero() || writeBehindInterval.isNegative()) {
+                throw new IllegalArgumentException("writeBehindInterval must be > 0");
+            }
         }
     }
 
