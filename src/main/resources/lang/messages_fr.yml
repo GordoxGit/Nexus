@@ -13,6 +13,7 @@ help:
     reload: "<gray>/nexus reload</gray> <dark_gray>-</dark_gray> <yellow>Recharge les configurations et messages.</yellow>"
     dump: "<gray>/nexus dump</gray> <dark_gray>-</dark_gray> <yellow>Affiche l'état courant (threads, DB, scheduler).</yellow>"
     budget: "<gray>/nexus budget [arène]</gray> <dark_gray>-</dark_gray> <yellow>Inspecte les budgets en cours.</yellow>"
+    player: "<gray>/nexus admin player <joueur> <export|import></gray> <dark_gray>-</dark_gray> <yellow>Export/import des données joueurs.</yellow>"
     holo: "<gray>/nexus holo <create|remove|move|list|reload></gray> <dark_gray>-</dark_gray> <yellow>Gère les hologrammes.</yellow>"
 
 errors:
@@ -26,6 +27,28 @@ admin:
   dump:
     header: "<gold>Dump Nexus</gold>"
     success: "<green>Dump généré.</green>"
+  player:
+    usage: "<gray>Usage :</gray> <yellow>/nexus admin player <joueur> <export|import> [fichier] [confirm]</yellow>"
+    unavailable: "<red>Les outils d'export/import ne sont pas disponibles (voir console).</red>"
+    invalid_target: "<red>Impossible de trouver un joueur correspondant à <input>.</red>"
+    export:
+      start: "<yellow>Export des données de <player> (<uuid>) vers le format <format>...</yellow>"
+      success: "<green>Données de <player> exportées vers <path>.</green>"
+      error: "<red>Export impossible pour <player> : <reason>.</red>"
+      invalid_format: "<red>Format inconnu : <format>.</red>"
+    import:
+      start: "<yellow>Import des données de <player> depuis <file>...</yellow>"
+      success: "<green>Import terminé pour <player>.</green>"
+      preview:
+        header: "<gold>Vérification du fichier <file> pour <player> :</gold>"
+        target: "<gray>UUID :</gray> <white><uuid></white> <gray>| Solde actuel :</gray> <yellow><current_balance></yellow> <gray>| Solde importé :</gray> <yellow><balance></yellow>"
+        profile: "<gray>Profil :</gray> Elo <yellow><elo></yellow>, Kills <yellow><kills></yellow>, Morts <yellow><deaths></yellow>, Victoires <yellow><wins></yellow>, Défaites <yellow><losses></yellow>, Parties <yellow><matches></yellow>"
+        confirm: "<yellow>Confirmez avec</yellow> <gray>/nexus admin player <player> import <file> confirm</gray>"
+      error: "<red>Import impossible : <reason>.</red>"
+      invalid: "<red>Données invalides : <reason>.</red>"
+      none: "<red>Aucun import en attente. Préparez d'abord un fichier.</red>"
+      mismatch: "<red>Ce fichier ne correspond pas à la demande d'import en attente.</red>"
+      expired: "<red>La demande d'import a expiré. Recommencez la validation.</red>"
 
 titles:
   round_start:

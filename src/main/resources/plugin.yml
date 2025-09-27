@@ -9,7 +9,7 @@ load: POSTWORLD
 commands:
   nexus:
     description: Commande principale du plugin Nexus.
-    usage: /<command> help|reload|dump|budget [arena]|holo
+    usage: /<command> help|reload|dump|budget [arena]|holo|admin
     permission: nexus.use
     aliases: [nx]
 permissions:
@@ -25,6 +25,12 @@ permissions:
   nexus.admin.budget:
     description: Inspecter les budgets des arènes.
     default: op
+  nexus.admin.player.export:
+    description: Exporter les données d'un joueur.
+    default: op
+  nexus.admin.player.import:
+    description: Importer les données d'un joueur.
+    default: op
   nexus.admin.*:
     description: Accès complet aux commandes d'administration Nexus.
     default: op
@@ -32,6 +38,8 @@ permissions:
       nexus.admin.reload: true
       nexus.admin.dump: true
       nexus.admin.budget: true
+      nexus.admin.player.export: true
+      nexus.admin.player.import: true
   nexus.holo.manage:
     description: Gérer les hologrammes Nexus via /nexus holo.
     default: op
