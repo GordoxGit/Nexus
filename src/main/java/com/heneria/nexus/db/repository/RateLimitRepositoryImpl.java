@@ -10,6 +10,7 @@ import java.sql.Timestamp;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
@@ -66,7 +67,7 @@ public final class RateLimitRepositoryImpl implements RateLimitRepository {
                             if (remaining.isNegative()) {
                                 remaining = Duration.ZERO;
                             }
-                            return RateLimitResult.blocked(remaining);
+                            return new RateLimitResult(false, Optional.of(remaining));
                         }
                     }
                 }
@@ -78,7 +79,7 @@ public final class RateLimitRepositoryImpl implements RateLimitRepository {
                 upsert.executeUpdate();
             }
             connection.commit();
-            return RateLimitResult.allowed();
+            return new RateLimitResult(true, Optional.empty());
         } catch (SQLException exception) {
             connection.rollback();
             throw exception;
