@@ -36,7 +36,8 @@ public final class DailyStatsRepository {
 
     public CompletableFuture<Void> saveOrUpdate(DailyStatsSnapshot snapshot) {
         Objects.requireNonNull(snapshot, "snapshot");
-        return dbProvider.execute(connection -> persist(connection, snapshot), ioExecutor);
+        return dbProvider.execute("DailyStatsRepository::saveOrUpdate",
+                connection -> persist(connection, snapshot), ioExecutor);
     }
 
     private Void persist(Connection connection, DailyStatsSnapshot snapshot) throws SQLException {

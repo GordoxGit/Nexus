@@ -61,7 +61,8 @@ public final class AnalyticsRepository {
         if (events.isEmpty()) {
             return CompletableFuture.completedFuture(0);
         }
-        return dbProvider.execute(connection -> persistBatch(connection, events), executorManager.io());
+        return dbProvider.execute("AnalyticsRepository::saveBatch",
+                connection -> persistBatch(connection, events), executorManager.io());
     }
 
     private int persistBatch(Connection connection, List<AnalyticsEvent> events) throws SQLException {

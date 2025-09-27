@@ -29,7 +29,7 @@ public final class PlayerClassRepositoryImpl implements PlayerClassRepository {
     public CompletableFuture<Boolean> isUnlocked(UUID playerUuid, String classId) {
         Objects.requireNonNull(playerUuid, "playerUuid");
         Objects.requireNonNull(classId, "classId");
-        return dbExecutor.execute(connection -> {
+        return dbExecutor.execute("PlayerClassRepository::isUnlocked", connection -> {
             try (PreparedStatement statement = connection.prepareStatement(SELECT_UNLOCK_SQL)) {
                 statement.setString(1, playerUuid.toString());
                 statement.setString(2, classId);
@@ -47,7 +47,7 @@ public final class PlayerClassRepositoryImpl implements PlayerClassRepository {
     public CompletableFuture<Void> unlock(UUID playerUuid, String classId) {
         Objects.requireNonNull(playerUuid, "playerUuid");
         Objects.requireNonNull(classId, "classId");
-        return dbExecutor.execute(connection -> {
+        return dbExecutor.execute("PlayerClassRepository::unlock", connection -> {
             try (PreparedStatement statement = connection.prepareStatement(UPSERT_UNLOCK_SQL)) {
                 statement.setString(1, playerUuid.toString());
                 statement.setString(2, classId);

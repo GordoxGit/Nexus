@@ -29,7 +29,7 @@ public final class PlayerCosmeticRepositoryImpl implements PlayerCosmeticReposit
     public CompletableFuture<Boolean> isUnlocked(UUID playerUuid, String cosmeticId) {
         Objects.requireNonNull(playerUuid, "playerUuid");
         Objects.requireNonNull(cosmeticId, "cosmeticId");
-        return dbExecutor.execute(connection -> {
+        return dbExecutor.execute("PlayerCosmeticRepository::isUnlocked", connection -> {
             try (PreparedStatement statement = connection.prepareStatement(SELECT_UNLOCK_SQL)) {
                 statement.setString(1, playerUuid.toString());
                 statement.setString(2, cosmeticId);
@@ -45,7 +45,7 @@ public final class PlayerCosmeticRepositoryImpl implements PlayerCosmeticReposit
         Objects.requireNonNull(playerUuid, "playerUuid");
         Objects.requireNonNull(cosmeticId, "cosmeticId");
         Objects.requireNonNull(cosmeticType, "cosmeticType");
-        return dbExecutor.execute(connection -> {
+        return dbExecutor.execute("PlayerCosmeticRepository::unlock", connection -> {
             try (PreparedStatement statement = connection.prepareStatement(UPSERT_UNLOCK_SQL)) {
                 statement.setString(1, playerUuid.toString());
                 statement.setString(2, cosmeticId);

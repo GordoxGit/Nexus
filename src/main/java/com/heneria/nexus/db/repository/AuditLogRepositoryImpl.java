@@ -42,7 +42,7 @@ public final class AuditLogRepositoryImpl implements AuditLogRepository {
         if (entries.isEmpty()) {
             return CompletableFuture.completedFuture(null);
         }
-        return dbExecutor.execute(connection -> {
+        return dbExecutor.execute("AuditLogRepository::saveAll", connection -> {
             try (PreparedStatement statement = connection.prepareStatement(INSERT_SQL)) {
                 for (AuditLogRecord entry : entries) {
                     statement.setTimestamp(1, Timestamp.from(entry.timestamp()));
@@ -73,7 +73,7 @@ public final class AuditLogRepositoryImpl implements AuditLogRepository {
         if (offset < 0) {
             throw new IllegalArgumentException("offset must be >= 0");
         }
-        return dbExecutor.execute(connection -> {
+        return dbExecutor.execute("AuditLogRepository::findRecent", connection -> {
             StringBuilder sql = new StringBuilder(BASE_SELECT_SQL);
             List<Object> parameters = new ArrayList<>();
             boolean whereAdded = false;

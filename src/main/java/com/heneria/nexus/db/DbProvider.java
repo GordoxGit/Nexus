@@ -14,6 +14,7 @@ import java.sql.SQLException;
 import java.time.Duration;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
@@ -115,16 +116,34 @@ public final class DbProvider implements LifecycleAware {
         this.degraded = degraded;
     }
 
-    public <T> CompletableFuture<T> execute(QueryTask<T> task, Executor executor) {
+    public <T> CompletableFuture<T> execute(String queryIdentifier, QueryTask<T> task, Executor executor) {
+        Objects.requireNonNull(queryIdentifier, "queryIdentifier");
+        Objects.requireNonNull(task, "task");
+        Objects.requireNonNull(executor, "executor");
         HikariDataSource dataSource = dataSourceRef.get();
         if (dataSource == null) {
             return CompletableFuture.failedFuture(new IllegalStateException("Database not available"));
         }
         return CompletableFuture.supplyAsync(() -> {
+            long startTime = System.nanoTime();
             try (Connection connection = dataSource.getConnection()) {
                 return task.apply(connection);
             } catch (SQLException exception) {
-                throw new RuntimeException(exception);
+                throw new CompletionException(exception);
+            } finally {
+                final long durationMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startTime);
+                CoreConfig.DatabaseSettings settings = settingsRef.get();
+                if (settings != null) {
+                    CoreConfig.DatabaseSettings.MonitoringSettings monitoring = settings.monitoring();
+                    if (monitoring.enableSqlTracing()) {
+                        logger.debug(() -> "[SQL TRACE] '%s' exécutée en %d ms".formatted(queryIdentifier, durationMs));
+                    }
+                    long threshold = monitoring.slowQueryThresholdMs();
+                    if (threshold > 0L && durationMs > threshold) {
+                        logger.warn("[SLOW QUERY] La requête '%s' a pris %d ms (seuil: %d ms)"
+                                .formatted(queryIdentifier, durationMs, threshold));
+                    }
+                }
             }
         }, executor);
     }

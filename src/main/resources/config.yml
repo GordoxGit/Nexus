@@ -41,6 +41,14 @@ database:
   jdbc: "jdbc:mariadb://127.0.0.1:3306/nexus"
   user: "nexus"
   password: "change_me"
+  monitoring:
+    # Si activé, toutes les requêtes SQL seront loggées au niveau DEBUG.
+    # À n'utiliser que pour le débogage !
+    enable_sql_tracing: false
+    # Seuil en millisecondes pour les requêtes lentes.
+    # Si une requête dépasse ce temps, un avertissement sera loggé.
+    # Mettre à 0 pour désactiver.
+    slow_query_threshold_ms: 500
   pool:
     maxSize: 10
     minIdle: 2

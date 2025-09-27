@@ -208,7 +208,8 @@ public final class PlayerDataImporter {
     }
 
     private CompletableFuture<Void> persistSnapshot(PlayerDataSnapshot snapshot) {
-        return dbProvider.execute(connection -> persistTransactional(connection, snapshot), executorManager.io());
+        return dbProvider.execute("PlayerDataImporter::persistSnapshot",
+                connection -> persistTransactional(connection, snapshot), executorManager.io());
     }
 
     private Void persistTransactional(Connection connection, PlayerDataSnapshot snapshot) throws SQLException {
