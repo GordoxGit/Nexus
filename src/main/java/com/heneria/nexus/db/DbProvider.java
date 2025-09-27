@@ -125,6 +125,24 @@ public final class DbProvider implements LifecycleAware {
         }, executor);
     }
 
+    public CompletableFuture<Boolean> checkHealth(Executor executor) {
+        Objects.requireNonNull(executor, "executor");
+        HikariDataSource dataSource = dataSourceRef.get();
+        if (dataSource == null) {
+            return CompletableFuture.completedFuture(false);
+        }
+        return CompletableFuture.supplyAsync(() -> {
+            try (Connection connection = dataSource.getConnection();
+                 PreparedStatement statement = connection.prepareStatement("SELECT 1");
+                 ResultSet resultSet = statement.executeQuery()) {
+                return resultSet.next();
+            } catch (SQLException exception) {
+                logger.debug(() -> "Health check MariaDB en échec : " + exception.getMessage());
+                return false;
+            }
+        }, executor);
+    }
+
     public Diagnostics diagnostics() {
         HikariDataSource dataSource = dataSourceRef.get();
         HikariPoolMXBean pool = dataSource != null ? dataSource.getHikariPoolMXBean() : null;

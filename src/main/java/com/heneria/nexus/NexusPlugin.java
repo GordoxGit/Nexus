@@ -12,6 +12,10 @@ import com.heneria.nexus.config.CoreConfig;
 import com.heneria.nexus.config.ReloadReport;
 import com.heneria.nexus.db.DatabaseMigrator;
 import com.heneria.nexus.db.DbProvider;
+import com.heneria.nexus.db.repository.EconomyRepository;
+import com.heneria.nexus.db.repository.EconomyRepositoryImpl;
+import com.heneria.nexus.db.repository.ProfileRepository;
+import com.heneria.nexus.db.repository.ProfileRepositoryImpl;
 import com.heneria.nexus.hologram.HoloService;
 import com.heneria.nexus.hologram.HoloServiceImpl;
 import com.heneria.nexus.hologram.Hologram;
@@ -624,6 +628,8 @@ public final class NexusPlugin extends JavaPlugin {
     private void registerServices() {
         serviceRegistry.registerService(RingScheduler.class, RingScheduler.class);
         serviceRegistry.registerService(MapService.class, MapServiceImpl.class);
+        serviceRegistry.registerService(ProfileRepository.class, ProfileRepositoryImpl.class);
+        serviceRegistry.registerService(EconomyRepository.class, EconomyRepositoryImpl.class);
         serviceRegistry.registerService(ProfileService.class, ProfileServiceImpl.class);
         serviceRegistry.registerService(QueueService.class, QueueServiceImpl.class);
         serviceRegistry.registerService(TimerService.class, TimerServiceImpl.class);
