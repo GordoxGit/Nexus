@@ -151,7 +151,7 @@ public final class CoreConfig {
 
     public record DatabaseSettings(boolean enabled, String jdbcUrl, String username, String password,
                                    PoolSettings poolSettings, Duration writeBehindInterval,
-                                   CacheSettings cacheSettings) {
+                                   CacheSettings cacheSettings, DataRetentionSettings retentionPolicy) {
         public DatabaseSettings {
             Objects.requireNonNull(jdbcUrl, "jdbcUrl");
             Objects.requireNonNull(username, "username");
@@ -159,6 +159,7 @@ public final class CoreConfig {
             Objects.requireNonNull(poolSettings, "poolSettings");
             Objects.requireNonNull(writeBehindInterval, "writeBehindInterval");
             Objects.requireNonNull(cacheSettings, "cacheSettings");
+            Objects.requireNonNull(retentionPolicy, "retentionPolicy");
             if (writeBehindInterval.isZero() || writeBehindInterval.isNegative()) {
                 throw new IllegalArgumentException("writeBehindInterval must be > 0");
             }
@@ -178,6 +179,14 @@ public final class CoreConfig {
                 Objects.requireNonNull(expireAfterAccess, "expireAfterAccess");
                 if (expireAfterAccess.isZero() || expireAfterAccess.isNegative()) {
                     throw new IllegalArgumentException("expireAfterAccess must be > 0");
+                }
+            }
+        }
+
+        public record DataRetentionSettings(int matchHistoryDays) {
+            public DataRetentionSettings {
+                if (matchHistoryDays < 0) {
+                    throw new IllegalArgumentException("matchHistoryDays must be >= 0");
                 }
             }
         }
