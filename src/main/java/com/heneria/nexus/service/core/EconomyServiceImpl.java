@@ -529,6 +529,7 @@ public final class EconomyServiceImpl implements EconomyService {
                         markDirtyForTransaction(deltas);
                         deltas.clear();
                     })
+                    .thenApply(ignored -> null)
                     .exceptionallyCompose(EconomyServiceImpl.this::propagateEconomyFailure);
         }
 
