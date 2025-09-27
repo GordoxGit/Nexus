@@ -31,6 +31,9 @@ permissions:
   nexus.admin.player.import:
     description: Importer les données d'un joueur.
     default: op
+  nexus.admin.audit.view:
+    description: Consulter les logs d'audit Nexus.
+    default: op
   nexus.admin.*:
     description: Accès complet aux commandes d'administration Nexus.
     default: op
@@ -40,6 +43,7 @@ permissions:
       nexus.admin.budget: true
       nexus.admin.player.export: true
       nexus.admin.player.import: true
+      nexus.admin.audit.view: true
   nexus.holo.manage:
     description: Gérer les hologrammes Nexus via /nexus holo.
     default: op
