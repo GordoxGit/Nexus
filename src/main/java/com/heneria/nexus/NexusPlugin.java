@@ -1,5 +1,13 @@
 package com.heneria.nexus;
 
+import com.heneria.nexus.admin.PlayerDataCodec;
+import com.heneria.nexus.admin.PlayerDataExporter;
+import com.heneria.nexus.admin.PlayerDataFormat;
+import com.heneria.nexus.admin.PlayerDataImporter;
+import com.heneria.nexus.admin.PlayerDataImporter.ImportPreparation;
+import com.heneria.nexus.admin.PlayerDataValidationException;
+import com.heneria.nexus.admin.PlayerEconomySnapshot;
+import com.heneria.nexus.admin.PlayerProfileSnapshot;
 import com.heneria.nexus.analytics.AnalyticsRepository;
 import com.heneria.nexus.analytics.AnalyticsService;
 import com.heneria.nexus.budget.BudgetService;
@@ -59,9 +67,12 @@ import com.heneria.nexus.util.MessageFacade;
 import com.heneria.nexus.util.NexusLogger;
 import com.heneria.nexus.watchdog.WatchdogService;
 import com.heneria.nexus.watchdog.WatchdogServiceImpl;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.time.Duration;
 import java.util.Collection;
 import java.util.EnumSet;
 import java.util.List;
@@ -71,13 +82,17 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.CompletionStage;
+import java.util.concurrent.ExecutionException;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
 import net.milkbowl.vault.economy.Economy;
+import org.bukkit.Bukkit;
 import org.bukkit.command.CommandSender;
 import org.bukkit.command.PluginCommand;
 import org.bukkit.Location;
+import org.bukkit.OfflinePlayer;
+import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.plugin.PluginManager;
 import org.bukkit.plugin.RegisteredServiceProvider;
@@ -108,6 +123,11 @@ public final class NexusPlugin extends JavaPlugin {
     private NexusContextManager contextManager;
     private boolean bootstrapFailed;
     private boolean servicesExposed;
+    private PlayerDataCodec playerDataCodec;
+    private PlayerDataExporter playerDataExporter;
+    private PlayerDataImporter playerDataImporter;
+    private Path exportsDirectory;
+    private Path importsDirectory;
 
     @Override
     public void onLoad() {
@@ -157,6 +177,7 @@ public final class NexusPlugin extends JavaPlugin {
 
             // Démarrage des services
             serviceRegistry.startAll(Duration.ofMillis(bundle.core().timeoutSettings().startMs()));
+            initializePlayerDataTools();
 
         } catch (Exception exception) {
             logger.error("Impossible d'initialiser ou de démarrer le registre de services", exception);
@@ -253,6 +274,44 @@ public final class NexusPlugin extends JavaPlugin {
         command.setTabCompleter(executor);
     }
 
+    private void initializePlayerDataTools() {
+        Path dataPath = getDataFolder().toPath();
+        try {
+            Files.createDirectories(dataPath);
+        } catch (IOException exception) {
+            logger.warn("Impossible de préparer le dossier de données Nexus", exception);
+        }
+        try {
+            exportsDirectory = dataPath.resolve("exports");
+            Files.createDirectories(exportsDirectory);
+        } catch (IOException exception) {
+            exportsDirectory = null;
+            logger.warn("Impossible de créer le dossier d'export des données joueurs", exception);
+        }
+        try {
+            importsDirectory = dataPath.resolve("imports");
+            Files.createDirectories(importsDirectory);
+        } catch (IOException exception) {
+            importsDirectory = null;
+            logger.warn("Impossible de créer le dossier d'import des données joueurs", exception);
+        }
+        playerDataCodec = new PlayerDataCodec();
+        ProfileRepository profileRepository = serviceRegistry.get(ProfileRepository.class);
+        EconomyRepository economyRepository = serviceRegistry.get(EconomyRepository.class);
+        if (exportsDirectory != null) {
+            playerDataExporter = new PlayerDataExporter(profileRepository, economyRepository, executorManager, playerDataCodec,
+                    exportsDirectory, logger);
+        } else {
+            playerDataExporter = null;
+        }
+        if (importsDirectory != null) {
+            playerDataImporter = new PlayerDataImporter(profileRepository, economyRepository, dbProvider, executorManager,
+                    playerDataCodec, importsDirectory, logger);
+        } else {
+            playerDataImporter = null;
+        }
+    }
+
     private void registerListeners() {
         PluginManager manager = getServer().getPluginManager();
         manager.registerEvents(new HologramVisibilityListener(serviceRegistry.get(HoloService.class)), this);
@@ -306,6 +365,9 @@ public final class NexusPlugin extends JavaPlugin {
         }
         if (sender.hasPermission("nexus.admin.budget")) {
             messageFacade.send(sender, "help.admin.budget");
+        }
+        if (sender.hasPermission("nexus.admin.player.export") || sender.hasPermission("nexus.admin.player.import")) {
+            messageFacade.send(sender, "help.admin.player");
         }
         if (sender.hasPermission("nexus.holo.manage")) {
             messageFacade.send(sender, "help.admin.holo");
@@ -511,6 +573,23 @@ public final class NexusPlugin extends JavaPlugin {
                 .toList();
     }
 
+    public List<String> suggestAdminPlayerTargets(String prefix) {
+        String normalized = prefix == null ? "" : prefix.toLowerCase(Locale.ROOT);
+        return getServer().getOnlinePlayers().stream()
+                .map(Player::getName)
+                .filter(Objects::nonNull)
+                .filter(name -> name.toLowerCase(Locale.ROOT).startsWith(normalized))
+                .sorted()
+                .toList();
+    }
+
+    public List<String> suggestImportFiles(String prefix) {
+        if (playerDataImporter == null) {
+            return List.of();
+        }
+        return playerDataImporter.suggestAvailableFiles(prefix);
+    }
+
     private String formatCoordinate(double value) {
         return String.format(Locale.ROOT, "%.2f", value);
     }
@@ -547,6 +626,137 @@ public final class NexusPlugin extends JavaPlugin {
         }, () -> sender.sendMessage(Component.text("Arène non trouvée.", NamedTextColor.RED)));
     }
 
+    public void handleAdmin(CommandSender sender, String[] args) {
+        if (args.length < 2) {
+            sendAdminPlayerUsage(sender);
+            return;
+        }
+        String sub = args[1].toLowerCase(Locale.ROOT);
+        if ("player".equals(sub)) {
+            handleAdminPlayer(sender, args);
+            return;
+        }
+        sendAdminPlayerUsage(sender);
+    }
+
+    private void handleAdminPlayer(CommandSender sender, String[] args) {
+        if (!sender.hasPermission("nexus.admin.player.export") && !sender.hasPermission("nexus.admin.player.import")) {
+            messageFacade.send(sender, "errors.no_permission");
+            return;
+        }
+        if (args.length < 4) {
+            sendAdminPlayerUsage(sender);
+            return;
+        }
+        ResolvedPlayer target = resolvePlayer(args[2]);
+        if (target == null) {
+            messageFacade.send(sender, "admin.player.invalid_target", Placeholder.unparsed("input", args[2]));
+            return;
+        }
+        String action = args[3].toLowerCase(Locale.ROOT);
+        switch (action) {
+            case "export" -> handlePlayerExport(sender, target, args);
+            case "import" -> handlePlayerImport(sender, target, args);
+            default -> sendAdminPlayerUsage(sender);
+        }
+    }
+
+    private void handlePlayerExport(CommandSender sender, ResolvedPlayer target, String[] args) {
+        if (!sender.hasPermission("nexus.admin.player.export")) {
+            messageFacade.send(sender, "errors.no_permission");
+            return;
+        }
+        if (playerDataExporter == null || exportsDirectory == null) {
+            messageFacade.send(sender, "admin.player.unavailable");
+            return;
+        }
+        PlayerDataFormat format = PlayerDataFormat.JSON;
+        if (args.length >= 5) {
+            String option = args[4];
+            if (option.startsWith("--format=")) {
+                option = option.substring("--format=".length());
+            }
+            try {
+                format = PlayerDataFormat.fromToken(option);
+            } catch (IllegalArgumentException exception) {
+                messageFacade.send(sender, "admin.player.export.invalid_format", Placeholder.unparsed("format", option));
+                return;
+            }
+        }
+        messageFacade.send(sender, "admin.player.export.start",
+                Placeholder.unparsed("player", target.displayName()),
+                Placeholder.unparsed("uuid", target.uuid().toString()),
+                Placeholder.unparsed("format", format.name().toLowerCase(Locale.ROOT)));
+        CompletableFuture<Path> future = playerDataExporter.exportPlayerData(target.uuid(), target.displayName(), format);
+        executorManager.thenMain(future, path -> messageFacade.send(sender, "admin.player.export.success",
+                        Placeholder.unparsed("player", target.displayName()),
+                        Placeholder.unparsed("path", formatRelativePath(path))))
+                .exceptionally(throwable -> {
+                    Throwable cause = unwrap(throwable);
+                    logger.warn("Export des données joueur impossible pour " + target.uuid(), cause);
+                    messageFacade.send(sender, "admin.player.export.error",
+                            Placeholder.unparsed("player", target.displayName()),
+                            Placeholder.unparsed("reason", describeError(cause)));
+                    return null;
+                });
+    }
+
+    private void handlePlayerImport(CommandSender sender, ResolvedPlayer target, String[] args) {
+        if (!sender.hasPermission("nexus.admin.player.import")) {
+            messageFacade.send(sender, "errors.no_permission");
+            return;
+        }
+        if (playerDataImporter == null || importsDirectory == null) {
+            messageFacade.send(sender, "admin.player.unavailable");
+            return;
+        }
+        if (args.length < 5) {
+            sendAdminPlayerUsage(sender);
+            return;
+        }
+        String fileName = args[4];
+        String actorKey = senderKey(sender);
+        if (args.length >= 6 && args[5].equalsIgnoreCase("confirm")) {
+            messageFacade.send(sender, "admin.player.import.start",
+                    Placeholder.unparsed("player", target.displayName()),
+                    Placeholder.unparsed("file", fileName));
+            CompletableFuture<Void> future = playerDataImporter.confirmImport(actorKey, target.uuid(), fileName);
+            executorManager.thenMain(future, unused -> messageFacade.send(sender, "admin.player.import.success",
+                            Placeholder.unparsed("player", target.displayName())))
+                    .exceptionally(throwable -> {
+                        handleImportConfirmationError(sender, target, fileName, throwable);
+                        return null;
+                    });
+            return;
+        }
+        CompletableFuture<ImportPreparation> future = playerDataImporter.prepareImport(actorKey, target.uuid(), fileName);
+        executorManager.thenMain(future, preparation -> {
+                    PlayerProfileSnapshot profile = preparation.snapshot().profile();
+                    PlayerEconomySnapshot economy = preparation.snapshot().economy();
+                    messageFacade.send(sender, "admin.player.import.preview.header",
+                            Placeholder.unparsed("player", target.displayName()),
+                            Placeholder.unparsed("file", preparation.fileName()));
+                    messageFacade.send(sender, "admin.player.import.preview.target",
+                            Placeholder.unparsed("uuid", target.uuid().toString()),
+                            Placeholder.unparsed("current_balance", formatLong(preparation.currentEconomy().balance())),
+                            Placeholder.unparsed("balance", formatLong(economy.balance())));
+                    messageFacade.send(sender, "admin.player.import.preview.profile",
+                            Placeholder.unparsed("elo", formatLong(profile.eloRating())),
+                            Placeholder.unparsed("kills", formatLong(profile.totalKills())),
+                            Placeholder.unparsed("deaths", formatLong(profile.totalDeaths())),
+                            Placeholder.unparsed("wins", formatLong(profile.totalWins())),
+                            Placeholder.unparsed("losses", formatLong(profile.totalLosses())),
+                            Placeholder.unparsed("matches", formatLong(profile.matchesPlayed())));
+                    messageFacade.send(sender, "admin.player.import.preview.confirm",
+                            Placeholder.unparsed("player", target.displayName()),
+                            Placeholder.unparsed("file", preparation.fileName()));
+                })
+                .exceptionally(throwable -> {
+                    handleImportPreparationError(sender, fileName, throwable);
+                    return null;
+                });
+    }
+
     private void sendBudgetSummary(CommandSender sender, BudgetService budgetService) {
         Collection<BudgetSnapshot> snapshots = budgetService.snapshots();
         messageFacade.prefix(sender).ifPresent(sender::sendMessage);
@@ -571,6 +781,130 @@ public final class NexusPlugin extends JavaPlugin {
             return "";
         }
         return " (en attente: " + pending + ")";
+    }
+
+    private void sendAdminPlayerUsage(CommandSender sender) {
+        messageFacade.send(sender, "admin.player.usage");
+    }
+
+    private ResolvedPlayer resolvePlayer(String token) {
+        try {
+            UUID uuid = UUID.fromString(token);
+            OfflinePlayer offline = Bukkit.getOfflinePlayer(uuid);
+            String name = offline.getName();
+            return new ResolvedPlayer(uuid, name != null ? name : uuid.toString());
+        } catch (IllegalArgumentException ignored) {
+            // Continue with name-based resolution
+        }
+        Player online = getServer().getPlayerExact(token);
+        if (online != null) {
+            return new ResolvedPlayer(online.getUniqueId(), online.getName());
+        }
+        OfflinePlayer cached = Bukkit.getOfflinePlayerIfCached(token);
+        if (cached == null) {
+            cached = Bukkit.getOfflinePlayer(token);
+        }
+        if (cached != null && cached.getUniqueId() != null && (cached.hasPlayedBefore() || cached.isOnline())) {
+            String name = cached.getName() != null ? cached.getName() : token;
+            return new ResolvedPlayer(cached.getUniqueId(), name);
+        }
+        return null;
+    }
+
+    private String senderKey(CommandSender sender) {
+        if (sender instanceof Player player) {
+            return player.getUniqueId().toString();
+        }
+        return "console";
+    }
+
+    private void handleImportPreparationError(CommandSender sender, String fileName, Throwable throwable) {
+        Throwable cause = unwrap(throwable);
+        if (cause instanceof PlayerDataValidationException validationException) {
+            messageFacade.send(sender, "admin.player.import.invalid",
+                    Placeholder.unparsed("reason", describeError(validationException)));
+            return;
+        }
+        if (cause instanceof IOException ioException) {
+            messageFacade.send(sender, "admin.player.import.error",
+                    Placeholder.unparsed("reason", describeError(ioException)));
+            return;
+        }
+        logger.warn("Préparation d'import impossible pour " + fileName, cause);
+        messageFacade.send(sender, "admin.player.import.error",
+                Placeholder.unparsed("reason", describeError(cause)));
+    }
+
+    private void handleImportConfirmationError(CommandSender sender, ResolvedPlayer target, String fileName, Throwable throwable) {
+        Throwable cause = unwrap(throwable);
+        if (cause instanceof IllegalStateException stateException) {
+            String code = stateException.getMessage();
+            if ("no-pending".equals(code)) {
+                messageFacade.send(sender, "admin.player.import.none");
+                return;
+            }
+            if ("mismatch".equals(code)) {
+                messageFacade.send(sender, "admin.player.import.mismatch");
+                return;
+            }
+            if ("expired".equals(code)) {
+                messageFacade.send(sender, "admin.player.import.expired");
+                return;
+            }
+        }
+        if (cause instanceof PlayerDataValidationException validationException) {
+            messageFacade.send(sender, "admin.player.import.invalid",
+                    Placeholder.unparsed("reason", describeError(validationException)));
+            return;
+        }
+        if (cause instanceof IOException ioException) {
+            messageFacade.send(sender, "admin.player.import.error",
+                    Placeholder.unparsed("reason", describeError(ioException)));
+            return;
+        }
+        logger.warn("Import des données joueur impossible pour " + target.uuid(), cause);
+        messageFacade.send(sender, "admin.player.import.error",
+                Placeholder.unparsed("reason", describeError(cause)));
+    }
+
+    private String formatLong(long value) {
+        return Long.toString(value);
+    }
+
+    private String formatRelativePath(Path path) {
+        if (path == null) {
+            return "";
+        }
+        try {
+            Path dataPath = getDataFolder().toPath();
+            if (path.startsWith(dataPath)) {
+                return dataPath.relativize(path).toString().replace('\\', '/');
+            }
+        } catch (Exception ignored) {
+            // Fallback to absolute path below
+        }
+        return path.toAbsolutePath().toString();
+    }
+
+    private Throwable unwrap(Throwable throwable) {
+        if (throwable instanceof CompletionException completionException && completionException.getCause() != null) {
+            return unwrap(completionException.getCause());
+        }
+        if (throwable instanceof ExecutionException executionException && executionException.getCause() != null) {
+            return unwrap(executionException.getCause());
+        }
+        return throwable;
+    }
+
+    private String describeError(Throwable throwable) {
+        String message = throwable.getMessage();
+        if (message == null || message.isBlank()) {
+            return throwable.getClass().getSimpleName();
+        }
+        return message;
+    }
+
+    private record ResolvedPlayer(UUID uuid, String displayName) {
     }
 
     public MessageFacade messages() {
