@@ -25,6 +25,7 @@
         <paper.version>1.21.1-R0.1-SNAPSHOT</paper.version>
         <mariadb.version>3.3.3</mariadb.version>
         <hikari.version>5.1.0</hikari.version>
+        <caffeine.version>3.1.8</caffeine.version>
         <placeholderapi.version>2.11.5</placeholderapi.version>
 
         <!--
@@ -72,6 +73,11 @@
             <groupId>org.mariadb.jdbc</groupId>
             <artifactId>mariadb-java-client</artifactId>
             <version>${mariadb.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.github.ben-manes.caffeine</groupId>
+            <artifactId>caffeine</artifactId>
+            <version>${caffeine.version}</version>
         </dependency>
         <dependency>
             <groupId>me.clip</groupId>
@@ -159,6 +165,10 @@
                                 <relocation>
                                     <pattern>org.mariadb.jdbc</pattern>
                                     <shadedPattern>com.heneria.nexus.lib.mariadb</shadedPattern>
+                                </relocation>
+                                <relocation>
+                                    <pattern>com.github.benmanes.caffeine</pattern>
+                                    <shadedPattern>com.heneria.nexus.lib.caffeine</shadedPattern>
                                 </relocation>
                             </relocations>
                             <transformers>
