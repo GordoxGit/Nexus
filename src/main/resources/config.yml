@@ -40,6 +40,7 @@ database:
     maxSize: 10
     minIdle: 2
     connTimeoutMs: 3000
+  write_behind_interval_seconds: 60
 
 services:
   expose-bukkit-services: false

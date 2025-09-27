@@ -36,6 +36,7 @@ public final class ProfileServiceImpl implements ProfileService {
     private final DbProvider dbProvider;
     private final ExecutorManager executorManager;
     private final ProfileRepository profileRepository;
+    private final PersistenceService persistenceService;
     private final ConcurrentHashMap<UUID, CacheEntry> cache = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<UUID, PlayerProfile> persistentStore = new ConcurrentHashMap<>();
     private final AtomicBoolean degraded = new AtomicBoolean();
@@ -46,11 +47,13 @@ public final class ProfileServiceImpl implements ProfileService {
                               DbProvider dbProvider,
                               ExecutorManager executorManager,
                               CoreConfig config,
-                              ProfileRepository profileRepository) {
+                              ProfileRepository profileRepository,
+                              PersistenceService persistenceService) {
         this.logger = Objects.requireNonNull(logger, "logger");
         this.dbProvider = Objects.requireNonNull(dbProvider, "dbProvider");
         this.executorManager = Objects.requireNonNull(executorManager, "executorManager");
         this.profileRepository = Objects.requireNonNull(profileRepository, "profileRepository");
+        this.persistenceService = Objects.requireNonNull(persistenceService, "persistenceService");
         this.degradedSettings.set(config.degradedModeSettings());
     }
 
@@ -81,7 +84,9 @@ public final class ProfileServiceImpl implements ProfileService {
                         return CompletableFuture.completedFuture(optional.get());
                     }
                     PlayerProfile created = defaultProfile(playerId);
-                    return profileRepository.createOrUpdate(created).thenApply(ignored -> created);
+                    snapshotLocally(created);
+                    persistenceService.markProfileDirty(playerId, () -> persistenceSnapshot(playerId));
+                    return CompletableFuture.completedFuture(created);
                 })
                 .thenApply(profile -> {
                     clearForcedFallback();
@@ -94,21 +99,9 @@ public final class ProfileServiceImpl implements ProfileService {
     public CompletableFuture<Void> saveAsync(PlayerProfile profile) {
         Objects.requireNonNull(profile, "profile");
         PlayerProfile snapshot = copyProfile(profile);
-        boolean providerDegraded = dbProvider.isDegraded();
-        refreshDegradedState(providerDegraded);
-        if (providerDegraded) {
-            return executorManager.runIo(() -> snapshotLocally(snapshot));
-        }
-        if (forcedFallback.get()) {
-            triggerHealthProbe();
-            return executorManager.runIo(() -> snapshotLocally(snapshot));
-        }
-        return profileRepository.createOrUpdate(snapshot)
-                .thenRun(() -> {
-                    clearForcedFallback();
-                    snapshotLocally(snapshot);
-                })
-                .exceptionallyCompose(throwable -> fallbackSave(snapshot, throwable));
+        snapshotLocally(snapshot);
+        persistenceService.markProfileDirty(profile.playerId(), () -> persistenceSnapshot(profile.playerId()));
+        return CompletableFuture.completedFuture(null);
     }
 
     @Override
@@ -172,9 +165,19 @@ public final class ProfileServiceImpl implements ProfileService {
     }
 
     private PlayerProfile loadFromFallback(UUID playerId) {
-        PlayerProfile stored = persistentStore.compute(playerId, (id, existing) -> existing != null ? existing : defaultProfile(id));
+        boolean[] created = new boolean[1];
+        PlayerProfile stored = persistentStore.compute(playerId, (id, existing) -> {
+            if (existing != null) {
+                return existing;
+            }
+            created[0] = true;
+            return defaultProfile(id);
+        });
         CacheEntry entry = new CacheEntry(copyProfile(stored), Instant.now());
         cache.put(playerId, entry);
+        if (created[0]) {
+            persistenceService.markProfileDirty(playerId, () -> persistenceSnapshot(playerId));
+        }
         return copyProfile(entry.profile());
     }
 
@@ -184,6 +187,15 @@ public final class ProfileServiceImpl implements ProfileService {
         cache.put(profile.playerId(), new CacheEntry(copyProfile(canonical), Instant.now()));
     }
 
+    PlayerProfile persistenceSnapshot(UUID playerId) {
+        PlayerProfile canonical = persistentStore.get(playerId);
+        if (canonical != null) {
+            return copyProfile(canonical);
+        }
+        CacheEntry entry = cache.get(playerId);
+        return entry != null ? copyProfile(entry.profile()) : null;
+    }
+
     private CompletableFuture<PlayerProfile> fallbackLoad(UUID playerId, Throwable throwable) {
         activateFallback("chargement du profil", throwable);
         return executorManager.supplyIo(() -> loadFromFallback(playerId));
@@ -191,7 +203,9 @@ public final class ProfileServiceImpl implements ProfileService {
 
     private CompletableFuture<Void> fallbackSave(PlayerProfile snapshot, Throwable throwable) {
         activateFallback("sauvegarde du profil", throwable);
-        return executorManager.runIo(() -> snapshotLocally(snapshot));
+        snapshotLocally(snapshot);
+        persistenceService.markProfileDirty(snapshot.playerId(), () -> persistenceSnapshot(snapshot.playerId()));
+        return CompletableFuture.completedFuture(null);
     }
 
     private void activateFallback(String action, Throwable throwable) {

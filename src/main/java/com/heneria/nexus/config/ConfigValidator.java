@@ -80,6 +80,7 @@ public final class ConfigValidator {
         int poolMax = positiveInt(yaml, "database.pool.maxSize", 10, issues, false);
         int poolMin = nonNegativeInt(yaml, "database.pool.minIdle", 2, issues);
         long poolTimeout = positiveLong(yaml, "database.pool.connTimeoutMs", 3000L, issues, true);
+        long writeBehindSeconds = positiveLong(yaml, "database.write_behind_interval_seconds", 60L, issues, true);
 
         boolean exposeServices = yaml.getBoolean("services.expose-bukkit-services", false);
         long timeoutStart = positiveLong(yaml, "timeouts.startMs", 5000L, issues, true);
@@ -205,7 +206,8 @@ public final class ConfigValidator {
             issues.error("database.pool", exception.getMessage());
             poolSettings = new CoreConfig.PoolSettings(10, 2, 3000L);
         }
-        databaseSettings = new CoreConfig.DatabaseSettings(databaseEnabled, jdbc, user, password, poolSettings);
+        databaseSettings = new CoreConfig.DatabaseSettings(databaseEnabled, jdbc, user, password, poolSettings,
+                java.time.Duration.ofSeconds(Math.max(1L, writeBehindSeconds)));
 
         CoreConfig.TimeoutSettings.WatchdogSettings watchdogSettings;
         try {

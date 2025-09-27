@@ -7,6 +7,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -92,6 +93,31 @@ public final class ProfileRepositoryImpl implements ProfileRepository {
                 statement.setInt(6, longToInt(statistics.getOrDefault(STAT_TOTAL_LOSSES, 0L)));
                 statement.setInt(7, longToInt(statistics.getOrDefault(STAT_MATCHES_PLAYED, 0L)));
                 statement.executeUpdate();
+            }
+            return null;
+        }, ioExecutor);
+    }
+
+    @Override
+    public CompletableFuture<Void> saveAll(Collection<PlayerProfile> profiles) {
+        Objects.requireNonNull(profiles, "profiles");
+        if (profiles.isEmpty()) {
+            return CompletableFuture.completedFuture(null);
+        }
+        return dbProvider.execute(connection -> {
+            try (PreparedStatement statement = connection.prepareStatement(UPSERT_PROFILE_SQL)) {
+                for (PlayerProfile profile : profiles) {
+                    Map<String, Long> statistics = profile.statistics();
+                    statement.setString(1, profile.playerId().toString());
+                    statement.setInt(2, longToInt(statistics.getOrDefault(STAT_ELO, 1000L)));
+                    statement.setInt(3, longToInt(statistics.getOrDefault(STAT_TOTAL_KILLS, 0L)));
+                    statement.setInt(4, longToInt(statistics.getOrDefault(STAT_TOTAL_DEATHS, 0L)));
+                    statement.setInt(5, longToInt(statistics.getOrDefault(STAT_TOTAL_WINS, 0L)));
+                    statement.setInt(6, longToInt(statistics.getOrDefault(STAT_TOTAL_LOSSES, 0L)));
+                    statement.setInt(7, longToInt(statistics.getOrDefault(STAT_MATCHES_PLAYED, 0L)));
+                    statement.addBatch();
+                }
+                statement.executeBatch();
             }
             return null;
         }, ioExecutor);

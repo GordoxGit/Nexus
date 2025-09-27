@@ -34,6 +34,8 @@ import com.heneria.nexus.api.service.TimerService;
 import com.heneria.nexus.service.core.ArenaServiceImpl;
 import com.heneria.nexus.service.core.EconomyServiceImpl;
 import com.heneria.nexus.service.core.MapServiceImpl;
+import com.heneria.nexus.service.core.PersistenceService;
+import com.heneria.nexus.service.core.PersistenceServiceImpl;
 import com.heneria.nexus.service.core.ProfileServiceImpl;
 import com.heneria.nexus.service.core.QueueServiceImpl;
 import com.heneria.nexus.service.core.TimerServiceImpl;
@@ -179,6 +181,11 @@ public final class NexusPlugin extends JavaPlugin {
             servicesExposed = false;
         }
         if (serviceRegistry != null) {
+            try {
+                serviceRegistry.get(PersistenceService.class).flushAllOnShutdown();
+            } catch (Exception exception) {
+                logger.error("Impossible de flush le cache de persistance avant l'arrêt", exception);
+            }
             serviceRegistry.stopAll(Duration.ofMillis(bundle != null ? bundle.core().timeoutSettings().stopMs() : 3000L));
         }
         if (executorManager != null) {
@@ -630,6 +637,7 @@ public final class NexusPlugin extends JavaPlugin {
         serviceRegistry.registerService(MapService.class, MapServiceImpl.class);
         serviceRegistry.registerService(ProfileRepository.class, ProfileRepositoryImpl.class);
         serviceRegistry.registerService(EconomyRepository.class, EconomyRepositoryImpl.class);
+        serviceRegistry.registerService(PersistenceService.class, PersistenceServiceImpl.class);
         serviceRegistry.registerService(ProfileService.class, ProfileServiceImpl.class);
         serviceRegistry.registerService(QueueService.class, QueueServiceImpl.class);
         serviceRegistry.registerService(TimerService.class, TimerServiceImpl.class);
