@@ -1,8 +1,7 @@
 package com.heneria.nexus.db.repository;
 
 import com.heneria.nexus.api.EconomyTransferResult;
-import com.heneria.nexus.concurrent.ExecutorManager;
-import com.heneria.nexus.db.DbProvider;
+import com.heneria.nexus.db.ResilientDbExecutor;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -11,7 +10,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.Executor;
 
 /**
  * Default MariaDB-backed implementation of {@link EconomyRepository}.
@@ -30,18 +28,16 @@ public final class EconomyRepositoryImpl implements EconomyRepository {
             "INSERT INTO nexus_economy (player_uuid, balance) VALUES (?, ?) " +
                     "ON DUPLICATE KEY UPDATE balance = VALUES(balance)";
 
-    private final DbProvider dbProvider;
-    private final Executor ioExecutor;
+    private final ResilientDbExecutor dbExecutor;
 
-    public EconomyRepositoryImpl(DbProvider dbProvider, ExecutorManager executorManager) {
-        this.dbProvider = Objects.requireNonNull(dbProvider, "dbProvider");
-        this.ioExecutor = Objects.requireNonNull(executorManager, "executorManager").io();
+    public EconomyRepositoryImpl(ResilientDbExecutor dbExecutor) {
+        this.dbExecutor = Objects.requireNonNull(dbExecutor, "dbExecutor");
     }
 
     @Override
     public CompletableFuture<Long> getBalance(UUID playerUuid) {
         Objects.requireNonNull(playerUuid, "playerUuid");
-        return dbProvider.execute(connection -> {
+        return dbExecutor.execute(connection -> {
             try (PreparedStatement statement = connection.prepareStatement(SELECT_BALANCE_SQL)) {
                 statement.setString(1, playerUuid.toString());
                 try (ResultSet resultSet = statement.executeQuery()) {
@@ -51,7 +47,7 @@ public final class EconomyRepositoryImpl implements EconomyRepository {
                     return 0L;
                 }
             }
-        }, ioExecutor);
+        });
     }
 
     @Override
@@ -60,7 +56,7 @@ public final class EconomyRepositoryImpl implements EconomyRepository {
         if (balance < 0L) {
             throw new IllegalArgumentException("balance must be >= 0");
         }
-        return dbProvider.execute(connection -> {
+        return dbExecutor.execute(connection -> {
             try (PreparedStatement update = connection.prepareStatement(UPDATE_BALANCE_SQL)) {
                 update.setLong(1, balance);
                 update.setString(2, playerUuid.toString());
@@ -74,13 +70,13 @@ public final class EconomyRepositoryImpl implements EconomyRepository {
                 }
             }
             return balance;
-        }, ioExecutor);
+        });
     }
 
     @Override
     public CompletableFuture<Long> addToBalance(UUID playerUuid, long amount) {
         Objects.requireNonNull(playerUuid, "playerUuid");
-        return dbProvider.execute(connection -> adjustBalance(connection, playerUuid, amount), ioExecutor);
+        return dbExecutor.execute(connection -> adjustBalance(connection, playerUuid, amount));
     }
 
     @Override
@@ -90,7 +86,7 @@ public final class EconomyRepositoryImpl implements EconomyRepository {
         if (amount < 0L) {
             throw new IllegalArgumentException("amount must be >= 0");
         }
-        return dbProvider.execute(connection -> transferInternal(connection, from, to, amount), ioExecutor);
+        return dbExecutor.execute(connection -> transferInternal(connection, from, to, amount));
     }
 
     @Override
@@ -99,7 +95,7 @@ public final class EconomyRepositoryImpl implements EconomyRepository {
         if (balances.isEmpty()) {
             return CompletableFuture.completedFuture(null);
         }
-        return dbProvider.execute(connection -> {
+        return dbExecutor.execute(connection -> {
             try (PreparedStatement statement = connection.prepareStatement(UPSERT_BALANCE_SQL)) {
                 for (Map.Entry<UUID, Long> entry : balances.entrySet()) {
                     statement.setString(1, entry.getKey().toString());
@@ -109,7 +105,7 @@ public final class EconomyRepositoryImpl implements EconomyRepository {
                 statement.executeBatch();
             }
             return null;
-        }, ioExecutor);
+        });
     }
 
     private long adjustBalance(Connection connection, UUID playerUuid, long amount) throws SQLException {

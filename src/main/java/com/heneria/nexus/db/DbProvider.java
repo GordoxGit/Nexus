@@ -42,7 +42,7 @@ public final class DbProvider implements LifecycleAware {
         settingsRef.set(settings);
         if (!settings.enabled()) {
             logger.info("Persistance désactivée, fonctionnement en mémoire");
-            degraded = false;
+            setDegraded(false);
             closeDataSource();
             return CompletableFuture.completedFuture(true);
         }
@@ -52,7 +52,7 @@ public final class DbProvider implements LifecycleAware {
         return CompletableFuture.supplyAsync(() -> testConnection(candidate), executor)
                 .handle((success, throwable) -> {
                     if (throwable != null || Boolean.FALSE.equals(success)) {
-                        degraded = true;
+                        setDegraded(true);
                         long attempts = failedAttempts.incrementAndGet();
                         closeQuietly(candidate);
                         if (throwable != null) {
@@ -63,7 +63,7 @@ public final class DbProvider implements LifecycleAware {
                         return false;
                     }
                     failedAttempts.set(0);
-                    degraded = false;
+                    setDegraded(false);
                     HikariDataSource previous = dataSourceRef.getAndSet(candidate);
                     closeQuietly(previous);
                     logger.info("Connexion MariaDB opérationnelle (%s)".formatted(settings.jdbcUrl()));
@@ -109,6 +109,10 @@ public final class DbProvider implements LifecycleAware {
             throw new SQLException("Database not available");
         }
         return dataSource.getConnection();
+    }
+
+    public void setDegraded(boolean degraded) {
+        this.degraded = degraded;
     }
 
     public <T> CompletableFuture<T> execute(QueryTask<T> task, Executor executor) {

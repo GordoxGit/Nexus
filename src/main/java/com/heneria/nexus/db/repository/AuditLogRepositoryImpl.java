@@ -2,8 +2,7 @@ package com.heneria.nexus.db.repository;
 
 import com.heneria.nexus.audit.AuditActionType;
 import com.heneria.nexus.audit.AuditLogRecord;
-import com.heneria.nexus.concurrent.ExecutorManager;
-import com.heneria.nexus.db.DbProvider;
+import com.heneria.nexus.db.ResilientDbExecutor;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -17,7 +16,6 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.Executor;
 
 /**
  * MariaDB backed implementation of {@link AuditLogRepository}.
@@ -32,12 +30,10 @@ public final class AuditLogRepositoryImpl implements AuditLogRepository {
             "SELECT log_id, timestamp, actor_uuid, actor_name, action_type, target_uuid, target_name, details " +
                     "FROM nexus_audit_logs";
 
-    private final DbProvider dbProvider;
-    private final Executor ioExecutor;
+    private final ResilientDbExecutor dbExecutor;
 
-    public AuditLogRepositoryImpl(DbProvider dbProvider, ExecutorManager executorManager) {
-        this.dbProvider = Objects.requireNonNull(dbProvider, "dbProvider");
-        this.ioExecutor = Objects.requireNonNull(executorManager, "executorManager").io();
+    public AuditLogRepositoryImpl(ResilientDbExecutor dbExecutor) {
+        this.dbExecutor = Objects.requireNonNull(dbExecutor, "dbExecutor");
     }
 
     @Override
@@ -46,7 +42,7 @@ public final class AuditLogRepositoryImpl implements AuditLogRepository {
         if (entries.isEmpty()) {
             return CompletableFuture.completedFuture(null);
         }
-        return dbProvider.execute(connection -> {
+        return dbExecutor.execute(connection -> {
             try (PreparedStatement statement = connection.prepareStatement(INSERT_SQL)) {
                 for (AuditLogRecord entry : entries) {
                     statement.setTimestamp(1, Timestamp.from(entry.timestamp()));
@@ -61,7 +57,7 @@ public final class AuditLogRepositoryImpl implements AuditLogRepository {
                 statement.executeBatch();
             }
             return null;
-        }, ioExecutor);
+        });
     }
 
     @Override
@@ -77,7 +73,7 @@ public final class AuditLogRepositoryImpl implements AuditLogRepository {
         if (offset < 0) {
             throw new IllegalArgumentException("offset must be >= 0");
         }
-        return dbProvider.execute(connection -> {
+        return dbExecutor.execute(connection -> {
             StringBuilder sql = new StringBuilder(BASE_SELECT_SQL);
             List<Object> parameters = new ArrayList<>();
             boolean whereAdded = false;
@@ -119,7 +115,7 @@ public final class AuditLogRepositoryImpl implements AuditLogRepository {
                     return records;
                 }
             }
-        }, ioExecutor);
+        });
     }
 
     private AuditLogRecord mapRow(ResultSet resultSet) throws SQLException {

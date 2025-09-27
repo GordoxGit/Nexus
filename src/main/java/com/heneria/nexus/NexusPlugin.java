@@ -31,6 +31,7 @@ import com.heneria.nexus.config.EconomyConfig;
 import com.heneria.nexus.config.ReloadReport;
 import com.heneria.nexus.db.DatabaseMigrator;
 import com.heneria.nexus.db.DbProvider;
+import com.heneria.nexus.db.ResilientDbExecutor;
 import com.heneria.nexus.db.repository.EconomyRepository;
 import com.heneria.nexus.db.repository.EconomyRepositoryImpl;
 import com.heneria.nexus.db.repository.MatchRepository;
@@ -144,6 +145,7 @@ public final class NexusPlugin extends JavaPlugin {
     private ExecutorManager executorManager;
     private RingScheduler ringScheduler;
     private DbProvider dbProvider;
+    private ResilientDbExecutor resilientDbExecutor;
     private DatabaseMigrator databaseMigrator;
     private LuckPerms luckPermsApi;
     private NexusContextManager contextManager;
@@ -192,6 +194,8 @@ public final class NexusPlugin extends JavaPlugin {
         this.executorManager = new ExecutorManager(this, logger, bundle.core().executorSettings());
         this.serviceRegistry = new ServiceRegistry(logger);
         this.dbProvider = new DbProvider(logger, this);
+        this.resilientDbExecutor = new ResilientDbExecutor(logger, dbProvider, executorManager.io(),
+                bundle.core().databaseSettings());
         this.databaseMigrator = new DatabaseMigrator(logger, this, dbProvider);
 
         registerSingletons();
@@ -203,6 +207,7 @@ public final class NexusPlugin extends JavaPlugin {
             serviceRegistry.wire(Duration.ofMillis(bundle.core().timeoutSettings().startMs()));
             this.ringScheduler = serviceRegistry.get(RingScheduler.class);
             this.dbProvider = serviceRegistry.get(DbProvider.class);
+            this.resilientDbExecutor = serviceRegistry.get(ResilientDbExecutor.class);
             this.databaseMigrator = serviceRegistry.get(DatabaseMigrator.class);
             ringScheduler.applyPerfSettings(bundle.core().arenaSettings());
 
@@ -461,6 +466,7 @@ public final class NexusPlugin extends JavaPlugin {
         serviceRegistry.updateSingleton(ConfigBundle.class, newBundle);
         serviceRegistry.updateSingleton(CoreConfig.class, newBundle.core());
         serviceRegistry.updateSingleton(EconomyConfig.class, newBundle.economy());
+        resilientDbExecutor.configure(newBundle.core().databaseSettings());
         configureDatabase(newBundle.core().databaseSettings());
         serviceRegistry.get(RateLimiterService.class).applyConfiguration(newBundle.core());
         serviceRegistry.get(DataPurgeService.class).applyConfiguration(newBundle.core());
@@ -1303,6 +1309,7 @@ public final class NexusPlugin extends JavaPlugin {
         serviceRegistry.registerSingleton(ExecutorManager.class, executorManager);
         serviceRegistry.registerSingleton(MessageFacade.class, messageFacade);
         serviceRegistry.registerSingleton(DbProvider.class, dbProvider);
+        serviceRegistry.registerSingleton(ResilientDbExecutor.class, resilientDbExecutor);
         serviceRegistry.registerSingleton(DatabaseMigrator.class, databaseMigrator);
         serviceRegistry.registerSingleton(Boolean.class, placeholderApiAvailable);
     }

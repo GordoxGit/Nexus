@@ -1,7 +1,6 @@
 package com.heneria.nexus.db.repository;
 
-import com.heneria.nexus.concurrent.ExecutorManager;
-import com.heneria.nexus.db.DbProvider;
+import com.heneria.nexus.db.ResilientDbExecutor;
 import com.heneria.nexus.match.MatchSnapshot;
 import com.heneria.nexus.match.MatchSnapshot.ParticipantStats;
 import java.sql.Connection;
@@ -12,7 +11,6 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.Executor;
 
 /**
  * Default MariaDB-backed implementation of {@link MatchRepository}.
@@ -32,24 +30,22 @@ public final class MatchRepositoryImpl implements MatchRepository {
 
     private static final int PURGE_BATCH_SIZE = 1_000;
 
-    private final DbProvider dbProvider;
-    private final Executor ioExecutor;
+    private final ResilientDbExecutor dbExecutor;
 
-    public MatchRepositoryImpl(DbProvider dbProvider, ExecutorManager executorManager) {
-        this.dbProvider = Objects.requireNonNull(dbProvider, "dbProvider");
-        this.ioExecutor = Objects.requireNonNull(executorManager, "executorManager").io();
+    public MatchRepositoryImpl(ResilientDbExecutor dbExecutor) {
+        this.dbExecutor = Objects.requireNonNull(dbExecutor, "dbExecutor");
     }
 
     @Override
     public CompletableFuture<Void> save(MatchSnapshot snapshot) {
         Objects.requireNonNull(snapshot, "snapshot");
-        return dbProvider.execute(connection -> persistSnapshot(connection, snapshot), ioExecutor);
+        return dbExecutor.execute(connection -> persistSnapshot(connection, snapshot));
     }
 
     @Override
     public CompletableFuture<Integer> purgeOldMatches(Instant olderThan) {
         Objects.requireNonNull(olderThan, "olderThan");
-        return dbProvider.execute(connection -> purgeMatches(connection, olderThan), ioExecutor);
+        return dbExecutor.execute(connection -> purgeMatches(connection, olderThan));
     }
 
     private Void persistSnapshot(Connection connection, MatchSnapshot snapshot) throws SQLException {

@@ -30,6 +30,15 @@ public final class ConfigValidator {
     private static final String DEFAULT_SERVER_MODE = "nexus";
     private static final Set<String> SUPPORTED_MAP_MODES = Set.of(
             "1v1", "2v2", "3v3", "4v4", "5v5", "ffa", "rush", "casual", "competitive");
+    private static final int DEFAULT_RETRY_MAX_ATTEMPTS = 5;
+    private static final long DEFAULT_RETRY_INITIAL_INTERVAL_MS = 1_000L;
+    private static final long DEFAULT_RETRY_MAX_INTERVAL_MS = 8_000L;
+    private static final double DEFAULT_RETRY_MULTIPLIER = 2.0D;
+    private static final double DEFAULT_CB_FAILURE_RATE = 50D;
+    private static final int DEFAULT_CB_MIN_CALLS = 5;
+    private static final long DEFAULT_CB_SLIDING_WINDOW_SECONDS = 30L;
+    private static final long DEFAULT_CB_WAIT_OPEN_SECONDS = 60L;
+    private static final int DEFAULT_CB_PERMITTED_HALF_OPEN_CALLS = 1;
 
     private final MiniMessage miniMessage = MiniMessage.miniMessage();
 
@@ -85,6 +94,33 @@ public final class ConfigValidator {
         long profileCacheMaxSize = positiveLong(yaml, "database.cache.profiles.max_size", 1000L, issues, true);
         long profileCacheExpireMinutes = positiveLong(yaml, "database.cache.profiles.expire_after_access_minutes", 15L, issues, true);
         int matchHistoryDays = nonNegativeInt(yaml, "database.retention_policy.match_history_days", 90, issues);
+        int retryMaxAttempts = positiveInt(yaml, "database.resilience.retry.max_attempts", DEFAULT_RETRY_MAX_ATTEMPTS, issues,
+                true);
+        long retryInitialIntervalMs = positiveLong(yaml, "database.resilience.retry.initial_interval_ms",
+                DEFAULT_RETRY_INITIAL_INTERVAL_MS, issues, true);
+        long retryMaxIntervalMs = positiveLong(yaml, "database.resilience.retry.max_interval_ms",
+                DEFAULT_RETRY_MAX_INTERVAL_MS, issues, true);
+        double retryMultiplier = positiveDouble(yaml, "database.resilience.retry.multiplier", DEFAULT_RETRY_MULTIPLIER, issues,
+                true);
+        if (retryMultiplier < 1D) {
+            issues.error("database.resilience.retry.multiplier", "Doit être >= 1");
+            retryMultiplier = 1D;
+        }
+        if (retryMaxIntervalMs < retryInitialIntervalMs) {
+            issues.error("database.resilience.retry.max_interval_ms",
+                    "Doit être >= database.resilience.retry.initial_interval_ms");
+            retryMaxIntervalMs = retryInitialIntervalMs;
+        }
+        double failureRateThreshold = boundedDouble(yaml, "database.resilience.circuit_breaker.failure_rate_threshold",
+                DEFAULT_CB_FAILURE_RATE, 1D, 100D, issues, true);
+        int circuitMinCalls = positiveInt(yaml, "database.resilience.circuit_breaker.minimum_number_of_calls",
+                DEFAULT_CB_MIN_CALLS, issues, true);
+        long circuitSlidingWindowSeconds = positiveLong(yaml, "database.resilience.circuit_breaker.sliding_window_seconds",
+                DEFAULT_CB_SLIDING_WINDOW_SECONDS, issues, true);
+        long waitOpenSeconds = positiveLong(yaml, "database.resilience.circuit_breaker.wait_duration_open_state_seconds",
+                DEFAULT_CB_WAIT_OPEN_SECONDS, issues, true);
+        int permittedHalfOpen = positiveInt(yaml, "database.resilience.circuit_breaker.permitted_calls_in_half_open_state",
+                DEFAULT_CB_PERMITTED_HALF_OPEN_CALLS, issues, true);
 
         boolean exposeServices = yaml.getBoolean("services.expose-bukkit-services", false);
         int maxBackupsPerFile = nonNegativeInt(yaml, "config.backups.max_backups_per_file", 10, issues);
@@ -237,8 +273,44 @@ public final class ConfigValidator {
             retentionSettings = new CoreConfig.DatabaseSettings.DataRetentionSettings(90);
         }
 
+        CoreConfig.DatabaseSettings.ResilienceSettings.RetrySettings retrySettings;
+        try {
+            retrySettings = new CoreConfig.DatabaseSettings.ResilienceSettings.RetrySettings(
+                    retryMaxAttempts,
+                    java.time.Duration.ofMillis(Math.max(1L, retryInitialIntervalMs)),
+                    java.time.Duration.ofMillis(Math.max(1L, retryMaxIntervalMs)),
+                    retryMultiplier);
+        } catch (IllegalArgumentException exception) {
+            issues.error("database.resilience.retry", exception.getMessage());
+            retrySettings = new CoreConfig.DatabaseSettings.ResilienceSettings.RetrySettings(
+                    DEFAULT_RETRY_MAX_ATTEMPTS,
+                    java.time.Duration.ofMillis(DEFAULT_RETRY_INITIAL_INTERVAL_MS),
+                    java.time.Duration.ofMillis(DEFAULT_RETRY_MAX_INTERVAL_MS),
+                    DEFAULT_RETRY_MULTIPLIER);
+        }
+        CoreConfig.DatabaseSettings.ResilienceSettings.CircuitBreakerSettings circuitBreakerSettings;
+        try {
+            circuitBreakerSettings = new CoreConfig.DatabaseSettings.ResilienceSettings.CircuitBreakerSettings(
+                    failureRateThreshold,
+                    circuitMinCalls,
+                    java.time.Duration.ofSeconds(Math.max(1L, circuitSlidingWindowSeconds)),
+                    java.time.Duration.ofSeconds(Math.max(1L, waitOpenSeconds)),
+                    permittedHalfOpen);
+        } catch (IllegalArgumentException exception) {
+            issues.error("database.resilience.circuit_breaker", exception.getMessage());
+            circuitBreakerSettings = new CoreConfig.DatabaseSettings.ResilienceSettings.CircuitBreakerSettings(
+                    DEFAULT_CB_FAILURE_RATE,
+                    DEFAULT_CB_MIN_CALLS,
+                    java.time.Duration.ofSeconds(DEFAULT_CB_SLIDING_WINDOW_SECONDS),
+                    java.time.Duration.ofSeconds(DEFAULT_CB_WAIT_OPEN_SECONDS),
+                    DEFAULT_CB_PERMITTED_HALF_OPEN_CALLS);
+        }
+        CoreConfig.DatabaseSettings.ResilienceSettings resilienceSettings =
+                new CoreConfig.DatabaseSettings.ResilienceSettings(retrySettings, circuitBreakerSettings);
+
         databaseSettings = new CoreConfig.DatabaseSettings(databaseEnabled, jdbc, user, password, poolSettings,
-                java.time.Duration.ofSeconds(Math.max(1L, writeBehindSeconds)), cacheSettings, retentionSettings);
+                java.time.Duration.ofSeconds(Math.max(1L, writeBehindSeconds)), cacheSettings, retentionSettings,
+                resilienceSettings);
 
         CoreConfig.TimeoutSettings.WatchdogSettings watchdogSettings;
         try {
@@ -718,6 +790,20 @@ public final class ConfigValidator {
         if (value <= 0D) {
             issues.error(path, "Doit être > 0");
             return def;
+        }
+        return value;
+    }
+
+    private double boundedDouble(YamlConfiguration yaml, String path, double def, double min, double max,
+                                 IssueCollector issues, boolean warnOnMissing) {
+        double value = yaml.getDouble(path, def);
+        if (!yaml.isSet(path) && warnOnMissing) {
+            issues.warn(path, "Valeur manquante, utilisation de " + def);
+            return def;
+        }
+        if (value < min || value > max) {
+            issues.error(path, "Doit être compris entre " + min + " et " + max);
+            return Math.max(min, Math.min(max, value));
         }
         return value;
     }

@@ -3,7 +3,7 @@
 #  PaperMC 1.21.x — Java 21
 # =============================================
 
-config-version: 3
+config-version: 4
 
 server:
   mode: "nexus"
@@ -45,6 +45,18 @@ database:
     maxSize: 10
     minIdle: 2
     connTimeoutMs: 3000
+  resilience:
+    retry:
+      max_attempts: 5
+      initial_interval_ms: 1000
+      max_interval_ms: 8000
+      multiplier: 2.0
+    circuit_breaker:
+      failure_rate_threshold: 50.0
+      minimum_number_of_calls: 5
+      sliding_window_seconds: 30
+      wait_duration_open_state_seconds: 60
+      permitted_calls_in_half_open_state: 1
   write_behind_interval_seconds: 60
   cache:
     profiles:

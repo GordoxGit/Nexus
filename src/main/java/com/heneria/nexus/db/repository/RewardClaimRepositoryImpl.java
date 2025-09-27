@@ -1,13 +1,11 @@
 package com.heneria.nexus.db.repository;
 
-import com.heneria.nexus.concurrent.ExecutorManager;
-import com.heneria.nexus.db.DbProvider;
+import com.heneria.nexus.db.ResilientDbExecutor;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.Executor;
 
 /**
  * MariaDB-backed implementation persisting claimed reward keys.
@@ -19,19 +17,17 @@ public final class RewardClaimRepositoryImpl implements RewardClaimRepository {
     private static final String INSERT_CLAIM_SQL =
             "INSERT INTO nexus_rewards_claimed (player_uuid, reward_key) VALUES (?, ?)";
 
-    private final DbProvider dbProvider;
-    private final Executor ioExecutor;
+    private final ResilientDbExecutor dbExecutor;
 
-    public RewardClaimRepositoryImpl(DbProvider dbProvider, ExecutorManager executorManager) {
-        this.dbProvider = Objects.requireNonNull(dbProvider, "dbProvider");
-        this.ioExecutor = Objects.requireNonNull(executorManager, "executorManager").io();
+    public RewardClaimRepositoryImpl(ResilientDbExecutor dbExecutor) {
+        this.dbExecutor = Objects.requireNonNull(dbExecutor, "dbExecutor");
     }
 
     @Override
     public CompletableFuture<Boolean> tryClaim(UUID playerUuid, String rewardKey) {
         Objects.requireNonNull(playerUuid, "playerUuid");
         Objects.requireNonNull(rewardKey, "rewardKey");
-        return dbProvider.execute(connection -> {
+        return dbExecutor.execute(connection -> {
             try (PreparedStatement statement = connection.prepareStatement(INSERT_CLAIM_SQL)) {
                 statement.setString(1, playerUuid.toString());
                 statement.setString(2, rewardKey);
@@ -43,7 +39,7 @@ public final class RewardClaimRepositoryImpl implements RewardClaimRepository {
                 }
                 throw exception;
             }
-        }, ioExecutor);
+        });
     }
 
     private boolean isDuplicateClaim(SQLException exception) {
