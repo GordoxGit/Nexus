@@ -10,6 +10,8 @@ import com.heneria.nexus.admin.PlayerEconomySnapshot;
 import com.heneria.nexus.admin.PlayerProfileSnapshot;
 import com.heneria.nexus.analytics.AnalyticsRepository;
 import com.heneria.nexus.analytics.AnalyticsService;
+import com.heneria.nexus.analytics.daily.DailyStatsAggregatorService;
+import com.heneria.nexus.analytics.daily.DailyStatsRepository;
 import com.heneria.nexus.budget.BudgetService;
 import com.heneria.nexus.budget.BudgetServiceImpl;
 import com.heneria.nexus.budget.BudgetSnapshot;
@@ -1003,6 +1005,8 @@ public final class NexusPlugin extends JavaPlugin {
         serviceRegistry.registerService(WatchdogService.class, WatchdogServiceImpl.class);
         serviceRegistry.registerService(AnalyticsRepository.class, AnalyticsRepository.class);
         serviceRegistry.registerService(AnalyticsService.class, AnalyticsService.class);
+        serviceRegistry.registerService(DailyStatsRepository.class, DailyStatsRepository.class);
+        serviceRegistry.registerService(DailyStatsAggregatorService.class, DailyStatsAggregatorService.class);
         serviceRegistry.registerService(ArenaService.class, ArenaServiceImpl.class);
         serviceRegistry.registerService(HoloService.class, HoloServiceImpl.class);
         serviceRegistry.registerService(RewardService.class, RewardServiceImpl.class);
