@@ -202,7 +202,7 @@ public final class ShopServiceImpl implements ShopService {
         return playerCosmeticRepository.unlock(playerId, cosmeticId, entry.type())
                 .thenCompose(ignored -> transaction.commit())
                 .thenApply(ignored -> {
-                    logPurchase(player, "COSMETIC:" + entry.type().name(), cosmeticId, entry.cost());
+                    logPurchase(player, "COSMETIC:" + entry.type(), cosmeticId, entry.cost());
                     return PurchaseResult.SUCCESS;
                 })
                 .exceptionallyCompose(throwable -> handleTransactionalFailure(transaction, player, "cosmétique", cosmeticId, throwable));
@@ -246,7 +246,7 @@ public final class ShopServiceImpl implements ShopService {
         }
         return rateLimiterService.check(player.getUniqueId(), actionKey, cooldown)
                 .thenApply(result -> {
-                    if (result.allowed()) {
+                    if (result.isAllowed()) {
                         return true;
                     }
                     Duration remaining = result.timeRemaining().orElse(cooldown);

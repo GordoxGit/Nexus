@@ -211,7 +211,7 @@ public final class BackupServiceImpl implements BackupService {
                         String name = path.getFileName().toString();
                         return name.startsWith(encoded + ".") && name.endsWith(".bak");
                     })
-                    .sorted(Comparator.comparing(path -> path.getFileName().toString()).reversed())
+                    .sorted(Comparator.comparing((Path path) -> path.getFileName().toString()).reversed())
                     .collect(Collectors.toList());
             if (backups.size() <= limit) {
                 return;

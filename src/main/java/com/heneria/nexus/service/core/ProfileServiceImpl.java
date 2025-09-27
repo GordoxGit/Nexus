@@ -155,7 +155,7 @@ public final class ProfileServiceImpl implements ProfileService {
                                         persistentStore.remove(profile.playerId());
                                         profileCache.invalidate(profile.playerId());
                                     }
-                                    return CompletableFuture.completedFuture(null);
+                                    return CompletableFuture.<Void>completedFuture(null);
                                 })
                                 .exceptionally(inner -> {
                                     logger.warn(
