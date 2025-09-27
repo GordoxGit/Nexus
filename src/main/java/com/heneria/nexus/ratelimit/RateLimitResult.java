@@ -21,10 +21,6 @@ public record RateLimitResult(boolean allowed, Optional<Duration> timeRemaining)
         });
     }
 
-    public static RateLimitResult allowed() {
-        return new RateLimitResult(true, Optional.empty());
-    }
-
     public static RateLimitResult blocked(Duration timeRemaining) {
         Objects.requireNonNull(timeRemaining, "timeRemaining");
         if (timeRemaining.isNegative()) {
