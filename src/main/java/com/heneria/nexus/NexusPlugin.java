@@ -67,6 +67,7 @@ import com.heneria.nexus.api.ArenaService;
 import com.heneria.nexus.api.EconomyService;
 import com.heneria.nexus.api.FirstWinBonusService;
 import com.heneria.nexus.api.MapService;
+import com.heneria.nexus.api.MapValidatorService;
 import com.heneria.nexus.api.ProfileService;
 import com.heneria.nexus.api.RewardService;
 import com.heneria.nexus.api.QueueService;
@@ -77,6 +78,7 @@ import com.heneria.nexus.service.core.ArenaServiceImpl;
 import com.heneria.nexus.service.core.EconomyServiceImpl;
 import com.heneria.nexus.service.core.FirstWinBonusServiceImpl;
 import com.heneria.nexus.service.core.MapServiceImpl;
+import com.heneria.nexus.service.core.MapValidatorServiceImpl;
 import com.heneria.nexus.service.core.PersistenceService;
 import com.heneria.nexus.service.core.PersistenceServiceImpl;
 import com.heneria.nexus.service.core.ProfileServiceImpl;
@@ -1431,6 +1433,7 @@ public final class NexusPlugin extends JavaPlugin {
 
     private void registerServices() {
         serviceRegistry.registerService(RingScheduler.class, RingScheduler.class);
+        serviceRegistry.registerService(MapValidatorService.class, MapValidatorServiceImpl.class);
         serviceRegistry.registerService(MapService.class, MapServiceImpl.class);
         serviceRegistry.registerService(ProfileRepository.class, ProfileRepositoryImpl.class);
         serviceRegistry.registerService(PlayerClassRepository.class, PlayerClassRepositoryImpl.class);
