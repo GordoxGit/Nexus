@@ -11,6 +11,7 @@ import com.heneria.nexus.api.QueueStats;
 import com.heneria.nexus.api.QueueTicket;
 import com.heneria.nexus.api.ProfileService;
 import com.heneria.nexus.api.TeleportService;
+import com.heneria.nexus.redis.RedisService;
 import com.heneria.nexus.util.NexusLogger;
 import com.heneria.nexus.util.MessageFacade;
 import java.time.Duration;
@@ -27,6 +28,8 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.Locale;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import net.luckperms.api.LuckPerms;
@@ -51,12 +54,16 @@ public final class QueueServiceImpl implements QueueService {
     private final ProfileService profileService;
     private final TeleportService teleportService;
     private final MessageFacade messageFacade;
+    private final RedisService redisService;
     private final Optional<LuckPerms> luckPerms;
+    private final GlobalMatchmaker globalMatchmaker;
     private final Map<ArenaMode, ConcurrentLinkedQueue<QueueTicket>> queues = new EnumMap<>(ArenaMode.class);
     private final ConcurrentHashMap<UUID, QueueTicket> ticketsByPlayer = new ConcurrentHashMap<>();
     private final AtomicLong matchesFormed = new AtomicLong();
     private final AtomicReference<CoreConfig.QueueSettings> settingsRef;
     private final AtomicReference<QueueStats> stats = new AtomicReference<>(new QueueStats(0, 0, 0L, 0L));
+    private final AtomicBoolean crossShardFallbackLogged = new AtomicBoolean();
+    private final String serverId;
     private volatile BukkitTask tickerTask;
 
     public QueueServiceImpl(JavaPlugin plugin,
@@ -65,6 +72,8 @@ public final class QueueServiceImpl implements QueueService {
                             ProfileService profileService,
                             TeleportService teleportService,
                             MessageFacade messageFacade,
+                            RedisService redisService,
+                            HealthCheckService healthCheckService,
                             CoreConfig config,
                             Optional<LuckPerms> luckPerms) {
         this.plugin = Objects.requireNonNull(plugin, "plugin");
@@ -73,8 +82,20 @@ public final class QueueServiceImpl implements QueueService {
         this.profileService = Objects.requireNonNull(profileService, "profileService");
         this.teleportService = Objects.requireNonNull(teleportService, "teleportService");
         this.messageFacade = Objects.requireNonNull(messageFacade, "messageFacade");
+        this.redisService = Objects.requireNonNull(redisService, "redisService");
         this.luckPerms = Objects.requireNonNull(luckPerms, "luckPerms");
+        Objects.requireNonNull(healthCheckService, "healthCheckService");
+        Objects.requireNonNull(config, "config");
         this.settingsRef = new AtomicReference<>(config.queueSettings());
+        this.serverId = Objects.requireNonNull(config.serverId(), "serverId");
+        this.globalMatchmaker = new GlobalMatchmaker(logger,
+                executorManager,
+                this.redisService,
+                healthCheckService,
+                settingsRef::get,
+                this::findLocalTicket,
+                this::isPlayerOnlineLocally,
+                this.serverId);
         for (ArenaMode mode : ArenaMode.values()) {
             queues.put(mode, new ConcurrentLinkedQueue<>());
         }
@@ -119,7 +140,12 @@ public final class QueueServiceImpl implements QueueService {
         QueueOptions effectiveOptions = options == null ? QueueOptions.standard() : options;
         QueueTicket ticket = new QueueTicket(playerId, mode, effectiveOptions, Instant.now());
         ticketsByPlayer.put(playerId, ticket);
-        queues.get(mode).add(ticket);
+        int weight = weightForTicket(ticket);
+        if (shouldUseCrossShard()) {
+            enqueueCrossShard(ticket, weight);
+        } else {
+            queues.get(mode).add(ticket);
+        }
         profileService.load(playerId).exceptionally(throwable -> {
             logger.debug(() -> "Préchargement du profil impossible pour " + playerId + ": " + throwable.getMessage());
             return null;
@@ -132,7 +158,11 @@ public final class QueueServiceImpl implements QueueService {
     public void leave(UUID playerId) {
         QueueTicket ticket = ticketsByPlayer.remove(playerId);
         if (ticket != null) {
-            queues.get(ticket.mode()).remove(ticket);
+            ConcurrentLinkedQueue<QueueTicket> queue = queues.get(ticket.mode());
+            if (queue != null) {
+                queue.remove(ticket);
+            }
+            removeFromRedis(ticket);
             updateStats();
         }
     }
@@ -150,17 +180,27 @@ public final class QueueServiceImpl implements QueueService {
 
     @Override
     public Optional<MatchPlan> tryMatch(ArenaMode mode) {
+        Objects.requireNonNull(mode, "mode");
+        int playersNeeded = playersNeededForMode(mode);
+        if (playersNeeded <= 0) {
+            return Optional.empty();
+        }
+        if (shouldUseCrossShard()) {
+            Optional<GlobalMatchmaker.MatchResult> result = globalMatchmaker.tryMatch(mode, playersNeeded);
+            result.ifPresent(this::handleGlobalMatch);
+            return result.map(GlobalMatchmaker.MatchResult::plan);
+        }
         ConcurrentLinkedQueue<QueueTicket> queue = queues.get(mode);
         if (queue == null) {
             return Optional.empty();
         }
         List<QueueTicket> candidates = new ArrayList<>(queue);
-        if (candidates.size() < 2) {
+        if (candidates.size() < playersNeeded) {
             return Optional.empty();
         }
         candidates.sort(Comparator.comparingInt(this::weightForTicket).reversed()
                 .thenComparing(QueueTicket::enqueuedAt));
-        List<QueueTicket> selected = candidates.stream().limit(2).toList();
+        List<QueueTicket> selected = candidates.stream().limit(playersNeeded).toList();
         List<UUID> players = selected.stream().map(QueueTicket::playerId).toList();
         if (players.stream().anyMatch(id -> !ticketsByPlayer.containsKey(id))) {
             selected.forEach(queue::remove);
@@ -172,7 +212,7 @@ public final class QueueServiceImpl implements QueueService {
         });
         updateStats();
         MatchPlan plan = new MatchPlan(UUID.randomUUID(), mode, players, Optional.empty());
-        dispatchTeleportRequests(selected);
+        dispatchTeleportRequests(selected, Optional.empty());
         return Optional.of(plan);
     }
 
@@ -183,16 +223,132 @@ public final class QueueServiceImpl implements QueueService {
         scheduleTicker();
     }
 
-    private void dispatchTeleportRequests(List<QueueTicket> tickets) {
+    private void handleGlobalMatch(GlobalMatchmaker.MatchResult result) {
+        if (result == null) {
+            return;
+        }
+        List<QueueTicket> localTickets = new ArrayList<>();
+        for (UUID playerId : result.plan().players()) {
+            QueueTicket ticket = ticketsByPlayer.remove(playerId);
+            if (ticket != null) {
+                ConcurrentLinkedQueue<QueueTicket> queue = queues.get(ticket.mode());
+                if (queue != null) {
+                    queue.remove(ticket);
+                }
+                localTickets.add(ticket);
+            }
+        }
+        if (!localTickets.isEmpty()) {
+            dispatchTeleportRequests(localTickets, result.targetServerId());
+        }
+        updateStats();
+    }
+
+    private void dispatchTeleportRequests(List<QueueTicket> tickets, Optional<String> targetServerId) {
         if (tickets.isEmpty()) {
             return;
         }
+        String target = targetServerId.filter(id -> !id.isBlank()).orElse(null);
         for (QueueTicket ticket : tickets) {
             UUID playerId = ticket.playerId();
             notifyTeleportStart(playerId);
-            teleportService.connectToArena(playerId).whenComplete((result, throwable) ->
+            teleportService.connectToArena(playerId, target).whenComplete((result, throwable) ->
                     executorManager.mainThread().runNow(() -> handleTeleportOutcome(ticket, result, throwable)));
         }
+    }
+
+    private void enqueueCrossShard(QueueTicket ticket, int weight) {
+        if (!redisService.isOperational()) {
+            fallbackToLocalQueue(ticket);
+            return;
+        }
+        String key = queueKeyFor(ticket.mode());
+        double score = computeScore(ticket, weight);
+        redisService.execute(jedis -> {
+            jedis.zadd(key, score, ticket.playerId().toString());
+            return null;
+        }).whenComplete((ignored, throwable) -> {
+            if (throwable != null) {
+                logger.warn("Impossible d'ajouter le joueur " + ticket.playerId() + " à la file Redis", throwable);
+                if (ticketsByPlayer.containsKey(ticket.playerId())) {
+                    fallbackToLocalQueue(ticket);
+                }
+            }
+        });
+    }
+
+    private void removeFromRedis(QueueTicket ticket) {
+        CoreConfig.QueueSettings settings = settingsRef.get();
+        CoreConfig.QueueSettings.CrossShardSettings crossShard = settings.crossShard();
+        if (!crossShard.enabled() || !redisService.isOperational()) {
+            return;
+        }
+        String key = queueKeyFor(ticket.mode());
+        redisService.execute(jedis -> {
+            jedis.zrem(key, ticket.playerId().toString());
+            return null;
+        }).exceptionally(throwable -> {
+            logger.debug(() -> "Suppression Redis ignorée pour " + ticket.playerId() + ": " + throwable.getMessage());
+            return null;
+        });
+    }
+
+    private void fallbackToLocalQueue(QueueTicket ticket) {
+        if (ticket == null) {
+            return;
+        }
+        ConcurrentLinkedQueue<QueueTicket> queue = queues.get(ticket.mode());
+        if (queue != null) {
+            queue.add(ticket);
+        }
+        updateStats();
+    }
+
+    private double computeScore(QueueTicket ticket, int weight) {
+        int effectiveWeight = Math.max(0, Math.min(Integer.MAX_VALUE, weight));
+        long priorityComponent = (long) Integer.MAX_VALUE - effectiveWeight;
+        long timestamp = Math.max(0L, ticket.enqueuedAt().toEpochMilli());
+        String formatted = String.format(Locale.ROOT, "%d.%013d", priorityComponent, timestamp);
+        return Double.parseDouble(formatted);
+    }
+
+    private String queueKeyFor(ArenaMode mode) {
+        CoreConfig.QueueSettings.CrossShardSettings crossShard = settingsRef.get().crossShard();
+        return crossShard.redisKeyPrefix() + ":" + mode.name().toLowerCase(Locale.ROOT);
+    }
+
+    private boolean shouldUseCrossShard() {
+        CoreConfig.QueueSettings settings = settingsRef.get();
+        CoreConfig.QueueSettings.CrossShardSettings crossShard = settings.crossShard();
+        if (crossShard == null || !crossShard.enabled()) {
+            crossShardFallbackLogged.set(false);
+            return false;
+        }
+        if (!redisService.isOperational()) {
+            if (crossShardFallbackLogged.compareAndSet(false, true)) {
+                logger.warn("Redis indisponible — bascule vers la file locale pour le matchmaking.");
+            }
+            return false;
+        }
+        if (crossShardFallbackLogged.getAndSet(false)) {
+            logger.info("Redis à nouveau disponible — reprise du matchmaking cross-shard.");
+        }
+        return true;
+    }
+
+    private int playersNeededForMode(ArenaMode mode) {
+        return switch (mode) {
+            case CASUAL, COMPETITIVE -> 2;
+        };
+    }
+
+    private Optional<QueueTicket> findLocalTicket(UUID playerId) {
+        return Optional.ofNullable(ticketsByPlayer.get(playerId));
+    }
+
+    private boolean isPlayerOnlineLocally(UUID playerId) {
+        Player player = plugin.getServer().getPlayer(playerId);
+        return player != null && player.isOnline();
     }
 
     private void notifyTeleportStart(UUID playerId) {

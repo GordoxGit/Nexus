@@ -412,7 +412,11 @@ public final class CoreConfig {
 
     public record DegradedModeSettings(boolean enabled, boolean banner) {}
 
-    public record QueueSettings(int tickHz, int vipWeight, String targetServerId, String hubGroup) {
+    public record QueueSettings(int tickHz,
+                                int vipWeight,
+                                String targetServerId,
+                                String hubGroup,
+                                CrossShardSettings crossShard) {
         public QueueSettings {
             if (tickHz <= 0) throw new IllegalArgumentException("tickHz must be > 0");
             if (vipWeight < 0) throw new IllegalArgumentException("vipWeight must be >= 0");
@@ -423,6 +427,19 @@ public final class CoreConfig {
             }
             if (hubGroup.isEmpty()) {
                 throw new IllegalArgumentException("hubGroup must not be empty");
+            }
+            crossShard = Objects.requireNonNull(crossShard, "crossShard");
+        }
+
+        public record CrossShardSettings(boolean enabled, String redisKeyPrefix, long lockTtlMs) {
+            public CrossShardSettings {
+                redisKeyPrefix = Objects.requireNonNull(redisKeyPrefix, "redisKeyPrefix").trim();
+                if (redisKeyPrefix.isEmpty()) {
+                    throw new IllegalArgumentException("redisKeyPrefix must not be empty");
+                }
+                if (lockTtlMs <= 0L) {
+                    throw new IllegalArgumentException("lockTtlMs must be > 0");
+                }
             }
         }
     }

@@ -17,6 +17,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Function;
 import redis.clients.jedis.Jedis;
 import redis.clients.jedis.JedisPool;
 import redis.clients.jedis.JedisPoolConfig;
@@ -129,6 +130,25 @@ public final class RedisService implements LifecycleAware {
             }
             try (Jedis jedis = pool.getResource()) {
                 return jedis.publish(channel, message);
+            } catch (Exception exception) {
+                reportFailure(exception);
+                throw exception;
+            }
+        });
+    }
+
+    public <T> CompletableFuture<T> execute(Function<Jedis, T> operation) {
+        Objects.requireNonNull(operation, "operation");
+        if (!isOperational()) {
+            return CompletableFuture.failedFuture(new IllegalStateException("Redis is not connected"));
+        }
+        return executorManager.supplyIo(() -> {
+            JedisPool pool = poolRef.get();
+            if (pool == null) {
+                throw new IllegalStateException("Redis connection pool unavailable");
+            }
+            try (Jedis jedis = pool.getResource()) {
+                return operation.apply(jedis);
             } catch (Exception exception) {
                 reportFailure(exception);
                 throw exception;
