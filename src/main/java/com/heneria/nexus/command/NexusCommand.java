@@ -17,11 +17,12 @@ public final class NexusCommand implements CommandExecutor, TabCompleter {
 
     private static final List<String> SUB_COMMANDS = List.of("help", "reload", "dump", "budget", "holo", "admin");
     private static final List<String> HOLO_SUB = List.of("create", "remove", "move", "list", "reload");
-    private static final List<String> ADMIN_SUB = List.of("player", "audit", "config");
+    private static final List<String> ADMIN_SUB = List.of("player", "audit", "config", "redis");
     private static final List<String> ADMIN_PLAYER_ACTIONS = List.of("export", "import");
     private static final List<String> ADMIN_AUDIT_ACTIONS = List.of("log");
     private static final List<String> ADMIN_CONFIG_ACTIONS = List.of("backups", "restore");
     private static final List<String> ADMIN_CONFIG_BACKUPS = List.of("list");
+    private static final List<String> ADMIN_REDIS_ACTIONS = List.of("status");
 
     private final NexusPlugin plugin;
 
@@ -114,6 +115,15 @@ public final class NexusCommand implements CommandExecutor, TabCompleter {
                 }
                 String prefix = args[2].toLowerCase(Locale.ROOT);
                 return ADMIN_CONFIG_ACTIONS.stream()
+                        .filter(action -> action.startsWith(prefix))
+                        .toList();
+            }
+            if (args.length == 3 && args[1].equalsIgnoreCase("redis")) {
+                if (!sender.hasPermission("nexus.admin.redis")) {
+                    return Collections.emptyList();
+                }
+                String prefix = args[2].toLowerCase(Locale.ROOT);
+                return ADMIN_REDIS_ACTIONS.stream()
                         .filter(action -> action.startsWith(prefix))
                         .toList();
             }
@@ -217,6 +227,7 @@ public final class NexusCommand implements CommandExecutor, TabCompleter {
                 || sender.hasPermission("nexus.admin.dump")
                 || sender.hasPermission("nexus.admin.budget")
                 || sender.hasPermission("nexus.admin.audit.view")
-                || sender.hasPermission("nexus.admin.config.manage_backups");
+                || sender.hasPermission("nexus.admin.config.manage_backups")
+                || sender.hasPermission("nexus.admin.redis");
     }
 }

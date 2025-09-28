@@ -45,6 +45,9 @@ permissions:
   nexus.admin.config.manage_backups:
     description: Gérer les sauvegardes de configuration Nexus.
     default: op
+  nexus.admin.redis:
+    description: Inspecter l'état de Redis et des communications inter-serveurs.
+    default: op
   nexus.admin.*:
     description: Accès complet aux commandes d'administration Nexus.
     default: op
@@ -56,6 +59,7 @@ permissions:
       nexus.admin.player.import: true
       nexus.admin.audit.view: true
       nexus.admin.config.manage_backups: true
+      nexus.admin.redis: true
   nexus.holo.manage:
     description: Gérer les hologrammes Nexus via /nexus holo.
     default: op

@@ -83,6 +83,8 @@ import com.heneria.nexus.service.core.ShopServiceImpl;
 import com.heneria.nexus.service.core.TimerServiceImpl;
 import com.heneria.nexus.service.core.TeleportServiceImpl;
 import com.heneria.nexus.service.core.VaultEconomyService;
+import com.heneria.nexus.redis.RedisManager;
+import com.heneria.nexus.redis.RedisService;
 import com.heneria.nexus.service.ratelimit.RateLimiterService;
 import com.heneria.nexus.service.ratelimit.RateLimiterServiceImpl;
 import com.heneria.nexus.service.maintenance.DataPurgeService;
@@ -424,6 +426,9 @@ public final class NexusPlugin extends JavaPlugin {
         if (sender.hasPermission("nexus.holo.manage")) {
             messageFacade.send(sender, "help.admin.holo");
         }
+        if (sender.hasPermission("nexus.admin.redis")) {
+            messageFacade.send(sender, "help.admin.redis");
+        }
     }
 
     public void handleReload(CommandSender sender) {
@@ -489,6 +494,7 @@ public final class NexusPlugin extends JavaPlugin {
         serviceRegistry.get(EconomyService.class).applyDegradedModeSettings(newBundle.core().degradedModeSettings());
         serviceRegistry.get(ShopService.class).applyRateLimitSettings(newBundle.core().rateLimitSettings());
         serviceRegistry.get(ShopService.class).applyCatalog(newBundle.economy().shop());
+        serviceRegistry.get(RedisManager.class).applySettings(newBundle.core().redisSettings());
         serviceRegistry.get(HoloService.class).applySettings(newBundle.core().hologramSettings());
         serviceRegistry.get(HoloService.class).loadFromConfig();
         if (servicesExposed && !newBundle.core().serviceSettings().exposeBukkitServices()) {
@@ -694,6 +700,7 @@ public final class NexusPlugin extends JavaPlugin {
             case "player" -> handleAdminPlayer(sender, args);
             case "audit" -> handleAdminAudit(sender, args);
             case "config" -> handleAdminConfig(sender, args);
+            case "redis" -> handleAdminRedis(sender, args);
             default -> sendAdminUsage(sender);
         }
     }
@@ -797,6 +804,44 @@ public final class NexusPlugin extends JavaPlugin {
             case "backups" -> handleAdminConfigBackups(sender, args);
             case "restore" -> handleAdminConfigRestore(sender, args);
             default -> sendAdminConfigUsage(sender);
+        }
+    }
+
+    private void handleAdminRedis(CommandSender sender, String[] args) {
+        if (!sender.hasPermission("nexus.admin.redis")) {
+            messageFacade.send(sender, "errors.no_permission");
+            return;
+        }
+        if (args.length < 3 || !args[2].equalsIgnoreCase("status")) {
+            sendAdminRedisUsage(sender);
+            return;
+        }
+        RedisManager redisManager = serviceRegistry.get(RedisManager.class);
+        RedisService.RedisDiagnostics diagnostics = redisManager.diagnostics();
+        RedisService.ConnectionState state = diagnostics.state();
+        String stateKey = switch (state) {
+            case CONNECTED -> "admin.redis.status.state.connected";
+            case CONNECTING -> "admin.redis.status.state.connecting";
+            case FAILED -> "admin.redis.status.state.failed";
+            case DISABLED -> "admin.redis.status.state.disabled";
+        };
+        messageFacade.prefix(sender).ifPresent(sender::sendMessage);
+        messageFacade.send(sender, "admin.redis.status.header",
+                Placeholder.component("state", messageFacade.render(sender, stateKey)));
+        if (state == RedisService.ConnectionState.DISABLED) {
+            messageFacade.send(sender, "admin.redis.status.disabled");
+            return;
+        }
+        messageFacade.send(sender, "admin.redis.status.subscribers",
+                Placeholder.unparsed("count", Integer.toString(diagnostics.activeSubscriptions())));
+        diagnostics.poolMetrics().ifPresent(metrics -> messageFacade.send(sender, "admin.redis.status.pool",
+                Placeholder.unparsed("active", Integer.toString(metrics.active())),
+                Placeholder.unparsed("idle", Integer.toString(metrics.idle())),
+                Placeholder.unparsed("waiters", Integer.toString(metrics.waiters()))));
+        diagnostics.lastError().ifPresent(error ->
+                messageFacade.send(sender, "admin.redis.status.last_error", Placeholder.unparsed("error", error)));
+        if (state == RedisService.ConnectionState.FAILED) {
+            messageFacade.send(sender, "admin.redis.status.retry");
         }
     }
 
@@ -1079,10 +1124,15 @@ public final class NexusPlugin extends JavaPlugin {
         messageFacade.send(sender, "admin.config.usage");
     }
 
+    private void sendAdminRedisUsage(CommandSender sender) {
+        messageFacade.send(sender, "admin.redis.usage");
+    }
+
     private void sendAdminUsage(CommandSender sender) {
         sendAdminPlayerUsage(sender);
         sendAdminAuditUsage(sender);
         sendAdminConfigUsage(sender);
+        sendAdminRedisUsage(sender);
     }
 
     private Optional<String> optionalAuditName(String value) {
@@ -1394,6 +1444,8 @@ public final class NexusPlugin extends JavaPlugin {
         serviceRegistry.registerService(ShopService.class, ShopServiceImpl.class);
         serviceRegistry.registerService(BudgetService.class, BudgetServiceImpl.class);
         serviceRegistry.registerService(WatchdogService.class, WatchdogServiceImpl.class);
+        serviceRegistry.registerService(RedisService.class, RedisService.class);
+        serviceRegistry.registerService(RedisManager.class, RedisManager.class);
         serviceRegistry.registerService(AnalyticsRepository.class, AnalyticsRepository.class);
         serviceRegistry.registerService(AnalyticsService.class, AnalyticsService.class);
         serviceRegistry.registerService(DailyStatsRepository.class, DailyStatsRepository.class);
