@@ -51,16 +51,11 @@ public final class DailyStatsAggregatorService implements LifecycleAware {
             """;
 
     private static final List<String> COINS_SQL_CANDIDATES = List.of(
-            "SELECT COALESCE(SUM(delta), 0) FROM nexus_economy_log WHERE delta > 0 AND created_at >= ? AND created_at < ?",
-            "SELECT COALESCE(SUM(amount_delta), 0) FROM nexus_economy_log WHERE amount_delta > 0 AND created_at >= ? AND created_at < ?",
             "SELECT COALESCE(SUM(amount), 0) FROM nexus_economy_log WHERE amount > 0 AND created_at >= ? AND created_at < ?"
     );
 
     private static final List<String> BPXP_SQL_CANDIDATES = List.of(
-            "SELECT COALESCE(SUM(xp_delta), 0) FROM nexus_battle_pass_xp_log WHERE xp_delta > 0 AND created_at >= ? AND created_at < ?",
-            "SELECT COALESCE(SUM(delta), 0) FROM nexus_battle_pass_xp_log WHERE delta > 0 AND created_at >= ? AND created_at < ?",
-            "SELECT COALESCE(SUM(xp_amount), 0) FROM nexus_battle_pass_xp_log WHERE xp_amount > 0 AND created_at >= ? AND created_at < ?",
-            "SELECT COALESCE(SUM(xp_delta), 0) FROM nexus_battle_pass_log WHERE xp_delta > 0 AND created_at >= ? AND created_at < ?"
+            "SELECT COALESCE(SUM(xp_delta), 0) FROM nexus_battle_pass_xp_log WHERE xp_delta > 0 AND created_at >= ? AND created_at < ?"
     );
 
     private final JavaPlugin plugin;
