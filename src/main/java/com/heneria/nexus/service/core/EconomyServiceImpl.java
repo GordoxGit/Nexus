@@ -348,7 +348,7 @@ public final class EconomyServiceImpl implements EconomyService {
                     }
                     return null;
                 })
-                .thenApply(ignored -> null);
+                .thenApply(ignored -> (Void) null);
     }
 
     private CompletableFuture<Void> logTransactionBatch(Map<UUID, List<PendingLogEntry>> entries,
@@ -529,7 +529,7 @@ public final class EconomyServiceImpl implements EconomyService {
                         markDirtyForTransaction(deltas);
                         deltas.clear();
                     })
-                    .thenApply(ignored -> null)
+                    .thenApply(ignored -> (Void) null)
                     .exceptionallyCompose(EconomyServiceImpl.this::propagateEconomyFailure);
         }
 
