@@ -150,6 +150,25 @@ public final class ConfigValidator {
             issues.error("queue.hub_group", "Doit être défini");
             hubGroup = "hub";
         }
+        ConfigurationSection crossShardSection = yaml.getConfigurationSection("queue.cross_shard");
+        boolean crossEnabled = false;
+        String crossRedisPrefix = "nexus:queue";
+        long crossLockTtlMs = 2000L;
+        if (crossShardSection != null) {
+            crossEnabled = crossShardSection.getBoolean("enabled", false);
+            String prefix = crossShardSection.getString("redis_key_prefix", "nexus:queue");
+            if (prefix == null || prefix.isBlank()) {
+                issues.error("queue.cross_shard.redis_key_prefix", "Doit être défini");
+                prefix = "nexus:queue";
+            }
+            crossRedisPrefix = prefix;
+            long ttl = crossShardSection.getLong("lock_ttl_ms", 2000L);
+            if (ttl <= 0L) {
+                issues.warn("queue.cross_shard.lock_ttl_ms", "Valeur <= 0, utilisation de 2000");
+                ttl = 2000L;
+            }
+            crossLockTtlMs = ttl;
+        }
         boolean strictMiniMessage = yaml.getBoolean("ui.minimessage.strict", true);
 
         int hologramHz = positiveInt(yaml, "holograms.update_hz", 5, issues, true);
@@ -369,11 +388,20 @@ public final class ConfigValidator {
             timeoutSettings = new CoreConfig.TimeoutSettings(5000L, 3000L,
                     new CoreConfig.TimeoutSettings.WatchdogSettings(10_000L, 8_000L));
         }
+        CoreConfig.QueueSettings.CrossShardSettings crossShardSettings;
         try {
-            queueSettings = new CoreConfig.QueueSettings(queueHz, queueVip, queueTarget, hubGroup);
+            crossShardSettings = new CoreConfig.QueueSettings.CrossShardSettings(crossEnabled, crossRedisPrefix,
+                    Math.max(1L, crossLockTtlMs));
+        } catch (IllegalArgumentException exception) {
+            issues.error("queue.cross_shard", exception.getMessage());
+            crossShardSettings = new CoreConfig.QueueSettings.CrossShardSettings(false, "nexus:queue", 2000L);
+        }
+        try {
+            queueSettings = new CoreConfig.QueueSettings(queueHz, queueVip, queueTarget, hubGroup, crossShardSettings);
         } catch (IllegalArgumentException exception) {
             issues.error("queue", exception.getMessage());
-            queueSettings = new CoreConfig.QueueSettings(5, 0, "nexus-1", "hub");
+            queueSettings = new CoreConfig.QueueSettings(5, 0, "nexus-1", "hub",
+                    new CoreConfig.QueueSettings.CrossShardSettings(false, "nexus:queue", 2000L));
         }
         try {
             hologramSettings = new CoreConfig.HologramSettings(hologramHz, hologramMaxVisible,

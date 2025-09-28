@@ -112,6 +112,10 @@ queue:
   vip_weight: 1
   target_server: "nexus-1"
   hub_group: "hub"
+  cross_shard:
+    enabled: false
+    redis_key_prefix: "nexus:queue"
+    lock_ttl_ms: 2000
 
 healthcheck:
   enabled: true

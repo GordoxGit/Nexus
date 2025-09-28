@@ -97,6 +97,24 @@ public final class HealthCheckService implements LifecycleAware {
         reschedule(newConfiguration);
     }
 
+    /**
+     * Attempts to find a Nexus server identifier that is currently available to host a match.
+     */
+    public Optional<String> findAvailableServerId() {
+        Configuration configuration = configurationRef.get();
+        if (!configuration.enabled()) {
+            return Optional.empty();
+        }
+        if (!isHealthy()) {
+            return Optional.empty();
+        }
+        ServerAvailability availability = resolveAvailability();
+        return switch (availability) {
+            case IN_GAME, UNKNOWN -> Optional.empty();
+            default -> Optional.ofNullable(configuration.serverId()).filter(id -> !id.isBlank());
+        };
+    }
+
     private void registerChannel() {
         try {
             plugin.getServer().getMessenger().registerOutgoingPluginChannel(plugin, CHANNEL);
