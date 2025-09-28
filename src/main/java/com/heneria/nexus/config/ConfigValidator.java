@@ -51,6 +51,12 @@ public final class ConfigValidator {
         Objects.requireNonNull(issues, "issues");
 
         String mode = readString(yaml, "server.mode", DEFAULT_SERVER_MODE, issues, false);
+        String serverId = readString(yaml, "server.id", "nexus-1", issues, true);
+        if (serverId == null || serverId.isBlank()) {
+            issues.error("server.id", "Doit être défini");
+            serverId = "nexus-1";
+        }
+        serverId = serverId.trim();
         Locale locale = parseLocale(readString(yaml, "server.language", DEFAULT_LOCALE.toLanguageTag(), issues, false),
                 "server.language", issues);
         ZoneId zone = parseZone(readString(yaml, "server.timezone", DEFAULT_ZONE.getId(), issues, false), issues);
@@ -156,6 +162,9 @@ public final class ConfigValidator {
         boolean analyticsEnabled = yaml.getBoolean("analytics.outbox.enabled", false);
         long flushIntervalSeconds = positiveLong(yaml, "analytics.outbox.flush_interval_seconds", 30L, issues, true);
         int analyticsMaxBatch = positiveInt(yaml, "analytics.outbox.max_batch_size", 200, issues, true);
+
+        boolean healthEnabled = yaml.getBoolean("healthcheck.enabled", true);
+        long healthIntervalSeconds = positiveLong(yaml, "healthcheck.interval_seconds", 5L, issues, true);
 
         Map<String, CoreConfig.TitleTimesProfile> titleProfiles = new LinkedHashMap<>();
         ConfigurationSection timesSection = yaml.getConfigurationSection("ui.title.times");
@@ -386,9 +395,17 @@ public final class ConfigValidator {
 
         CoreConfig.RateLimitSettings rateLimitSettings = parseRateLimitSettingsSafe(yaml, issues);
 
-        return new CoreConfig(mode, locale, zone, arenaSettings, executorSettings, databaseSettings,
+        CoreConfig.HealthCheckSettings healthCheckSettings;
+        try {
+            healthCheckSettings = new CoreConfig.HealthCheckSettings(healthEnabled, healthIntervalSeconds);
+        } catch (IllegalArgumentException exception) {
+            issues.error("healthcheck", exception.getMessage());
+            healthCheckSettings = new CoreConfig.HealthCheckSettings(true, Math.max(1L, healthIntervalSeconds));
+        }
+
+        return new CoreConfig(mode, serverId, locale, zone, arenaSettings, executorSettings, databaseSettings,
                 redisSettings, rateLimitSettings, serviceSettings, backupSettings, timeoutSettings, degradedModeSettings,
-                queueSettings, hologramSettings, analyticsSettings, uiSettings);
+                queueSettings, hologramSettings, analyticsSettings, uiSettings, healthCheckSettings);
     }
 
     private CoreConfig.RateLimitSettings parseRateLimitSettingsSafe(YamlConfiguration yaml, IssueCollector issues) {

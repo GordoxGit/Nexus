@@ -3,9 +3,10 @@
 #  PaperMC 1.21.x — Java 21
 # =============================================
 
-config-version: 4
+config-version: 5
 
 server:
+  id: "nexus-1"
   mode: "nexus"
   language: "fr"
   timezone: "Europe/Paris"
@@ -111,6 +112,10 @@ queue:
   vip_weight: 1
   target_server: "nexus-1"
   hub_group: "hub"
+
+healthcheck:
+  enabled: true
+  interval_seconds: 5
 
 analytics:
   outbox:

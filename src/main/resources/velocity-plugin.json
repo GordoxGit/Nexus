@@ -1,0 +1,8 @@
+{
+  "id": "nexusproxy",
+  "name": "Nexus Proxy",
+  "version": "${project.version}",
+  "main": "com.heneria.nexusproxy.velocity.NexusProxyPlugin",
+  "authors": ["Heneria"],
+  "dependencies": []
+}

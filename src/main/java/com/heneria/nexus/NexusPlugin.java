@@ -82,6 +82,7 @@ import com.heneria.nexus.service.core.RewardServiceImpl;
 import com.heneria.nexus.service.core.ShopServiceImpl;
 import com.heneria.nexus.service.core.TimerServiceImpl;
 import com.heneria.nexus.service.core.TeleportServiceImpl;
+import com.heneria.nexus.service.core.HealthCheckService;
 import com.heneria.nexus.service.core.VaultEconomyService;
 import com.heneria.nexus.redis.RedisManager;
 import com.heneria.nexus.redis.RedisService;
@@ -496,6 +497,7 @@ public final class NexusPlugin extends JavaPlugin {
         serviceRegistry.get(ShopService.class).applyCatalog(newBundle.economy().shop());
         serviceRegistry.get(RedisManager.class).applySettings(newBundle.core().redisSettings());
         serviceRegistry.get(HoloService.class).applySettings(newBundle.core().hologramSettings());
+        serviceRegistry.get(HealthCheckService.class).applyConfiguration(newBundle.core());
         serviceRegistry.get(HoloService.class).loadFromConfig();
         if (servicesExposed && !newBundle.core().serviceSettings().exposeBukkitServices()) {
             getServer().getServicesManager().unregisterAll(this);
@@ -1438,6 +1440,7 @@ public final class NexusPlugin extends JavaPlugin {
         serviceRegistry.registerService(PersistenceService.class, PersistenceServiceImpl.class);
         serviceRegistry.registerService(ProfileService.class, ProfileServiceImpl.class);
         serviceRegistry.registerService(TeleportService.class, TeleportServiceImpl.class);
+        serviceRegistry.registerService(HealthCheckService.class, HealthCheckService.class);
         serviceRegistry.registerService(QueueService.class, QueueServiceImpl.class);
         serviceRegistry.registerService(TimerService.class, TimerServiceImpl.class);
         serviceRegistry.registerService(RateLimiterService.class, RateLimiterServiceImpl.class);
