@@ -15,6 +15,7 @@ import net.kyori.adventure.bossbar.BossBar;
 public final class CoreConfig {
 
     private final String serverMode;
+    private final String serverId;
     private final Locale language;
     private final ZoneId timezone;
     private final ArenaSettings arenaSettings;
@@ -30,8 +31,10 @@ public final class CoreConfig {
     private final HologramSettings hologramSettings;
     private final AnalyticsSettings analyticsSettings;
     private final UiSettings uiSettings;
+    private final HealthCheckSettings healthCheckSettings;
 
     public CoreConfig(String serverMode,
+                      String serverId,
                       Locale language,
                       ZoneId timezone,
                       ArenaSettings arenaSettings,
@@ -46,8 +49,10 @@ public final class CoreConfig {
                       QueueSettings queueSettings,
                       HologramSettings hologramSettings,
                       AnalyticsSettings analyticsSettings,
-                      UiSettings uiSettings) {
+                      UiSettings uiSettings,
+                      HealthCheckSettings healthCheckSettings) {
         this.serverMode = Objects.requireNonNull(serverMode, "serverMode");
+        this.serverId = Objects.requireNonNull(serverId, "serverId");
         this.language = Objects.requireNonNull(language, "language");
         this.timezone = Objects.requireNonNull(timezone, "timezone");
         this.arenaSettings = Objects.requireNonNull(arenaSettings, "arenaSettings");
@@ -63,10 +68,15 @@ public final class CoreConfig {
         this.hologramSettings = Objects.requireNonNull(hologramSettings, "hologramSettings");
         this.analyticsSettings = Objects.requireNonNull(analyticsSettings, "analyticsSettings");
         this.uiSettings = Objects.requireNonNull(uiSettings, "uiSettings");
+        this.healthCheckSettings = Objects.requireNonNull(healthCheckSettings, "healthCheckSettings");
     }
 
     public String serverMode() {
         return serverMode;
+    }
+
+    public String serverId() {
+        return serverId;
     }
 
     public Locale language() {
@@ -127,6 +137,10 @@ public final class CoreConfig {
 
     public UiSettings uiSettings() {
         return uiSettings;
+    }
+
+    public HealthCheckSettings healthCheckSettings() {
+        return healthCheckSettings;
     }
 
     public record BackupSettings(int maxBackupsPerFile) {
@@ -417,6 +431,14 @@ public final class CoreConfig {
         public UiSettings {
             Objects.requireNonNull(titleProfiles, "titleProfiles");
             Objects.requireNonNull(bossBarDefaults, "bossBarDefaults");
+        }
+    }
+
+    public record HealthCheckSettings(boolean enabled, long intervalSeconds) {
+        public HealthCheckSettings {
+            if (intervalSeconds <= 0L) {
+                throw new IllegalArgumentException("intervalSeconds must be > 0");
+            }
         }
     }
 
