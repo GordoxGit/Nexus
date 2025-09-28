@@ -31,8 +31,6 @@ import org.bukkit.scheduler.BukkitTask;
  */
 public final class DailyStatsAggregatorService implements LifecycleAware {
 
-    private static final ZoneId DEFAULT_ZONE = ZoneId.systemDefault();
-
     private static final String MATCHES_COUNT_SQL = """
             SELECT COUNT(*)
             FROM nexus_matches
@@ -84,8 +82,9 @@ public final class DailyStatsAggregatorService implements LifecycleAware {
         this.dbProvider = Objects.requireNonNull(dbProvider, "dbProvider");
         this.repository = Objects.requireNonNull(repository, "repository");
         this.ioExecutor = Objects.requireNonNull(executorManager, "executorManager").io();
-        this.zoneId = DEFAULT_ZONE;
-        this.enabled = Objects.requireNonNull(coreConfig, "coreConfig").databaseSettings().enabled();
+        CoreConfig config = Objects.requireNonNull(coreConfig, "coreConfig");
+        this.zoneId = Objects.requireNonNull(config.timezone(), "timezone");
+        this.enabled = config.databaseSettings().enabled();
     }
 
     @Override
