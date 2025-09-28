@@ -102,6 +102,8 @@ degraded-mode:
 queue:
   tick_hz: 5
   vip_weight: 1
+  target_server: "nexus-1"
+  hub_group: "hub"
 
 analytics:
   outbox:

@@ -378,10 +378,18 @@ public final class CoreConfig {
 
     public record DegradedModeSettings(boolean enabled, boolean banner) {}
 
-    public record QueueSettings(int tickHz, int vipWeight) {
+    public record QueueSettings(int tickHz, int vipWeight, String targetServerId, String hubGroup) {
         public QueueSettings {
             if (tickHz <= 0) throw new IllegalArgumentException("tickHz must be > 0");
             if (vipWeight < 0) throw new IllegalArgumentException("vipWeight must be >= 0");
+            targetServerId = Objects.requireNonNull(targetServerId, "targetServerId").trim();
+            hubGroup = Objects.requireNonNull(hubGroup, "hubGroup").trim();
+            if (targetServerId.isEmpty()) {
+                throw new IllegalArgumentException("targetServerId must not be empty");
+            }
+            if (hubGroup.isEmpty()) {
+                throw new IllegalArgumentException("hubGroup must not be empty");
+            }
         }
     }
 

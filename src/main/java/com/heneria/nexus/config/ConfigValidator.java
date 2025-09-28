@@ -134,6 +134,16 @@ public final class ConfigValidator {
         boolean degradedBanner = yaml.getBoolean("degraded-mode.banner", true);
         int queueHz = positiveInt(yaml, "queue.tick_hz", 5, issues, true);
         int queueVip = nonNegativeInt(yaml, "queue.vip_weight", 0, issues);
+        String queueTarget = readString(yaml, "queue.target_server", "nexus-1", issues, true);
+        if (queueTarget == null || queueTarget.isBlank()) {
+            issues.error("queue.target_server", "Doit être défini");
+            queueTarget = "nexus-1";
+        }
+        String hubGroup = readString(yaml, "queue.hub_group", "hub", issues, true);
+        if (hubGroup == null || hubGroup.isBlank()) {
+            issues.error("queue.hub_group", "Doit être défini");
+            hubGroup = "hub";
+        }
         boolean strictMiniMessage = yaml.getBoolean("ui.minimessage.strict", true);
 
         int hologramHz = positiveInt(yaml, "holograms.update_hz", 5, issues, true);
@@ -336,10 +346,10 @@ public final class ConfigValidator {
                     new CoreConfig.TimeoutSettings.WatchdogSettings(10_000L, 8_000L));
         }
         try {
-            queueSettings = new CoreConfig.QueueSettings(queueHz, queueVip);
+            queueSettings = new CoreConfig.QueueSettings(queueHz, queueVip, queueTarget, hubGroup);
         } catch (IllegalArgumentException exception) {
             issues.error("queue", exception.getMessage());
-            queueSettings = new CoreConfig.QueueSettings(5, 0);
+            queueSettings = new CoreConfig.QueueSettings(5, 0, "nexus-1", "hub");
         }
         try {
             hologramSettings = new CoreConfig.HologramSettings(hologramHz, hologramMaxVisible,
