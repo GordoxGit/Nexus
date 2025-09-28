@@ -332,11 +332,11 @@ public final class EconomyServiceImpl implements EconomyService {
         }
     }
 
-    private CompletableFuture<Object> logEconomyChange(UUID accountId,
-                                                       long amount,
-                                                       long balanceAfter,
-                                                       TransactionType type,
-                                                       String reason) {
+    private CompletableFuture<Void> logEconomyChange(UUID accountId,
+                                                     long amount,
+                                                     long balanceAfter,
+                                                     TransactionType type,
+                                                     String reason) {
         if (!shouldLogTransactions()) {
             return CompletableFuture.completedFuture(null);
         }
