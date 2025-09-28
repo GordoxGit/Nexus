@@ -331,6 +331,21 @@ public final class ConfigValidator {
                 java.time.Duration.ofSeconds(Math.max(1L, writeBehindSeconds)), cacheSettings, monitoringSettings,
                 retentionSettings, resilienceSettings);
 
+        boolean redisEnabled = yaml.getBoolean("redis.enabled", false);
+        String redisHost = readString(yaml, "redis.host", "127.0.0.1", issues, true);
+        int redisPort = boundedInt(yaml, "redis.port", 6379, 1, 65_535, issues);
+        String redisPassword = readString(yaml, "redis.password", "", issues, false);
+        long redisTimeoutMs = positiveLong(yaml, "redis.timeout_ms", 2000L, issues, true);
+        CoreConfig.RedisSettings redisSettings;
+        try {
+            redisSettings = new CoreConfig.RedisSettings(redisEnabled, redisHost,
+                    Math.max(1, redisPort), redisPassword == null ? "" : redisPassword,
+                    Math.max(1L, redisTimeoutMs));
+        } catch (IllegalArgumentException exception) {
+            issues.error("redis", exception.getMessage());
+            redisSettings = new CoreConfig.RedisSettings(false, "127.0.0.1", 6379, "", 2000L);
+        }
+
         CoreConfig.TimeoutSettings.WatchdogSettings watchdogSettings;
         try {
             watchdogSettings = new CoreConfig.TimeoutSettings.WatchdogSettings(watchdogReset, watchdogPaste);
@@ -372,8 +387,8 @@ public final class ConfigValidator {
         CoreConfig.RateLimitSettings rateLimitSettings = parseRateLimitSettingsSafe(yaml, issues);
 
         return new CoreConfig(mode, locale, zone, arenaSettings, executorSettings, databaseSettings,
-                rateLimitSettings, serviceSettings, backupSettings, timeoutSettings, degradedModeSettings, queueSettings,
-                hologramSettings, analyticsSettings, uiSettings);
+                redisSettings, rateLimitSettings, serviceSettings, backupSettings, timeoutSettings, degradedModeSettings,
+                queueSettings, hologramSettings, analyticsSettings, uiSettings);
     }
 
     private CoreConfig.RateLimitSettings parseRateLimitSettingsSafe(YamlConfiguration yaml, IssueCollector issues) {

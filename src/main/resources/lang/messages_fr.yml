@@ -17,6 +17,7 @@ help:
     audit: "<gray>/nexus admin audit log <joueur|*></gray> <dark_gray>-</dark_gray> <yellow>Consulte les actions sensibles enregistrées.</yellow>"
     holo: "<gray>/nexus holo <create|remove|move|list|reload></gray> <dark_gray>-</dark_gray> <yellow>Gère les hologrammes.</yellow>"
     config: "<gray>/nexus admin config <backups|restore></gray> <dark_gray>-</dark_gray> <yellow>Gère les sauvegardes des configurations.</yellow>"
+    redis: "<gray>/nexus admin redis status</gray> <dark_gray>-</dark_gray> <yellow>Inspecte l'état de la connexion Redis.</yellow>"
 
 errors:
   no_permission: "<red>Vous n'avez pas la permission requise.</red>"
@@ -92,6 +93,20 @@ admin:
       safety_backup: "<gray>Une sauvegarde de l'état actuel a été créée : <yellow><backup></yellow>.</gray>"
       reload_hint: "<yellow>Exécutez</yellow> <gray>/nexus reload</gray> <yellow>pour appliquer les changements.</yellow>"
       error: "<red>Impossible de restaurer la configuration : <reason>.</red>"
+  redis:
+    usage: "<gray>Usage :</gray> <yellow>/nexus admin redis status</yellow>"
+    status:
+      header: "<gold>Statut Redis :</gold> <state>"
+      disabled: "<gray>Redis est désactivé dans la configuration.</gray>"
+      subscribers: "<gray>Abonnements actifs :</gray> <yellow><count></yellow>"
+      pool: "<gray>Pool :</gray> Actifs <yellow><active></yellow> | Inactifs <yellow><idle></yellow> | En attente <yellow><waiters></yellow>"
+      last_error: "<gray>Dernière erreur :</gray> <red><error></red>"
+      retry: "<yellow>Une nouvelle tentative de connexion sera effectuée automatiquement.</yellow>"
+      state:
+        connected: "<green>Connecté</green>"
+        connecting: "<yellow>Connexion...</yellow>"
+        failed: "<red>Échec de la connexion</red>"
+        disabled: "<gray>Désactivé</gray>"
 
 titles:
   round_start:

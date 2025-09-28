@@ -20,6 +20,7 @@ public final class CoreConfig {
     private final ArenaSettings arenaSettings;
     private final ExecutorSettings executorSettings;
     private final DatabaseSettings databaseSettings;
+    private final RedisSettings redisSettings;
     private final RateLimitSettings rateLimitSettings;
     private final ServiceSettings serviceSettings;
     private final BackupSettings backupSettings;
@@ -36,6 +37,7 @@ public final class CoreConfig {
                       ArenaSettings arenaSettings,
                       ExecutorSettings executorSettings,
                       DatabaseSettings databaseSettings,
+                      RedisSettings redisSettings,
                       RateLimitSettings rateLimitSettings,
                       ServiceSettings serviceSettings,
                       BackupSettings backupSettings,
@@ -51,6 +53,7 @@ public final class CoreConfig {
         this.arenaSettings = Objects.requireNonNull(arenaSettings, "arenaSettings");
         this.executorSettings = Objects.requireNonNull(executorSettings, "executorSettings");
         this.databaseSettings = Objects.requireNonNull(databaseSettings, "databaseSettings");
+        this.redisSettings = Objects.requireNonNull(redisSettings, "redisSettings");
         this.rateLimitSettings = Objects.requireNonNull(rateLimitSettings, "rateLimitSettings");
         this.serviceSettings = Objects.requireNonNull(serviceSettings, "serviceSettings");
         this.backupSettings = Objects.requireNonNull(backupSettings, "backupSettings");
@@ -84,6 +87,10 @@ public final class CoreConfig {
 
     public DatabaseSettings databaseSettings() {
         return databaseSettings;
+    }
+
+    public RedisSettings redisSettings() {
+        return redisSettings;
     }
 
     public RateLimitSettings rateLimitSettings() {
@@ -277,6 +284,19 @@ public final class CoreConfig {
                         throw new IllegalArgumentException("permittedCallsInHalfOpenState must be > 0");
                     }
                 }
+            }
+        }
+    }
+
+    public record RedisSettings(boolean enabled, String host, int port, String password, long timeoutMs) {
+        public RedisSettings {
+            Objects.requireNonNull(host, "host");
+            Objects.requireNonNull(password, "password");
+            if (port <= 0 || port > 65_535) {
+                throw new IllegalArgumentException("port must be between 1 and 65535");
+            }
+            if (timeoutMs <= 0L) {
+                throw new IllegalArgumentException("timeoutMs must be > 0");
             }
         }
     }
