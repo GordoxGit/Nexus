@@ -501,6 +501,7 @@ public final class NexusPlugin extends JavaPlugin {
         serviceRegistry.get(ShopService.class).applyRateLimitSettings(newBundle.core().rateLimitSettings());
         serviceRegistry.get(ShopService.class).applyCatalog(newBundle.economy().shop());
         serviceRegistry.get(RedisManager.class).applySettings(newBundle.core().redisSettings());
+        serviceRegistry.get(RedisManager.class).applyDegradedModeSettings(newBundle.core().degradedModeSettings());
         serviceRegistry.get(HoloService.class).applySettings(newBundle.core().hologramSettings());
         serviceRegistry.get(HealthCheckService.class).applyConfiguration(newBundle.core());
         serviceRegistry.get(FirstWinBonusService.class).applySettings(newBundle.core(), newBundle.economy());
@@ -830,7 +831,7 @@ public final class NexusPlugin extends JavaPlugin {
         String stateKey = switch (state) {
             case CONNECTED -> "admin.redis.status.state.connected";
             case CONNECTING -> "admin.redis.status.state.connecting";
-            case FAILED -> "admin.redis.status.state.failed";
+            case DEGRADED -> "admin.redis.status.state.degraded";
             case DISABLED -> "admin.redis.status.state.disabled";
         };
         messageFacade.prefix(sender).ifPresent(sender::sendMessage);
@@ -848,7 +849,7 @@ public final class NexusPlugin extends JavaPlugin {
                 Placeholder.unparsed("waiters", Integer.toString(metrics.waiters()))));
         diagnostics.lastError().ifPresent(error ->
                 messageFacade.send(sender, "admin.redis.status.last_error", Placeholder.unparsed("error", error)));
-        if (state == RedisService.ConnectionState.FAILED) {
+        if (state == RedisService.ConnectionState.DEGRADED) {
             messageFacade.send(sender, "admin.redis.status.retry");
         }
     }
