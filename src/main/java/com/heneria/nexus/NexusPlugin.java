@@ -21,6 +21,7 @@ import com.heneria.nexus.analytics.daily.DailyStatsRepository;
 import com.heneria.nexus.budget.BudgetService;
 import com.heneria.nexus.budget.BudgetServiceImpl;
 import com.heneria.nexus.budget.BudgetSnapshot;
+import com.heneria.nexus.command.HubCommand;
 import com.heneria.nexus.command.NexusCommand;
 import com.heneria.nexus.config.BackupService;
 import com.heneria.nexus.config.BackupServiceImpl;
@@ -67,6 +68,7 @@ import com.heneria.nexus.api.MapService;
 import com.heneria.nexus.api.ProfileService;
 import com.heneria.nexus.api.RewardService;
 import com.heneria.nexus.api.QueueService;
+import com.heneria.nexus.api.TeleportService;
 import com.heneria.nexus.api.ShopService;
 import com.heneria.nexus.api.service.TimerService;
 import com.heneria.nexus.service.core.ArenaServiceImpl;
@@ -79,6 +81,7 @@ import com.heneria.nexus.service.core.QueueServiceImpl;
 import com.heneria.nexus.service.core.RewardServiceImpl;
 import com.heneria.nexus.service.core.ShopServiceImpl;
 import com.heneria.nexus.service.core.TimerServiceImpl;
+import com.heneria.nexus.service.core.TeleportServiceImpl;
 import com.heneria.nexus.service.core.VaultEconomyService;
 import com.heneria.nexus.service.ratelimit.RateLimiterService;
 import com.heneria.nexus.service.ratelimit.RateLimiterServiceImpl;
@@ -318,6 +321,9 @@ public final class NexusPlugin extends JavaPlugin {
         NexusCommand executor = new NexusCommand(this);
         command.setExecutor(executor);
         command.setTabCompleter(executor);
+        PluginCommand hubCommand = Objects.requireNonNull(getCommand("hub"), "Command hub not registered in plugin.yml");
+        HubCommand hubExecutor = new HubCommand(this, serviceRegistry.get(TeleportService.class), messageFacade);
+        hubCommand.setExecutor(hubExecutor);
     }
 
     private void initializePlayerDataTools() {
@@ -475,6 +481,7 @@ public final class NexusPlugin extends JavaPlugin {
         serviceRegistry.get(RateLimiterService.class).applyConfiguration(newBundle.core());
         serviceRegistry.get(DataPurgeService.class).applyConfiguration(newBundle.core());
         serviceRegistry.get(QueueService.class).applySettings(newBundle.core().queueSettings());
+        serviceRegistry.get(TeleportService.class).applySettings(newBundle.core().queueSettings());
         serviceRegistry.get(ArenaService.class).applyArenaSettings(newBundle.core().arenaSettings());
         serviceRegistry.get(ArenaService.class).applyWatchdogSettings(newBundle.core().timeoutSettings().watchdog());
         serviceRegistry.get(BudgetService.class).applySettings(newBundle.core().arenaSettings());
@@ -1380,6 +1387,7 @@ public final class NexusPlugin extends JavaPlugin {
         serviceRegistry.registerService(AuditService.class, AuditServiceImpl.class);
         serviceRegistry.registerService(PersistenceService.class, PersistenceServiceImpl.class);
         serviceRegistry.registerService(ProfileService.class, ProfileServiceImpl.class);
+        serviceRegistry.registerService(TeleportService.class, TeleportServiceImpl.class);
         serviceRegistry.registerService(QueueService.class, QueueServiceImpl.class);
         serviceRegistry.registerService(TimerService.class, TimerServiceImpl.class);
         serviceRegistry.registerService(RateLimiterService.class, RateLimiterServiceImpl.class);

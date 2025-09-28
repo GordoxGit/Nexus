@@ -18,6 +18,7 @@ import com.heneria.nexus.api.EconomyService;
 import com.heneria.nexus.api.MapService;
 import com.heneria.nexus.api.ProfileService;
 import com.heneria.nexus.api.QueueService;
+import com.heneria.nexus.api.TeleportService;
 import com.heneria.nexus.api.events.NexusArenaEndEvent;
 import com.heneria.nexus.api.events.NexusArenaStartEvent;
 import com.heneria.nexus.db.repository.MatchRepository;
@@ -37,6 +38,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicReference;
+import org.bukkit.entity.Player;
 import org.bukkit.plugin.PluginManager;
 import org.bukkit.plugin.java.JavaPlugin;
 
@@ -49,6 +51,7 @@ public final class ArenaServiceImpl implements ArenaService {
     private final NexusLogger logger;
     private final MapService mapService;
     private final QueueService queueService;
+    private final TeleportService teleportService;
     private final Optional<ProfileService> profileService;
     private final EconomyService economyService;
     private final ExecutorManager executorManager;
@@ -66,6 +69,7 @@ public final class ArenaServiceImpl implements ArenaService {
                             NexusLogger logger,
                             MapService mapService,
                             QueueService queueService,
+                            TeleportService teleportService,
                             Optional<ProfileService> profileService,
                             EconomyService economyService,
                             ExecutorManager executorManager,
@@ -79,6 +83,7 @@ public final class ArenaServiceImpl implements ArenaService {
         this.logger = Objects.requireNonNull(logger, "logger");
         this.mapService = Objects.requireNonNull(mapService, "mapService");
         this.queueService = Objects.requireNonNull(queueService, "queueService");
+        this.teleportService = Objects.requireNonNull(teleportService, "teleportService");
         this.profileService = Objects.requireNonNull(profileService, "profileService");
         this.economyService = Objects.requireNonNull(economyService, "economyService");
         this.executorManager = Objects.requireNonNull(executorManager, "executorManager");
@@ -156,6 +161,7 @@ public final class ArenaServiceImpl implements ArenaService {
             persistMatchSnapshot(handle, completedAt);
             budgetService.unregisterArena(handle);
             arenas.remove(handle.id());
+            teleportPlayersToHub();
             executorManager.compute().execute(() -> queueService.tryMatch(handle.mode()).ifPresent(plan ->
                     logger.info("Match prêt après fin d'arène " + handle.id() + " -> " + plan.matchId())));
             profileService.ifPresent(service -> {
@@ -164,6 +170,32 @@ public final class ArenaServiceImpl implements ArenaService {
                 }
             });
         }
+    }
+
+    private void teleportPlayersToHub() {
+        plugin.getServer().getOnlinePlayers().forEach(player -> {
+            UUID playerId = player.getUniqueId();
+            teleportService.returnToHub(playerId).whenComplete((result, throwable) ->
+                    executorManager.mainThread().runNow(() -> handleHubTeleportResult(player, result, throwable)));
+        });
+    }
+
+    private void handleHubTeleportResult(Player player,
+                                         TeleportService.TeleportResult result,
+                                         Throwable throwable) {
+        if (!player.isOnline()) {
+            return;
+        }
+        if (throwable != null) {
+            logger.warn("Retour hub impossible pour " + player.getName(), throwable);
+            return;
+        }
+        if (result == null || result.success()) {
+            return;
+        }
+        String reason = result.message().isBlank() ? "Destination indisponible" : result.message();
+        logger.warn("Retour hub refusé pour " + player.getName() + " : " + reason
+                + " (" + result.status() + ")");
     }
 
     private void safe(Runnable runnable) {

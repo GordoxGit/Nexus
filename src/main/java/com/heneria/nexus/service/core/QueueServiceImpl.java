@@ -10,7 +10,9 @@ import com.heneria.nexus.api.QueueSnapshot;
 import com.heneria.nexus.api.QueueStats;
 import com.heneria.nexus.api.QueueTicket;
 import com.heneria.nexus.api.ProfileService;
+import com.heneria.nexus.api.TeleportService;
 import com.heneria.nexus.util.NexusLogger;
+import com.heneria.nexus.util.MessageFacade;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -33,6 +35,8 @@ import net.luckperms.api.model.group.GroupManager;
 import net.luckperms.api.model.user.User;
 import net.luckperms.api.node.NodeType;
 import net.luckperms.api.node.types.InheritanceNode;
+import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
+import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitTask;
 
@@ -45,6 +49,8 @@ public final class QueueServiceImpl implements QueueService {
     private final NexusLogger logger;
     private final ExecutorManager executorManager;
     private final ProfileService profileService;
+    private final TeleportService teleportService;
+    private final MessageFacade messageFacade;
     private final Optional<LuckPerms> luckPerms;
     private final Map<ArenaMode, ConcurrentLinkedQueue<QueueTicket>> queues = new EnumMap<>(ArenaMode.class);
     private final ConcurrentHashMap<UUID, QueueTicket> ticketsByPlayer = new ConcurrentHashMap<>();
@@ -57,12 +63,16 @@ public final class QueueServiceImpl implements QueueService {
                             NexusLogger logger,
                             ExecutorManager executorManager,
                             ProfileService profileService,
+                            TeleportService teleportService,
+                            MessageFacade messageFacade,
                             CoreConfig config,
                             Optional<LuckPerms> luckPerms) {
         this.plugin = Objects.requireNonNull(plugin, "plugin");
         this.logger = Objects.requireNonNull(logger, "logger");
         this.executorManager = Objects.requireNonNull(executorManager, "executorManager");
         this.profileService = Objects.requireNonNull(profileService, "profileService");
+        this.teleportService = Objects.requireNonNull(teleportService, "teleportService");
+        this.messageFacade = Objects.requireNonNull(messageFacade, "messageFacade");
         this.luckPerms = Objects.requireNonNull(luckPerms, "luckPerms");
         this.settingsRef = new AtomicReference<>(config.queueSettings());
         for (ArenaMode mode : ArenaMode.values()) {
@@ -162,6 +172,7 @@ public final class QueueServiceImpl implements QueueService {
         });
         updateStats();
         MatchPlan plan = new MatchPlan(UUID.randomUUID(), mode, players, Optional.empty());
+        dispatchTeleportRequests(selected);
         return Optional.of(plan);
     }
 
@@ -170,6 +181,69 @@ public final class QueueServiceImpl implements QueueService {
         Objects.requireNonNull(settings, "settings");
         settingsRef.set(settings);
         scheduleTicker();
+    }
+
+    private void dispatchTeleportRequests(List<QueueTicket> tickets) {
+        if (tickets.isEmpty()) {
+            return;
+        }
+        for (QueueTicket ticket : tickets) {
+            UUID playerId = ticket.playerId();
+            notifyTeleportStart(playerId);
+            teleportService.connectToArena(playerId).whenComplete((result, throwable) ->
+                    executorManager.mainThread().runNow(() -> handleTeleportOutcome(ticket, result, throwable)));
+        }
+    }
+
+    private void notifyTeleportStart(UUID playerId) {
+        executorManager.mainThread().runNow(() -> {
+            Player player = plugin.getServer().getPlayer(playerId);
+            if (player != null) {
+                messageFacade.send(player, "network.arena.teleporting");
+            }
+        });
+    }
+
+    private void handleTeleportOutcome(QueueTicket ticket,
+                                       TeleportService.TeleportResult result,
+                                       Throwable throwable) {
+        UUID playerId = ticket.playerId();
+        if (throwable != null) {
+            logger.warn("Téléportation vers l'arène impossible pour " + playerId, throwable);
+            notifyTeleportFailure(playerId, "Erreur interne");
+            requeueIfOnline(ticket);
+            return;
+        }
+        if (result == null) {
+            logger.warn("Réponse de téléportation nulle pour " + playerId);
+            notifyTeleportFailure(playerId, "Réponse invalide");
+            requeueIfOnline(ticket);
+            return;
+        }
+        if (result.success()) {
+            return;
+        }
+        String reason = result.message().isBlank() ? "Destination indisponible" : result.message();
+        logger.warn("Téléportation refusée pour " + playerId + " : " + reason
+                + " (" + result.status() + ")");
+        notifyTeleportFailure(playerId, reason);
+        requeueIfOnline(ticket);
+    }
+
+    private void notifyTeleportFailure(UUID playerId, String reason) {
+        Player player = plugin.getServer().getPlayer(playerId);
+        if (player != null) {
+            messageFacade.send(player, "network.arena.failed",
+                    Placeholder.unparsed("reason", reason));
+        }
+    }
+
+    private void requeueIfOnline(QueueTicket ticket) {
+        Player player = plugin.getServer().getPlayer(ticket.playerId());
+        if (player == null) {
+            return;
+        }
+        executorManager.compute().execute(() -> enqueue(ticket.playerId(), ticket.mode(), ticket.options()));
     }
 
     private int weightForTicket(QueueTicket ticket) {

@@ -12,9 +12,17 @@ commands:
     usage: /<command> help|reload|dump|budget [arena]|holo|admin
     permission: nexus.use
     aliases: [nx]
+  hub:
+    description: Retourner vers le serveur hub.
+    usage: /<command>
+    permission: nexus.commands.hub
+    aliases: [l, lobby]
 permissions:
   nexus.use:
     description: Accéder aux commandes publiques de Nexus.
+    default: true
+  nexus.commands.hub:
+    description: Retourner vers le hub via /hub.
     default: true
   nexus.admin.reload:
     description: Recharger la configuration Nexus.

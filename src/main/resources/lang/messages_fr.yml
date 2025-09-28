@@ -20,9 +20,19 @@ help:
 
 errors:
   no_permission: "<red>Vous n'avez pas la permission requise.</red>"
+  player_only: "<red>Cette commande doit être exécutée en jeu.</red>"
 
 shop:
   rate_limited: "<red>Veuillez patienter encore <seconds> seconde(s) avant de réessayer.</red>"
+
+network:
+  arena:
+    teleporting: "<yellow>Téléportation vers l'arène...</yellow>"
+    failed: "<red>Impossible de rejoindre l'arène : <reason>.</red>"
+  hub:
+    teleporting: "<yellow>Téléportation vers le hub...</yellow>"
+    success: "<green>Retour vers le hub en cours...</green>"
+    failed: "<red>Impossible de rejoindre le hub : <reason>.</red>"
 
 admin:
   reload:
