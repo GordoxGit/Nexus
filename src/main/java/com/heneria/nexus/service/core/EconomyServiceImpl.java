@@ -494,7 +494,7 @@ public final class EconomyServiceImpl implements EconomyService {
         }
 
         @Override
-        public CompletableFuture<Object> commit() {
+        public CompletionStage<Void> commit() {
             if (closed) {
                 return CompletableFuture.completedFuture(null);
             }
