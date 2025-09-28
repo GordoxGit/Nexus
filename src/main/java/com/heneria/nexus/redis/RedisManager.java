@@ -27,11 +27,17 @@ public final class RedisManager {
         this.redisService = Objects.requireNonNull(redisService, "redisService");
         Objects.requireNonNull(coreConfig, "coreConfig");
         redisService.applySettings(coreConfig.redisSettings());
+        redisService.applyDegradedModeSettings(coreConfig.degradedModeSettings());
     }
 
     public void applySettings(CoreConfig.RedisSettings settings) {
         Objects.requireNonNull(settings, "settings");
         redisService.applySettings(settings);
+    }
+
+    public void applyDegradedModeSettings(CoreConfig.DegradedModeSettings settings) {
+        Objects.requireNonNull(settings, "settings");
+        redisService.applyDegradedModeSettings(settings);
     }
 
     public boolean isEnabled() {

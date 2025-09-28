@@ -324,6 +324,13 @@ public final class QueueServiceImpl implements QueueService {
             crossShardFallbackLogged.set(false);
             return false;
         }
+        RedisService.ConnectionState redisState = redisService.state();
+        if (redisState == RedisService.ConnectionState.DEGRADED) {
+            if (crossShardFallbackLogged.compareAndSet(false, true)) {
+                logger.warn("Redis en mode dégradé — file d'attente locale activée.");
+            }
+            return false;
+        }
         if (!redisService.isOperational()) {
             if (crossShardFallbackLogged.compareAndSet(false, true)) {
                 logger.warn("Redis indisponible — bascule vers la file locale pour le matchmaking.");

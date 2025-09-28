@@ -3,6 +3,7 @@ package com.heneria.nexus.redis;
 import com.heneria.nexus.config.CoreConfig;
 import com.heneria.nexus.concurrent.ExecutorManager;
 import com.heneria.nexus.service.LifecycleAware;
+import com.heneria.nexus.util.MessageFacade;
 import com.heneria.nexus.util.NamedThreadFactory;
 import com.heneria.nexus.util.NexusLogger;
 import java.util.Objects;
@@ -15,13 +16,18 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
+import net.kyori.adventure.text.Component;
+import org.bukkit.entity.Player;
+import org.bukkit.plugin.java.JavaPlugin;
 import redis.clients.jedis.Jedis;
 import redis.clients.jedis.JedisPool;
 import redis.clients.jedis.JedisPoolConfig;
 import redis.clients.jedis.JedisPubSub;
+import redis.clients.jedis.exceptions.JedisConnectionException;
 
 /**
  * Manages the lifecycle of the Redis connection and pub/sub listeners.
@@ -29,11 +35,15 @@ import redis.clients.jedis.JedisPubSub;
 public final class RedisService implements LifecycleAware {
 
     private static final long SUBSCRIPTION_RETRY_DELAY_MS = 2_000L;
-    private static final long RECONNECT_DELAY_SECONDS = 5L;
+    private static final long INITIAL_RECONNECT_DELAY_SECONDS = 2L;
+    private static final long MAX_RECONNECT_DELAY_SECONDS = 60L;
 
     private final NexusLogger logger;
     private final ExecutorManager executorManager;
+    private final JavaPlugin plugin;
+    private final MessageFacade messageFacade;
     private final AtomicReference<CoreConfig.RedisSettings> settingsRef;
+    private final AtomicReference<CoreConfig.DegradedModeSettings> degradedSettings;
     private final ScheduledExecutorService reconnectScheduler;
     private final AtomicReference<JedisPool> poolRef = new AtomicReference<>();
     private final AtomicReference<ConnectionState> state = new AtomicReference<>(ConnectionState.DISABLED);
@@ -42,12 +52,21 @@ public final class RedisService implements LifecycleAware {
     private final ConcurrentMap<Long, Subscription> subscriptions = new ConcurrentHashMap<>();
     private final AtomicLong subscriptionIds = new AtomicLong();
     private final AtomicBoolean started = new AtomicBoolean();
+    private final AtomicInteger reconnectAttempts = new AtomicInteger();
+    private final AtomicBoolean degradedNotified = new AtomicBoolean();
 
-    public RedisService(NexusLogger logger, ExecutorManager executorManager, CoreConfig coreConfig) {
+    public RedisService(NexusLogger logger,
+                        ExecutorManager executorManager,
+                        JavaPlugin plugin,
+                        MessageFacade messageFacade,
+                        CoreConfig coreConfig) {
         this.logger = Objects.requireNonNull(logger, "logger");
         this.executorManager = Objects.requireNonNull(executorManager, "executorManager");
+        this.plugin = Objects.requireNonNull(plugin, "plugin");
+        this.messageFacade = Objects.requireNonNull(messageFacade, "messageFacade");
         Objects.requireNonNull(coreConfig, "coreConfig");
         this.settingsRef = new AtomicReference<>(coreConfig.redisSettings());
+        this.degradedSettings = new AtomicReference<>(coreConfig.degradedModeSettings());
         this.reconnectScheduler = Executors.newSingleThreadScheduledExecutor(
                 new NamedThreadFactory("Nexus-Redis-Reconnect", true, logger));
     }
@@ -57,11 +76,11 @@ public final class RedisService implements LifecycleAware {
         started.set(true);
         CoreConfig.RedisSettings settings = settingsRef.get();
         if (settings == null || !settings.enabled()) {
-            state.set(ConnectionState.DISABLED);
+            updateState(ConnectionState.DISABLED);
             logger.info("Intégration Redis désactivée.");
             return CompletableFuture.completedFuture(null);
         }
-        state.set(ConnectionState.CONNECTING);
+        updateState(ConnectionState.CONNECTING);
         return executorManager.runIo(() -> connect(settings));
     }
 
@@ -73,7 +92,7 @@ public final class RedisService implements LifecycleAware {
         subscriptions.clear();
         closePool();
         reconnectScheduler.shutdownNow();
-        state.set(ConnectionState.DISABLED);
+        updateState(ConnectionState.DISABLED);
         return CompletableFuture.completedFuture(null);
     }
 
@@ -90,13 +109,19 @@ public final class RedisService implements LifecycleAware {
             subscriptions.clear();
             closePool();
             lastError.set(null);
-            state.set(ConnectionState.DISABLED);
+            reconnectAttempts.set(0);
+            updateState(ConnectionState.DISABLED);
             return;
         }
         if (previous == null || !previous.equals(settings) || state.get() != ConnectionState.CONNECTED) {
-            state.set(ConnectionState.CONNECTING);
+            updateState(ConnectionState.CONNECTING);
             executorManager.runIo(() -> connect(settings));
         }
+    }
+
+    public void applyDegradedModeSettings(CoreConfig.DegradedModeSettings settings) {
+        Objects.requireNonNull(settings, "settings");
+        degradedSettings.set(settings);
     }
 
     public boolean isOperational() {
@@ -192,10 +217,10 @@ public final class RedisService implements LifecycleAware {
             return;
         }
         if (settings == null || !settings.enabled()) {
-            state.set(ConnectionState.DISABLED);
+            updateState(ConnectionState.DISABLED);
             return;
         }
-        state.set(ConnectionState.CONNECTING);
+        updateState(ConnectionState.CONNECTING);
         JedisPool newPool = null;
         try {
             newPool = createPool(settings);
@@ -206,7 +231,8 @@ public final class RedisService implements LifecycleAware {
             if (previous != null) {
                 previous.close();
             }
-            state.set(ConnectionState.CONNECTED);
+            reconnectAttempts.set(0);
+            updateState(ConnectionState.CONNECTED);
             lastError.set(null);
             logger.info(() -> "Connexion Redis établie (%s:%d)".formatted(settings.host(), settings.port()));
             restartSubscriptions();
@@ -250,7 +276,10 @@ public final class RedisService implements LifecycleAware {
         } else {
             logger.debug(() -> "Redis toujours indisponible : " + formatErrorMessage(throwable));
         }
-        state.set(ConnectionState.FAILED);
+        if (!(throwable instanceof JedisConnectionException)) {
+            logger.debug(() -> "Erreur Redis non liée à la connexion détectée : " + throwable.getClass().getSimpleName());
+        }
+        updateState(ConnectionState.DEGRADED);
         scheduleReconnect();
     }
 
@@ -266,6 +295,8 @@ public final class RedisService implements LifecycleAware {
         if (existing != null && !existing.isDone()) {
             return;
         }
+        int attempt = reconnectAttempts.incrementAndGet();
+        long delaySeconds = computeBackoffSeconds(attempt);
         final ScheduledFuture<?>[] holder = new ScheduledFuture<?>[1];
         Runnable task = () -> {
             try {
@@ -273,12 +304,13 @@ public final class RedisService implements LifecycleAware {
                 if (current == null || !current.enabled() || !started.get()) {
                     return;
                 }
+                updateState(ConnectionState.CONNECTING);
                 executorManager.runIo(() -> connect(current));
             } finally {
                 reconnectFuture.compareAndSet(holder[0], null);
             }
         };
-        ScheduledFuture<?> future = reconnectScheduler.schedule(task, RECONNECT_DELAY_SECONDS, TimeUnit.SECONDS);
+        ScheduledFuture<?> future = reconnectScheduler.schedule(task, delaySeconds, TimeUnit.SECONDS);
         holder[0] = future;
         reconnectFuture.set(future);
     }
@@ -288,6 +320,7 @@ public final class RedisService implements LifecycleAware {
         if (future != null) {
             future.cancel(false);
         }
+        reconnectAttempts.set(0);
     }
 
     private void closePool() {
@@ -317,7 +350,60 @@ public final class RedisService implements LifecycleAware {
         DISABLED,
         CONNECTING,
         CONNECTED,
-        FAILED
+        DEGRADED
+    }
+
+    private long computeBackoffSeconds(int attempt) {
+        if (attempt <= 0) {
+            return INITIAL_RECONNECT_DELAY_SECONDS;
+        }
+        long delay = INITIAL_RECONNECT_DELAY_SECONDS;
+        if (attempt > 1) {
+            long multiplier = 1L << Math.min(attempt - 1, 30);
+            delay = Math.min(MAX_RECONNECT_DELAY_SECONDS, INITIAL_RECONNECT_DELAY_SECONDS * multiplier);
+        }
+        return Math.min(MAX_RECONNECT_DELAY_SECONDS, delay);
+    }
+
+    private void updateState(ConnectionState newState) {
+        ConnectionState previous = state.getAndSet(newState);
+        if (previous != newState) {
+            handleStateTransition(previous, newState);
+        }
+    }
+
+    private void handleStateTransition(ConnectionState previous, ConnectionState current) {
+        if (current == ConnectionState.DEGRADED) {
+            if (degradedNotified.compareAndSet(false, true)) {
+                logger.warn("Redis indisponible — mode dégradé activé.");
+                notifyAdministrators("alerts.redis.degraded");
+            } else {
+                logger.debug("Redis toujours en mode dégradé.");
+            }
+        } else if (current == ConnectionState.CONNECTED) {
+            if (previous == ConnectionState.DEGRADED) {
+                logger.info("Redis reconnecté — mode dégradé désactivé.");
+                notifyAdministrators("alerts.redis.recovered");
+            }
+            degradedNotified.set(false);
+        } else if (current == ConnectionState.DISABLED) {
+            degradedNotified.set(false);
+        }
+    }
+
+    private void notifyAdministrators(String messageKey) {
+        CoreConfig.DegradedModeSettings settings = degradedSettings.get();
+        if (settings == null || !settings.enabled() || !settings.banner()) {
+            return;
+        }
+        Component component = messageFacade.render(messageKey);
+        plugin.getServer().getScheduler().runTask(plugin, () -> {
+            for (Player player : plugin.getServer().getOnlinePlayers()) {
+                if (player.hasPermission("nexus.admin.notify")) {
+                    player.sendActionBar(component);
+                }
+            }
+        });
     }
 
     public record RedisDiagnostics(ConnectionState state,

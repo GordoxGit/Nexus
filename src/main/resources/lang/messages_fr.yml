@@ -105,8 +105,13 @@ admin:
       state:
         connected: "<green>Connecté</green>"
         connecting: "<yellow>Connexion...</yellow>"
-        failed: "<red>Échec de la connexion</red>"
+        degraded: "<yellow>Mode dégradé</yellow>"
         disabled: "<gray>Désactivé</gray>"
+
+alerts:
+  redis:
+    degraded: "<red>Redis hors ligne</red> <dark_gray>:</dark_gray> <yellow>mode dégradé activé</yellow>"
+    recovered: "<green>Redis reconnecté</green> <dark_gray>:</dark_gray> <gray>retour au mode normal</gray>"
 
 titles:
   round_start:
