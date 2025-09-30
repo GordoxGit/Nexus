@@ -377,10 +377,12 @@ public final class CoreConfig {
 
     public record ServiceSettings(boolean exposeBukkitServices) {}
 
-    public record SecuritySettings(Set<String> allowedChannels) {
+    public record SecuritySettings(Set<String> allowedChannels,
+                                   NetworkRateLimitSettings networkRateLimitSettings) {
 
         public SecuritySettings {
             Objects.requireNonNull(allowedChannels, "allowedChannels");
+            Objects.requireNonNull(networkRateLimitSettings, "networkRateLimitSettings");
             Set<String> normalized = allowedChannels.stream()
                     .filter(Objects::nonNull)
                     .map(String::trim)
@@ -388,6 +390,29 @@ public final class CoreConfig {
                     .map(channel -> channel.toLowerCase(Locale.ROOT))
                     .collect(Collectors.toCollection(LinkedHashSet::new));
             this.allowedChannels = Collections.unmodifiableSet(normalized);
+            this.networkRateLimitSettings = networkRateLimitSettings;
+        }
+
+        public record NetworkRateLimitSettings(boolean enabled, boolean failOpen, Map<String, Integer> limits) {
+
+            public NetworkRateLimitSettings {
+                Objects.requireNonNull(limits, "limits");
+                Map<String, Integer> sanitized = new LinkedHashMap<>();
+                limits.forEach((channel, limit) -> {
+                    if (channel == null) {
+                        return;
+                    }
+                    String normalized = channel.trim();
+                    if (normalized.isEmpty()) {
+                        return;
+                    }
+                    if (limit == null || limit <= 0) {
+                        return;
+                    }
+                    sanitized.put(normalized.toLowerCase(Locale.ROOT), limit);
+                });
+                this.limits = Collections.unmodifiableMap(sanitized);
+            }
         }
     }
 

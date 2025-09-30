@@ -94,6 +94,7 @@ import com.heneria.nexus.service.core.VaultEconomyService;
 import com.heneria.nexus.redis.RedisManager;
 import com.heneria.nexus.redis.RedisService;
 import com.heneria.nexus.security.ChannelSecurityManager;
+import com.heneria.nexus.security.NetworkRateLimiter;
 import com.heneria.nexus.service.ratelimit.RateLimiterService;
 import com.heneria.nexus.service.ratelimit.RateLimiterServiceImpl;
 import com.heneria.nexus.service.maintenance.DataPurgeService;
@@ -495,6 +496,7 @@ public final class NexusPlugin extends JavaPlugin {
         resilientDbExecutor.configure(newBundle.core().databaseSettings());
         configureDatabase(newBundle.core().databaseSettings());
         serviceRegistry.get(ChannelSecurityManager.class).applySettings(newBundle.core().securitySettings());
+        serviceRegistry.get(NetworkRateLimiter.class).applySettings(newBundle.core().securitySettings());
         serviceRegistry.get(RateLimiterService.class).applyConfiguration(newBundle.core());
         serviceRegistry.get(DataPurgeService.class).applyConfiguration(newBundle.core());
         serviceRegistry.get(QueueService.class).applySettings(newBundle.core().queueSettings());
@@ -1438,6 +1440,7 @@ public final class NexusPlugin extends JavaPlugin {
     private void registerServices() {
         serviceRegistry.registerService(RingScheduler.class, RingScheduler.class);
         serviceRegistry.registerService(ChannelSecurityManager.class, ChannelSecurityManager.class);
+        serviceRegistry.registerService(NetworkRateLimiter.class, NetworkRateLimiter.class);
         serviceRegistry.registerService(MapValidatorService.class, MapValidatorServiceImpl.class);
         serviceRegistry.registerService(MapService.class, MapServiceImpl.class);
         serviceRegistry.registerService(MapRotationService.class, MapRotationServiceImpl.class);

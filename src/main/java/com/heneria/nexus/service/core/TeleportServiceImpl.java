@@ -7,6 +7,7 @@ import com.heneria.nexus.api.TeleportService;
 import com.heneria.nexus.config.CoreConfig;
 import com.heneria.nexus.concurrent.ExecutorManager;
 import com.heneria.nexus.security.ChannelSecurityManager;
+import com.heneria.nexus.security.NetworkRateLimiter;
 import com.heneria.nexus.service.core.payload.TeleportResultPayload;
 import com.heneria.nexus.util.NexusLogger;
 import java.io.ByteArrayInputStream;
@@ -39,11 +40,13 @@ public final class TeleportServiceImpl implements TeleportService, PluginMessage
     private static final String SUBCHANNEL_CONNECT = "Connect";
     private static final String SUBCHANNEL_RETURN = "ReturnToHub";
     private static final String SUBCHANNEL_RESULT = "Result";
+    private static final String PROXY_SOURCE = "velocity-proxy";
 
     private final JavaPlugin plugin;
     private final NexusLogger logger;
     private final ExecutorManager executorManager;
     private final ChannelSecurityManager channelSecurityManager;
+    private final NetworkRateLimiter networkRateLimiter;
     private final ObjectMapper objectMapper;
     private final AtomicReference<CoreConfig.QueueSettings> settingsRef;
     private final ConcurrentHashMap<UUID, PendingTeleport> pending = new ConcurrentHashMap<>();
@@ -54,11 +57,13 @@ public final class TeleportServiceImpl implements TeleportService, PluginMessage
                                NexusLogger logger,
                                ExecutorManager executorManager,
                                ChannelSecurityManager channelSecurityManager,
+                               NetworkRateLimiter networkRateLimiter,
                                CoreConfig config) {
         this.plugin = Objects.requireNonNull(plugin, "plugin");
         this.logger = Objects.requireNonNull(logger, "logger");
         this.executorManager = Objects.requireNonNull(executorManager, "executorManager");
         this.channelSecurityManager = Objects.requireNonNull(channelSecurityManager, "channelSecurityManager");
+        this.networkRateLimiter = Objects.requireNonNull(networkRateLimiter, "networkRateLimiter");
         Objects.requireNonNull(config, "config");
         this.settingsRef = new AtomicReference<>(config.queueSettings());
         this.objectMapper = new ObjectMapper()
@@ -168,6 +173,20 @@ public final class TeleportServiceImpl implements TeleportService, PluginMessage
             logger.warn("PluginMessage reçu sur un canal non autorisé: {} (origine: {})", channel, origin);
             return;
         }
+        String sourceServerId = resolveSourceServerId(player);
+        networkRateLimiter.isAllowed(sourceServerId, channel).whenComplete((allowed, throwable) -> {
+            if (throwable != null) {
+                logger.warn("Erreur lors du contrôle du débit réseau sur {}", channel, throwable);
+                return;
+            }
+            if (!Boolean.TRUE.equals(allowed)) {
+                return;
+            }
+            handlePluginMessage(channel, message);
+        });
+    }
+
+    private void handlePluginMessage(String channel, byte[] message) {
         if (!CHANNEL.equalsIgnoreCase(channel)) {
             return;
         }
@@ -185,6 +204,10 @@ public final class TeleportServiceImpl implements TeleportService, PluginMessage
         }
         TeleportStatus status = parseStatus(data.status());
         completePending(data.requestId(), status, data.message());
+    }
+
+    private String resolveSourceServerId(Player player) {
+        return PROXY_SOURCE;
     }
 
     private Optional<TeleportResultPayload> decodeTeleportPayload(byte[] message) {
