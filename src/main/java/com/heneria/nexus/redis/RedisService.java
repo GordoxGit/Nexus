@@ -2,6 +2,7 @@ package com.heneria.nexus.redis;
 
 import com.heneria.nexus.config.CoreConfig;
 import com.heneria.nexus.concurrent.ExecutorManager;
+import com.heneria.nexus.security.ChannelSecurityManager;
 import com.heneria.nexus.service.LifecycleAware;
 import com.heneria.nexus.util.MessageFacade;
 import com.heneria.nexus.util.NamedThreadFactory;
@@ -42,6 +43,7 @@ public final class RedisService implements LifecycleAware {
     private final ExecutorManager executorManager;
     private final JavaPlugin plugin;
     private final MessageFacade messageFacade;
+    private final ChannelSecurityManager channelSecurityManager;
     private final AtomicReference<CoreConfig.RedisSettings> settingsRef;
     private final AtomicReference<CoreConfig.DegradedModeSettings> degradedSettings;
     private final ScheduledExecutorService reconnectScheduler;
@@ -59,11 +61,13 @@ public final class RedisService implements LifecycleAware {
                         ExecutorManager executorManager,
                         JavaPlugin plugin,
                         MessageFacade messageFacade,
+                        ChannelSecurityManager channelSecurityManager,
                         CoreConfig coreConfig) {
         this.logger = Objects.requireNonNull(logger, "logger");
         this.executorManager = Objects.requireNonNull(executorManager, "executorManager");
         this.plugin = Objects.requireNonNull(plugin, "plugin");
         this.messageFacade = Objects.requireNonNull(messageFacade, "messageFacade");
+        this.channelSecurityManager = Objects.requireNonNull(channelSecurityManager, "channelSecurityManager");
         Objects.requireNonNull(coreConfig, "coreConfig");
         this.settingsRef = new AtomicReference<>(coreConfig.redisSettings());
         this.degradedSettings = new AtomicReference<>(coreConfig.degradedModeSettings());
@@ -488,6 +492,11 @@ public final class RedisService implements LifecycleAware {
                     JedisPubSub subscriber = new JedisPubSub() {
                         @Override
                         public void onMessage(String channel, String message) {
+                            if (!channelSecurityManager.isChannelAllowed(channel)) {
+                                logger.warn("Message Redis ignoré sur un canal non autorisé: {} (subscription={})",
+                                        channel, id);
+                                return;
+                            }
                             try {
                                 listener.onMessage(channel, message);
                             } catch (Throwable throwable) {
