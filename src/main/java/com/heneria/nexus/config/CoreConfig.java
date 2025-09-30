@@ -2,11 +2,14 @@ package com.heneria.nexus.config;
 
 import java.time.Duration;
 import java.time.ZoneId;
-import java.util.Locale;
+import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.stream.Collectors;
 import net.kyori.adventure.bossbar.BossBar;
 
 /**
@@ -24,6 +27,7 @@ public final class CoreConfig {
     private final RedisSettings redisSettings;
     private final RateLimitSettings rateLimitSettings;
     private final ServiceSettings serviceSettings;
+    private final SecuritySettings securitySettings;
     private final BackupSettings backupSettings;
     private final TimeoutSettings timeoutSettings;
     private final DegradedModeSettings degradedModeSettings;
@@ -43,6 +47,7 @@ public final class CoreConfig {
                       RedisSettings redisSettings,
                       RateLimitSettings rateLimitSettings,
                       ServiceSettings serviceSettings,
+                      SecuritySettings securitySettings,
                       BackupSettings backupSettings,
                       TimeoutSettings timeoutSettings,
                       DegradedModeSettings degradedModeSettings,
@@ -61,6 +66,7 @@ public final class CoreConfig {
         this.redisSettings = Objects.requireNonNull(redisSettings, "redisSettings");
         this.rateLimitSettings = Objects.requireNonNull(rateLimitSettings, "rateLimitSettings");
         this.serviceSettings = Objects.requireNonNull(serviceSettings, "serviceSettings");
+        this.securitySettings = Objects.requireNonNull(securitySettings, "securitySettings");
         this.backupSettings = Objects.requireNonNull(backupSettings, "backupSettings");
         this.timeoutSettings = Objects.requireNonNull(timeoutSettings, "timeoutSettings");
         this.degradedModeSettings = Objects.requireNonNull(degradedModeSettings, "degradedModeSettings");
@@ -109,6 +115,10 @@ public final class CoreConfig {
 
     public ServiceSettings serviceSettings() {
         return serviceSettings;
+    }
+
+    public SecuritySettings securitySettings() {
+        return securitySettings;
     }
 
     public BackupSettings backupSettings() {
@@ -366,6 +376,20 @@ public final class CoreConfig {
     }
 
     public record ServiceSettings(boolean exposeBukkitServices) {}
+
+    public record SecuritySettings(Set<String> allowedChannels) {
+
+        public SecuritySettings {
+            Objects.requireNonNull(allowedChannels, "allowedChannels");
+            Set<String> normalized = allowedChannels.stream()
+                    .filter(Objects::nonNull)
+                    .map(String::trim)
+                    .filter(channel -> !channel.isEmpty())
+                    .map(channel -> channel.toLowerCase(Locale.ROOT))
+                    .collect(Collectors.toCollection(LinkedHashSet::new));
+            this.allowedChannels = Collections.unmodifiableSet(normalized);
+        }
+    }
 
     public record HologramSettings(int updateHz, int maxVisiblePerInstance, double lineSpacing, double viewRange, int maxPooledTextDisplays, int maxPooledInteractions) {
         public HologramSettings {

@@ -6,6 +6,7 @@ import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -233,6 +234,7 @@ public final class ConfigValidator {
         }
 
         CoreConfig.UiSettings uiSettings = new CoreConfig.UiSettings(strictMiniMessage, titleProfiles, bossBarDefaults);
+        CoreConfig.SecuritySettings securitySettings = parseSecuritySettings(yaml, issues);
 
         CoreConfig.ArenaSettings arenaSettings;
         CoreConfig.ExecutorSettings executorSettings;
@@ -432,8 +434,40 @@ public final class ConfigValidator {
         }
 
         return new CoreConfig(mode, serverId, locale, zone, arenaSettings, executorSettings, databaseSettings,
-                redisSettings, rateLimitSettings, serviceSettings, backupSettings, timeoutSettings, degradedModeSettings,
-                queueSettings, hologramSettings, analyticsSettings, uiSettings, healthCheckSettings);
+                redisSettings, rateLimitSettings, serviceSettings, securitySettings, backupSettings, timeoutSettings,
+                degradedModeSettings, queueSettings, hologramSettings, analyticsSettings, uiSettings, healthCheckSettings);
+    }
+
+    private CoreConfig.SecuritySettings parseSecuritySettings(YamlConfiguration yaml, IssueCollector issues) {
+        Set<String> allowed = new LinkedHashSet<>();
+        ConfigurationSection securitySection = yaml.getConfigurationSection("security");
+        if (securitySection == null) {
+            issues.warn("security", "Section manquante, aucun canal ne sera autorisé");
+            return new CoreConfig.SecuritySettings(Set.of());
+        }
+        List<?> rawChannels = securitySection.getList("allowed_channels");
+        if (rawChannels == null) {
+            issues.warn("security.allowed_channels", "Liste manquante, aucun canal ne sera autorisé");
+            return new CoreConfig.SecuritySettings(Set.of());
+        }
+        for (int index = 0; index < rawChannels.size(); index++) {
+            Object value = rawChannels.get(index);
+            String path = "security.allowed_channels[" + index + "]";
+            if (!(value instanceof String channelValue)) {
+                issues.warn(path, "Valeur non textuelle ignorée");
+                continue;
+            }
+            String trimmed = channelValue.trim();
+            if (trimmed.isEmpty()) {
+                issues.warn(path, "Canal vide ignoré");
+                continue;
+            }
+            allowed.add(trimmed);
+        }
+        if (allowed.isEmpty()) {
+            issues.warn("security.allowed_channels", "Aucun canal autorisé défini — tous les messages reçus seront rejetés");
+        }
+        return new CoreConfig.SecuritySettings(allowed);
     }
 
     private CoreConfig.RateLimitSettings parseRateLimitSettingsSafe(YamlConfiguration yaml, IssueCollector issues) {

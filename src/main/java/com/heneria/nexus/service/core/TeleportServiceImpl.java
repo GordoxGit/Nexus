@@ -1,8 +1,13 @@
 package com.heneria.nexus.service.core;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.heneria.nexus.api.TeleportService;
 import com.heneria.nexus.config.CoreConfig;
 import com.heneria.nexus.concurrent.ExecutorManager;
+import com.heneria.nexus.security.ChannelSecurityManager;
+import com.heneria.nexus.service.core.payload.TeleportResultPayload;
 import com.heneria.nexus.util.NexusLogger;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -38,6 +43,8 @@ public final class TeleportServiceImpl implements TeleportService, PluginMessage
     private final JavaPlugin plugin;
     private final NexusLogger logger;
     private final ExecutorManager executorManager;
+    private final ChannelSecurityManager channelSecurityManager;
+    private final ObjectMapper objectMapper;
     private final AtomicReference<CoreConfig.QueueSettings> settingsRef;
     private final ConcurrentHashMap<UUID, PendingTeleport> pending = new ConcurrentHashMap<>();
     private final AtomicReference<Throwable> lastError = new AtomicReference<>();
@@ -46,12 +53,16 @@ public final class TeleportServiceImpl implements TeleportService, PluginMessage
     public TeleportServiceImpl(JavaPlugin plugin,
                                NexusLogger logger,
                                ExecutorManager executorManager,
+                               ChannelSecurityManager channelSecurityManager,
                                CoreConfig config) {
         this.plugin = Objects.requireNonNull(plugin, "plugin");
         this.logger = Objects.requireNonNull(logger, "logger");
         this.executorManager = Objects.requireNonNull(executorManager, "executorManager");
+        this.channelSecurityManager = Objects.requireNonNull(channelSecurityManager, "channelSecurityManager");
         Objects.requireNonNull(config, "config");
         this.settingsRef = new AtomicReference<>(config.queueSettings());
+        this.objectMapper = new ObjectMapper()
+                .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, true);
     }
 
     @Override
@@ -152,26 +163,55 @@ public final class TeleportServiceImpl implements TeleportService, PluginMessage
 
     @Override
     public void onPluginMessageReceived(String channel, Player player, byte[] message) {
+        if (!channelSecurityManager.isChannelAllowed(channel)) {
+            String origin = player != null ? player.getName() + "/" + player.getUniqueId() : "<inconnu>";
+            logger.warn("PluginMessage reçu sur un canal non autorisé: {} (origine: {})", channel, origin);
+            return;
+        }
         if (!CHANNEL.equalsIgnoreCase(channel)) {
             return;
         }
         if (message == null || message.length == 0) {
             return;
         }
+        Optional<TeleportResultPayload> payload = decodeTeleportPayload(message);
+        if (payload.isEmpty()) {
+            return;
+        }
+        TeleportResultPayload data = payload.get();
+        if (data.requestId() == null) {
+            logger.warn("PluginMessage reçu sans identifiant de requête sur {}", CHANNEL);
+            return;
+        }
+        TeleportStatus status = parseStatus(data.status());
+        completePending(data.requestId(), status, data.message());
+    }
+
+    private Optional<TeleportResultPayload> decodeTeleportPayload(byte[] message) {
         try (DataInputStream input = new DataInputStream(new ByteArrayInputStream(message))) {
-            String subChannel = input.readUTF();
-            if (!SUBCHANNEL_RESULT.equalsIgnoreCase(subChannel)) {
-                logger.debug(() -> "Sous-canal plugin message inattendu: " + subChannel);
-                return;
+            String token = input.readUTF();
+            if (token == null || token.isBlank()) {
+                logger.warn("PluginMessage reçu sans contenu sur {}", CHANNEL);
+                return Optional.empty();
+            }
+            if (token.trim().startsWith("{")) {
+                TeleportResultPayload payload = objectMapper.readValue(token, TeleportResultPayload.class);
+                return Optional.of(payload);
+            }
+            if (!SUBCHANNEL_RESULT.equalsIgnoreCase(token)) {
+                logger.debug(() -> "Sous-canal plugin message inattendu: " + token);
+                return Optional.empty();
             }
             UUID requestId = UUID.fromString(input.readUTF());
             String statusRaw = safeReadUtf(input);
             String reason = safeReadUtf(input);
-            TeleportStatus status = parseStatus(statusRaw);
-            completePending(requestId, status, reason);
+            return Optional.of(new TeleportResultPayload(requestId, statusRaw, reason));
+        } catch (JsonProcessingException exception) {
+            logger.warn("PluginMessage JSON invalide reçu sur " + CHANNEL, exception);
         } catch (Exception exception) {
             logger.warn("PluginMessage invalide reçu sur " + CHANNEL, exception);
         }
+        return Optional.empty();
     }
 
     private CompletableFuture<TeleportResult> dispatchRequest(UUID playerId,

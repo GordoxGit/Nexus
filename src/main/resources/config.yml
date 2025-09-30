@@ -11,6 +11,13 @@ server:
   language: "fr"
   timezone: "Europe/Paris"
 
+security:
+  # Liste des canaux de communication autorisés pour les PluginMessages et Redis.
+  # Seuls les messages provenant de ces canaux seront traités.
+  allowed_channels:
+    - "nexus:main"
+    - "nexus:health"
+
 config:
   backups:
     # Nombre maximum de sauvegardes à conserver par fichier. Mettre à 0 pour désactiver.
