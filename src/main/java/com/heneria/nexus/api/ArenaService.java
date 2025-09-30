@@ -7,6 +7,8 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.UUID;
+import org.bukkit.Location;
+import org.bukkit.entity.Player;
 
 /**
  * Core gameplay service managing arena instances and their lifecycle.
@@ -38,6 +40,17 @@ public interface ArenaService extends LifecycleAware {
      * @return collection view of all running arena handles
      */
     Collection<ArenaHandle> instances();
+
+    /**
+     * Resolves the spawn location associated with the provided player.
+     *
+     * @param player player whose spawn should be retrieved
+     * @return location of the spawn when known
+     */
+    default Optional<Location> findSpawnLocation(Player player) {
+        Objects.requireNonNull(player, "player");
+        return Optional.empty();
+    }
 
     /**
      * Requests a phase transition for the given arena. This method must be
