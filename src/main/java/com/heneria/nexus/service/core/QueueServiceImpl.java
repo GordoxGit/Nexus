@@ -3,6 +3,9 @@ package com.heneria.nexus.service.core;
 import com.heneria.nexus.config.CoreConfig;
 import com.heneria.nexus.concurrent.ExecutorManager;
 import com.heneria.nexus.api.ArenaMode;
+import com.heneria.nexus.api.MapDefinition;
+import com.heneria.nexus.api.MapRotationService;
+import com.heneria.nexus.api.MapSelectionContext;
 import com.heneria.nexus.api.MatchPlan;
 import com.heneria.nexus.api.QueueOptions;
 import com.heneria.nexus.api.QueueService;
@@ -19,6 +22,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
+import java.util.Deque;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
@@ -28,6 +32,7 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.Locale;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
@@ -48,6 +53,8 @@ import org.bukkit.scheduler.BukkitTask;
  */
 public final class QueueServiceImpl implements QueueService {
 
+    private static final int MAX_RECENT_MAPS = 5;
+
     private final JavaPlugin plugin;
     private final NexusLogger logger;
     private final ExecutorManager executorManager;
@@ -57,6 +64,7 @@ public final class QueueServiceImpl implements QueueService {
     private final RedisService redisService;
     private final Optional<LuckPerms> luckPerms;
     private final GlobalMatchmaker globalMatchmaker;
+    private final MapRotationService mapRotationService;
     private final Map<ArenaMode, ConcurrentLinkedQueue<QueueTicket>> queues = new EnumMap<>(ArenaMode.class);
     private final ConcurrentHashMap<UUID, QueueTicket> ticketsByPlayer = new ConcurrentHashMap<>();
     private final AtomicLong matchesFormed = new AtomicLong();
@@ -64,6 +72,7 @@ public final class QueueServiceImpl implements QueueService {
     private final AtomicReference<QueueStats> stats = new AtomicReference<>(new QueueStats(0, 0, 0L, 0L));
     private final AtomicBoolean crossShardFallbackLogged = new AtomicBoolean();
     private final String serverId;
+    private final Deque<String> recentMaps = new ConcurrentLinkedDeque<>();
     private volatile BukkitTask tickerTask;
 
     public QueueServiceImpl(JavaPlugin plugin,
@@ -74,6 +83,7 @@ public final class QueueServiceImpl implements QueueService {
                             MessageFacade messageFacade,
                             RedisService redisService,
                             HealthCheckService healthCheckService,
+                            MapRotationService mapRotationService,
                             CoreConfig config,
                             Optional<LuckPerms> luckPerms) {
         this.plugin = Objects.requireNonNull(plugin, "plugin");
@@ -84,6 +94,7 @@ public final class QueueServiceImpl implements QueueService {
         this.messageFacade = Objects.requireNonNull(messageFacade, "messageFacade");
         this.redisService = Objects.requireNonNull(redisService, "redisService");
         this.luckPerms = Objects.requireNonNull(luckPerms, "luckPerms");
+        this.mapRotationService = Objects.requireNonNull(mapRotationService, "mapRotationService");
         Objects.requireNonNull(healthCheckService, "healthCheckService");
         Objects.requireNonNull(config, "config");
         this.settingsRef = new AtomicReference<>(config.queueSettings());
@@ -206,12 +217,16 @@ public final class QueueServiceImpl implements QueueService {
             selected.forEach(queue::remove);
             return Optional.empty();
         }
+        Optional<MapDefinition> chosenMap = chooseMapForMatch(mode, players.size());
+        if (chosenMap.isEmpty()) {
+            return Optional.empty();
+        }
         selected.forEach(ticket -> {
             ticketsByPlayer.remove(ticket.playerId());
             queue.remove(ticket);
         });
         updateStats();
-        MatchPlan plan = new MatchPlan(UUID.randomUUID(), mode, players, Optional.empty());
+        MatchPlan plan = new MatchPlan(UUID.randomUUID(), mode, players, Optional.of(chosenMap.get().id()));
         dispatchTeleportRequests(selected, Optional.empty());
         return Optional.of(plan);
     }
@@ -407,6 +422,37 @@ public final class QueueServiceImpl implements QueueService {
             return;
         }
         executorManager.compute().execute(() -> enqueue(ticket.playerId(), ticket.mode(), ticket.options()));
+    }
+
+    private Optional<MapDefinition> chooseMapForMatch(ArenaMode mode, int playerCount) {
+        List<String> history = snapshotRecentMaps();
+        MapSelectionContext context = new MapSelectionContext(mode, playerCount, history);
+        List<MapDefinition> candidates = mapRotationService.getMapChoices(context);
+        if (candidates.isEmpty()) {
+            logger.error("Rotation des cartes: aucune carte disponible pour " + mode
+                    + " (" + playerCount + " joueurs)");
+            return Optional.empty();
+        }
+        MapDefinition selected = candidates.get(0);
+        mapRotationService.recordMatch(selected.id());
+        rememberMap(selected.id());
+        return Optional.of(selected);
+    }
+
+    private List<String> snapshotRecentMaps() {
+        return List.copyOf(new ArrayList<>(recentMaps));
+    }
+
+    private void rememberMap(String mapId) {
+        if (mapId == null || mapId.isBlank()) {
+            return;
+        }
+        String normalized = mapId.toLowerCase(Locale.ROOT);
+        recentMaps.remove(normalized);
+        recentMaps.addFirst(normalized);
+        while (recentMaps.size() > MAX_RECENT_MAPS) {
+            recentMaps.removeLast();
+        }
     }
 
     private int weightForTicket(QueueTicket ticket) {
