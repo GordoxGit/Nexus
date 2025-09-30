@@ -37,6 +37,10 @@ public final class ConfigManager implements AutoCloseable {
     private static final String ECONOMY_FILE = "economy.yml";
     private static final String HOLOGRAMS_FILE = "holograms.yml";
     private static final String LANG_DIRECTORY = "lang";
+    private static final String MAPS_DIRECTORY = "maps";
+    private static final String WORLD_TEMPLATES_DIRECTORY = "world_templates";
+    private static final String EXAMPLE_MAP_DIRECTORY = "example_map";
+    private static final String EXAMPLE_MAP_FILE = "map.yml";
     private static final String DEFAULT_LANGUAGE_FILENAME = "messages_fr.yml";
     private static final String DEFAULT_LANGUAGE_FILE = "lang/" + DEFAULT_LANGUAGE_FILENAME;
     private static final String MESSAGE_FILE_PREFIX = "messages_";
@@ -210,6 +214,15 @@ public final class ConfigManager implements AutoCloseable {
             if (Files.notExists(langPath)) {
                 Files.createDirectories(langPath);
             }
+            Path mapsPath = dataDirectory.resolve(MAPS_DIRECTORY);
+            if (Files.notExists(mapsPath)) {
+                Files.createDirectories(mapsPath);
+            }
+            Path worldTemplatesPath = dataDirectory.resolve(WORLD_TEMPLATES_DIRECTORY);
+            if (Files.notExists(worldTemplatesPath)) {
+                Files.createDirectories(worldTemplatesPath);
+            }
+            createExampleMapIfNeeded(mapsPath);
         } catch (IOException exception) {
             throw new IllegalStateException("Impossible de créer le dossier de données du plugin", exception);
         }
@@ -234,6 +247,55 @@ public final class ConfigManager implements AutoCloseable {
             }
             plugin.saveResource(resource, false);
         }
+    }
+
+    private void createExampleMapIfNeeded(Path mapsDirectory) throws IOException {
+        Path exampleDirectory = mapsDirectory.resolve(EXAMPLE_MAP_DIRECTORY);
+        if (Files.exists(exampleDirectory)) {
+            return;
+        }
+        Files.createDirectories(exampleDirectory);
+        Path mapFile = exampleDirectory.resolve(EXAMPLE_MAP_FILE);
+        if (Files.exists(mapFile)) {
+            return;
+        }
+        String exampleContent = """
+# Exemple de configuration pour une carte Nexus
+asset:
+  type: SCHEMATIC
+  file: example_map.schem
+
+rules:
+  min_players: 4
+  max_players: 12
+
+teams:
+  red:
+    name: "Rouge"
+    spawn:
+      x: 0
+      y: 64
+      z: 0
+    nexus:
+      hp: 100
+      position:
+        x: 5
+        y: 65
+        z: 5
+  blue:
+    name: "Bleu"
+    spawn:
+      x: 10
+      y: 64
+      z: 10
+    nexus:
+      hp: 100
+      position:
+        x: 15
+        y: 65
+        z: 15
+""";
+        Files.writeString(mapFile, exampleContent, StandardCharsets.UTF_8);
     }
 
     private MessageCatalog loadMessageBundles(Locale configuredFallback, ReloadReport.Builder builder) {

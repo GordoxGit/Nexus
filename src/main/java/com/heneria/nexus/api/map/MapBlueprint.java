@@ -37,15 +37,23 @@ public record MapBlueprint(boolean configurationPresent,
     /**
      * Description of the schematic/world asset used by the map.
      */
-    public record MapAsset(String file, Map<String, Object> properties) {
+    public record MapAsset(String type, String file, Map<String, Object> properties) {
 
         public MapAsset {
             Objects.requireNonNull(properties, "properties");
             properties = Map.copyOf(properties);
         }
 
+        public MapAsset(String type, String file) {
+            this(type, file, Map.of());
+        }
+
+        public MapAsset(String file, Map<String, Object> properties) {
+            this(null, file, properties);
+        }
+
         public MapAsset(String file) {
-            this(file, Map.of());
+            this(null, file, Map.of());
         }
     }
 

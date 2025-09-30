@@ -55,15 +55,70 @@ public final class MapValidatorServiceImpl implements MapValidatorService {
                                MapAsset asset,
                                List<String> warnings,
                                List<String> errors) {
-        if (asset == null || asset.file() == null || asset.file().isBlank()) {
-            errors.add("[" + definition.id() + "] Section asset invalide : fichier non défini");
+        if (asset == null) {
+            errors.add("[" + definition.id() + "] Section asset manquante ou invalide");
             return;
         }
-        Path assetPath = definition.folder().resolve(asset.file());
-        if (!Files.exists(assetPath)) {
-            errors.add("[" + definition.id() + "] Le fichier asset '" + asset.file()
-                    + "' est introuvable dans " + assetPath.getParent());
+        String rawType = asset.type();
+        if (rawType == null || rawType.isBlank()) {
+            errors.add("[" + definition.id() + "] Section asset invalide : type non défini");
+            return;
         }
+        String normalizedType = rawType.trim().toUpperCase(Locale.ROOT);
+        String file = asset.file();
+        if (file == null || file.isBlank()) {
+            errors.add("[" + definition.id() + "] Section asset invalide : fichier non défini pour le type "
+                    + normalizedType);
+            return;
+        }
+        switch (normalizedType) {
+            case "SCHEMATIC" -> validateSchematic(definition, file, errors);
+            case "WORLD_TEMPLATE" -> validateWorldTemplate(definition, file, errors);
+            default -> errors.add("[" + definition.id() + "] Type d'asset inconnu: " + rawType);
+        }
+    }
+
+    private void validateSchematic(MapDefinition definition, String file, List<String> errors) {
+        Path assetPath = definition.folder().resolve(file);
+        if (!Files.exists(assetPath) || Files.isDirectory(assetPath)) {
+            String parent = assetPath.getParent() != null ? assetPath.getParent().toAbsolutePath().toString()
+                    : definition.folder().toAbsolutePath().toString();
+            errors.add("Erreur pour la carte '" + definition.id() + "': L'asset de type SCHEMATIC '" + file
+                    + "' est introuvable dans le dossier " + parent + "/");
+        }
+    }
+
+    private void validateWorldTemplate(MapDefinition definition, String folderName, List<String> errors) {
+        Path worldTemplatesDirectory = resolveWorldTemplatesDirectory(definition.folder());
+        if (worldTemplatesDirectory == null) {
+            errors.add("Erreur pour la carte '" + definition.id()
+                    + "': Impossible de localiser le dossier world_templates pour valider l'asset '"
+                    + folderName + "'.");
+            return;
+        }
+        Path templateFolder = worldTemplatesDirectory.resolve(folderName);
+        if (!Files.exists(templateFolder) || !Files.isDirectory(templateFolder)) {
+            errors.add("Erreur pour la carte '" + definition.id() + "': L'asset de type WORLD_TEMPLATE '" + folderName
+                    + "' est introuvable dans le dossier " + worldTemplatesDirectory.toAbsolutePath() + "/");
+            return;
+        }
+        Path levelDat = templateFolder.resolve("level.dat");
+        if (!Files.exists(levelDat) || Files.isDirectory(levelDat)) {
+            errors.add("Erreur pour la carte '" + definition.id() + "': L'asset WORLD_TEMPLATE '" + folderName
+                    + "' est invalide : level.dat manquant dans " + templateFolder.toAbsolutePath() + "/");
+        }
+    }
+
+    private Path resolveWorldTemplatesDirectory(Path mapFolder) {
+        Path mapsDirectory = mapFolder.getParent();
+        if (mapsDirectory == null) {
+            return null;
+        }
+        Path dataDirectory = mapsDirectory.getParent();
+        if (dataDirectory == null) {
+            return null;
+        }
+        return dataDirectory.resolve("world_templates");
     }
 
     private void validateRules(MapRules rules, List<String> errors) {

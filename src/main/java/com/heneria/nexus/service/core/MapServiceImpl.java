@@ -244,9 +244,12 @@ public final class MapServiceImpl implements MapService {
         if (section == null) {
             return null;
         }
+        String type = section.getString("type");
         String file = section.getString("file");
-        Map<String, Object> properties = extractMetadata(section);
-        return new MapAsset(file, properties);
+        Map<String, Object> properties = new LinkedHashMap<>(extractMetadata(section));
+        properties.remove("type");
+        properties.remove("file");
+        return new MapAsset(type, file, properties);
     }
 
     private MapRules parseRules(ConfigurationSection section) {
