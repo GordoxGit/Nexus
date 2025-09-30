@@ -443,12 +443,14 @@ public final class ConfigValidator {
         ConfigurationSection securitySection = yaml.getConfigurationSection("security");
         if (securitySection == null) {
             issues.warn("security", "Section manquante, aucun canal ne sera autorisé");
-            return new CoreConfig.SecuritySettings(Set.of());
+            return new CoreConfig.SecuritySettings(Set.of(),
+                    new CoreConfig.SecuritySettings.NetworkRateLimitSettings(false, true, Map.of()));
         }
         List<?> rawChannels = securitySection.getList("allowed_channels");
         if (rawChannels == null) {
             issues.warn("security.allowed_channels", "Liste manquante, aucun canal ne sera autorisé");
-            return new CoreConfig.SecuritySettings(Set.of());
+            return new CoreConfig.SecuritySettings(Set.of(),
+                    parseNetworkRateLimitSettings(securitySection, issues));
         }
         for (int index = 0; index < rawChannels.size(); index++) {
             Object value = rawChannels.get(index);
@@ -467,7 +469,36 @@ public final class ConfigValidator {
         if (allowed.isEmpty()) {
             issues.warn("security.allowed_channels", "Aucun canal autorisé défini — tous les messages reçus seront rejetés");
         }
-        return new CoreConfig.SecuritySettings(allowed);
+        CoreConfig.SecuritySettings.NetworkRateLimitSettings rateLimitSettings =
+                parseNetworkRateLimitSettings(securitySection, issues);
+        return new CoreConfig.SecuritySettings(allowed, rateLimitSettings);
+    }
+
+    private CoreConfig.SecuritySettings.NetworkRateLimitSettings parseNetworkRateLimitSettings(
+            ConfigurationSection securitySection, IssueCollector issues) {
+        ConfigurationSection limitsSection = securitySection.getConfigurationSection("network_rate_limits");
+        if (limitsSection == null) {
+            issues.warn("security.network_rate_limits", "Section manquante, rate limiter réseau désactivé");
+            return new CoreConfig.SecuritySettings.NetworkRateLimitSettings(false, true, Map.of());
+        }
+        boolean enabled = limitsSection.getBoolean("enabled", true);
+        boolean failOpen = limitsSection.getBoolean("fail_open", true);
+        ConfigurationSection perChannelSection = limitsSection.getConfigurationSection("limits");
+        Map<String, Integer> limits = new LinkedHashMap<>();
+        if (perChannelSection == null) {
+            issues.warn("security.network_rate_limits.limits", "Section manquante, aucun canal ne sera limité");
+        } else {
+            for (String key : perChannelSection.getKeys(false)) {
+                String path = "security.network_rate_limits.limits." + key;
+                int threshold = perChannelSection.getInt(key, -1);
+                if (threshold <= 0) {
+                    issues.warn(path, "Seuil <= 0 ignoré");
+                    continue;
+                }
+                limits.put(key, threshold);
+            }
+        }
+        return new CoreConfig.SecuritySettings.NetworkRateLimitSettings(enabled, failOpen, limits);
     }
 
     private CoreConfig.RateLimitSettings parseRateLimitSettingsSafe(YamlConfiguration yaml, IssueCollector issues) {

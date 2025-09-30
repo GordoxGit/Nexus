@@ -17,6 +17,13 @@ security:
   allowed_channels:
     - "nexus:main"
     - "nexus:health"
+  network_rate_limits:
+    enabled: true
+    # true = autorise le trafic en cas de panne Redis, false = bloque tout
+    fail_open: true
+    limits:
+      "nexus:health": 2
+      "nexus:main": 100
 
 config:
   backups:
