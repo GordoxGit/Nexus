@@ -11,6 +11,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 import net.kyori.adventure.bossbar.BossBar;
+import org.bukkit.Particle;
 
 /**
  * Immutable view over the main nexus configuration.
@@ -161,14 +162,44 @@ public final class CoreConfig {
         }
     }
 
-    public record ArenaSettings(int hudHz, int scoreboardHz, int particlesSoftCap, int particlesHardCap,
-                                int maxEntities, int maxItems, int maxProjectiles) {
+    public record ArenaSettings(int hudHz,
+                                int scoreboardHz,
+                                int particlesSoftCap,
+                                int particlesHardCap,
+                                int maxEntities,
+                                int maxItems,
+                                int maxProjectiles,
+                                SpawnProtectionSettings spawnProtection) {
         public ArenaSettings {
             if (hudHz <= 0) throw new IllegalArgumentException("hudHz must be positive");
             if (scoreboardHz <= 0) throw new IllegalArgumentException("scoreboardHz must be positive");
             if (particlesSoftCap < 0) throw new IllegalArgumentException("particlesSoftCap must be >= 0");
             if (particlesHardCap < particlesSoftCap) throw new IllegalArgumentException("particlesHardCap must be >= particlesSoftCap");
             if (maxEntities < 0 || maxItems < 0 || maxProjectiles < 0) throw new IllegalArgumentException("budgets must be >= 0");
+            Objects.requireNonNull(spawnProtection, "spawnProtection");
+        }
+
+        public record SpawnProtectionSettings(boolean enabled,
+                                              Duration duration,
+                                              int resistanceAmplifier,
+                                              boolean glow,
+                                              Particle particle,
+                                              String actionBarMessage,
+                                              int actionBarIntervalTicks) {
+
+            public SpawnProtectionSettings {
+                Objects.requireNonNull(duration, "duration");
+                if (duration.isNegative() || duration.isZero()) {
+                    throw new IllegalArgumentException("duration must be > 0");
+                }
+                if (resistanceAmplifier < 0) {
+                    throw new IllegalArgumentException("resistanceAmplifier must be >= 0");
+                }
+                Objects.requireNonNull(actionBarMessage, "actionBarMessage");
+                if (actionBarIntervalTicks <= 0) {
+                    throw new IllegalArgumentException("actionBarIntervalTicks must be > 0");
+                }
+            }
         }
     }
 

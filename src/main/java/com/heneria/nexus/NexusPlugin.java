@@ -58,11 +58,14 @@ import com.heneria.nexus.hologram.HoloServiceImpl;
 import com.heneria.nexus.hologram.Hologram;
 import com.heneria.nexus.hologram.HologramVisibilityListener;
 import com.heneria.nexus.listener.FirstWinBonusListener;
+import com.heneria.nexus.listener.PlayerRespawnListener;
+import com.heneria.nexus.listener.SpawnProtectionListener;
 import com.heneria.nexus.scheduler.GamePhase;
 import com.heneria.nexus.scheduler.RingScheduler;
 import com.heneria.nexus.scheduler.RingScheduler.TaskProfile;
 import com.heneria.nexus.concurrent.ExecutorManager;
 import com.heneria.nexus.service.ServiceRegistry;
+import com.heneria.nexus.api.AntiSpawnKillService;
 import com.heneria.nexus.api.ArenaService;
 import com.heneria.nexus.api.EconomyService;
 import com.heneria.nexus.api.FirstWinBonusService;
@@ -75,6 +78,7 @@ import com.heneria.nexus.api.QueueService;
 import com.heneria.nexus.api.TeleportService;
 import com.heneria.nexus.api.ShopService;
 import com.heneria.nexus.api.service.TimerService;
+import com.heneria.nexus.service.core.AntiSpawnKillServiceImpl;
 import com.heneria.nexus.service.core.ArenaServiceImpl;
 import com.heneria.nexus.service.core.EconomyServiceImpl;
 import com.heneria.nexus.service.core.FirstWinBonusServiceImpl;
@@ -379,8 +383,12 @@ public final class NexusPlugin extends JavaPlugin {
 
     private void registerListeners() {
         PluginManager manager = getServer().getPluginManager();
+        AntiSpawnKillService spawnKillService = serviceRegistry.get(AntiSpawnKillService.class);
+        ArenaService arenaService = serviceRegistry.get(ArenaService.class);
         manager.registerEvents(new HologramVisibilityListener(serviceRegistry.get(HoloService.class)), this);
         manager.registerEvents(new FirstWinBonusListener(logger, serviceRegistry.get(FirstWinBonusService.class)), this);
+        manager.registerEvents(new PlayerRespawnListener(logger, arenaService, spawnKillService, executorManager), this);
+        manager.registerEvents(new SpawnProtectionListener(spawnKillService), this);
     }
 
     private boolean checkDependencies() {
@@ -1472,6 +1480,7 @@ public final class NexusPlugin extends JavaPlugin {
         serviceRegistry.registerService(AnalyticsService.class, AnalyticsService.class);
         serviceRegistry.registerService(DailyStatsRepository.class, DailyStatsRepository.class);
         serviceRegistry.registerService(DailyStatsAggregatorService.class, DailyStatsAggregatorService.class);
+        serviceRegistry.registerService(AntiSpawnKillService.class, AntiSpawnKillServiceImpl.class);
         serviceRegistry.registerService(ArenaService.class, ArenaServiceImpl.class);
         serviceRegistry.registerService(HoloService.class, HoloServiceImpl.class);
         serviceRegistry.registerService(RewardService.class, RewardServiceImpl.class);

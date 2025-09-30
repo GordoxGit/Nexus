@@ -8,6 +8,7 @@ import com.heneria.nexus.audit.AuditService;
 import com.heneria.nexus.budget.BudgetService;
 import com.heneria.nexus.config.CoreConfig;
 import com.heneria.nexus.concurrent.ExecutorManager;
+import com.heneria.nexus.api.AntiSpawnKillService;
 import com.heneria.nexus.api.ArenaBudget;
 import com.heneria.nexus.api.ArenaCreationException;
 import com.heneria.nexus.api.ArenaHandle;
@@ -34,11 +35,15 @@ import com.heneria.nexus.watchdog.WatchdogService;
 import com.heneria.nexus.watchdog.WatchdogTimeoutException;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalLong;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -46,6 +51,7 @@ import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.atomic.AtomicInteger;
+import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 import org.bukkit.entity.Player;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
@@ -57,11 +63,16 @@ import org.bukkit.World;
 import org.bukkit.plugin.PluginManager;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitTask;
+import org.bukkit.scoreboard.Scoreboard;
+import org.bukkit.scoreboard.ScoreboardManager;
+import org.bukkit.scoreboard.Team;
 
 /**
  * Default arena orchestration service.
  */
 public final class ArenaServiceImpl implements ArenaService {
+
+    private static final PlainTextComponentSerializer PLAIN_SERIALIZER = PlainTextComponentSerializer.plainText();
 
     private final JavaPlugin plugin;
     private final NexusLogger logger;
@@ -73,12 +84,14 @@ public final class ArenaServiceImpl implements ArenaService {
     private final EconomyService economyService;
     private final ExecutorManager executorManager;
     private final BudgetService budgetService;
+    private final AntiSpawnKillService antiSpawnKillService;
     private final MatchRepository matchRepository;
     private final WatchdogService watchdogService;
     private final ConcurrentHashMap<UUID, ArenaHandle> arenas = new ConcurrentHashMap<>();
     private final ConcurrentMap<UUID, BukkitTask> countdownTasks = new ConcurrentHashMap<>();
     private final ConcurrentMap<UUID, Instant> completionTimes = new ConcurrentHashMap<>();
     private final ConcurrentMap<UUID, FreezeState> frozenPlayers = new ConcurrentHashMap<>();
+    private final ConcurrentMap<UUID, Location> spawnLocations = new ConcurrentHashMap<>();
     private final CopyOnWriteArrayList<ArenaListener> listeners = new CopyOnWriteArrayList<>();
     private final AtomicReference<CoreConfig.ArenaSettings> settingsRef;
     private final AtomicReference<CoreConfig.TimeoutSettings.WatchdogSettings> watchdogSettingsRef;
@@ -95,6 +108,7 @@ public final class ArenaServiceImpl implements ArenaService {
                             EconomyService economyService,
                             ExecutorManager executorManager,
                             BudgetService budgetService,
+                            AntiSpawnKillService antiSpawnKillService,
                             MatchRepository matchRepository,
                             Optional<AnalyticsService> analyticsService,
                             WatchdogService watchdogService,
@@ -110,6 +124,7 @@ public final class ArenaServiceImpl implements ArenaService {
         this.economyService = Objects.requireNonNull(economyService, "economyService");
         this.executorManager = Objects.requireNonNull(executorManager, "executorManager");
         this.budgetService = Objects.requireNonNull(budgetService, "budgetService");
+        this.antiSpawnKillService = Objects.requireNonNull(antiSpawnKillService, "antiSpawnKillService");
         this.matchRepository = Objects.requireNonNull(matchRepository, "matchRepository");
         this.analyticsService = Objects.requireNonNull(analyticsService, "analyticsService");
         this.watchdogService = Objects.requireNonNull(watchdogService, "watchdogService");
@@ -191,6 +206,8 @@ public final class ArenaServiceImpl implements ArenaService {
         }
         players.forEach(player -> {
             UUID playerId = player.getUniqueId();
+            spawnLocations.remove(playerId);
+            antiSpawnKillService.revokeProtection(playerId);
             teleportService.returnToHub(playerId).whenComplete((result, throwable) ->
                     executorManager.mainThread().runNow(() -> handleHubTeleportResult(player, result, throwable)));
         });
@@ -235,6 +252,10 @@ public final class ArenaServiceImpl implements ArenaService {
         cancelCountdown(handle);
         unfreezePlayers(handle);
         setWorldPvP(handle, true);
+        playersInArena(handle).forEach(player -> {
+            spawnLocations.putIfAbsent(player.getUniqueId(), player.getLocation().clone());
+            antiSpawnKillService.applyProtection(player);
+        });
         plugin.getServer().getPluginManager().callEvent(new NexusArenaStartEvent(handle));
     }
 
@@ -330,21 +351,23 @@ public final class ArenaServiceImpl implements ArenaService {
             logger.warn("Aucun point de spawn défini pour l'arène " + handle.id());
             return;
         }
-        List<MapVector> spawns = blueprint.teams().stream()
-                .map(MapTeam::spawn)
-                .filter(Objects::nonNull)
-                .filter(MapVector::hasCoordinates)
-                .toList();
-        if (spawns.isEmpty()) {
+        SpawnLookup lookup = buildSpawnLookup(blueprint);
+        if (lookup.fallback().isEmpty()) {
             logger.warn("Points de spawn invalides pour l'arène " + handle.id());
             return;
         }
-        for (int index = 0; index < players.size(); index++) {
-            Player player = players.get(index);
-            MapVector spawn = spawns.get(index % spawns.size());
+        AtomicInteger fallbackIndex = new AtomicInteger();
+        for (Player player : players) {
+            MapVector spawn = resolveSpawnVector(player, lookup)
+                    .orElseGet(() -> {
+                        int next = fallbackIndex.getAndIncrement();
+                        List<MapVector> fallbacks = lookup.fallback();
+                        return fallbacks.get(next % fallbacks.size());
+                    });
             Location location = toLocation(world, spawn);
             if (location != null) {
                 player.teleport(location);
+                spawnLocations.put(player.getUniqueId(), location.clone());
             }
         }
     }
@@ -468,6 +491,133 @@ public final class ArenaServiceImpl implements ArenaService {
                 .orElse(List.of());
     }
 
+    @Override
+    public Optional<Location> findSpawnLocation(Player player) {
+        Objects.requireNonNull(player, "player");
+        Location assigned = spawnLocations.get(player.getUniqueId());
+        if (assigned != null) {
+            Location clone = assigned.clone();
+            if (clone.getWorld() == null && player.getWorld() != null) {
+                clone.setWorld(player.getWorld());
+            }
+            return Optional.of(clone);
+        }
+        return resolveSpawnLocationFromBlueprint(player);
+    }
+
+    private Optional<Location> resolveSpawnLocationFromBlueprint(Player player) {
+        World world = player.getWorld();
+        if (world == null) {
+            return Optional.empty();
+        }
+        Optional<ArenaHandle> handleOptional = findArenaByWorld(world.getName());
+        if (handleOptional.isEmpty()) {
+            return Optional.empty();
+        }
+        Optional<MapDefinition> definitionOptional = mapService.getMap(handleOptional.get().mapId());
+        if (definitionOptional.isEmpty()) {
+            return Optional.empty();
+        }
+        MapBlueprint blueprint = definitionOptional.get().blueprint();
+        if (blueprint == null) {
+            return Optional.empty();
+        }
+        SpawnLookup lookup = buildSpawnLookup(blueprint);
+        Optional<MapVector> vector = resolveSpawnVector(player, lookup);
+        if (vector.isEmpty()) {
+            return Optional.empty();
+        }
+        Location location = toLocation(world, vector.get());
+        if (location == null) {
+            return Optional.empty();
+        }
+        spawnLocations.put(player.getUniqueId(), location.clone());
+        return Optional.of(location);
+    }
+
+    private Optional<ArenaHandle> findArenaByWorld(String worldName) {
+        if (worldName == null) {
+            return Optional.empty();
+        }
+        return arenas.values().stream()
+                .filter(handle -> worldName.equalsIgnoreCase(handle.id().toString())
+                        || worldName.equalsIgnoreCase(handle.mapId()))
+                .findFirst();
+    }
+
+    private SpawnLookup buildSpawnLookup(MapBlueprint blueprint) {
+        Map<String, MapVector> byId = new HashMap<>();
+        Map<String, MapVector> byDisplay = new HashMap<>();
+        List<MapVector> fallback = new ArrayList<>();
+        if (blueprint == null || blueprint.teams() == null) {
+            return new SpawnLookup(Map.of(), Map.of(), List.of());
+        }
+        for (MapTeam team : blueprint.teams()) {
+            if (team == null) {
+                continue;
+            }
+            MapVector spawn = team.spawn();
+            if (spawn == null || !spawn.hasCoordinates()) {
+                continue;
+            }
+            fallback.add(spawn);
+            byId.put(team.id().toLowerCase(Locale.ROOT), spawn);
+            String displayName = team.displayName();
+            if (displayName != null && !displayName.isBlank()) {
+                byDisplay.put(displayName.toLowerCase(Locale.ROOT), spawn);
+            }
+        }
+        return new SpawnLookup(Map.copyOf(byId), Map.copyOf(byDisplay), List.copyOf(fallback));
+    }
+
+    private Optional<MapVector> resolveSpawnVector(Player player, SpawnLookup lookup) {
+        Team team = findTeam(player);
+        if (team == null) {
+            return Optional.empty();
+        }
+        String teamName = team.getName();
+        if (teamName != null) {
+            MapVector vector = lookup.byId().get(teamName.toLowerCase(Locale.ROOT));
+            if (vector != null) {
+                return Optional.of(vector);
+            }
+        }
+        Component displayName = team.displayName();
+        if (displayName != null) {
+            String plain = PLAIN_SERIALIZER.serialize(displayName).trim();
+            if (!plain.isEmpty()) {
+                MapVector vector = lookup.byDisplay().get(plain.toLowerCase(Locale.ROOT));
+                if (vector != null) {
+                    return Optional.of(vector);
+                }
+            }
+        }
+        return Optional.empty();
+    }
+
+    private Team findTeam(Player player) {
+        Scoreboard scoreboard = player.getScoreboard();
+        if (scoreboard != null) {
+            Team team = scoreboard.getEntryTeam(player.getName());
+            if (team != null) {
+                return team;
+            }
+        }
+        ScoreboardManager manager = Bukkit.getScoreboardManager();
+        if (manager != null) {
+            Scoreboard main = manager.getMainScoreboard();
+            if (main != null) {
+                return main.getEntryTeam(player.getName());
+            }
+        }
+        return null;
+    }
+
+    private record SpawnLookup(Map<String, MapVector> byId,
+                               Map<String, MapVector> byDisplay,
+                               List<MapVector> fallback) {
+    }
+
     private Optional<World> resolveArenaWorld(ArenaHandle handle) {
         World world = Bukkit.getWorld(handle.id().toString());
         if (world != null) {
@@ -520,6 +670,7 @@ public final class ArenaServiceImpl implements ArenaService {
     public void applyArenaSettings(CoreConfig.ArenaSettings settings) {
         settingsRef.set(Objects.requireNonNull(settings, "settings"));
         ringScheduler.applyPerfSettings(settings);
+        antiSpawnKillService.applySettings(settings.spawnProtection());
         logger.info("Paramètres d'arène mis à jour: hud=" + settings.hudHz() + " scoreboard=" + settings.scoreboardHz());
     }
 

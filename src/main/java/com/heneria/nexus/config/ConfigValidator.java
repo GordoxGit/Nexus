@@ -17,6 +17,7 @@ import java.util.Set;
 import net.kyori.adventure.bossbar.BossBar;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.minimessage.MiniMessage;
+import org.bukkit.Particle;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.YamlConfiguration;
 
@@ -40,6 +41,12 @@ public final class ConfigValidator {
     private static final long DEFAULT_CB_SLIDING_WINDOW_SECONDS = 30L;
     private static final long DEFAULT_CB_WAIT_OPEN_SECONDS = 60L;
     private static final int DEFAULT_CB_PERMITTED_HALF_OPEN_CALLS = 1;
+    private static final int DEFAULT_SPAWN_PROTECTION_DURATION_SECONDS = 4;
+    private static final int DEFAULT_SPAWN_PROTECTION_RESISTANCE = 10;
+    private static final boolean DEFAULT_SPAWN_PROTECTION_GLOW = true;
+    private static final Particle DEFAULT_SPAWN_PROTECTION_PARTICLE = Particle.TOTEM;
+    private static final String DEFAULT_SPAWN_PROTECTION_MESSAGE = "<gold>Invulnérable pendant <seconds>s</gold>";
+    private static final int DEFAULT_SPAWN_PROTECTION_INTERVAL_TICKS = 5;
 
     private final MiniMessage miniMessage = MiniMessage.miniMessage();
 
@@ -73,6 +80,7 @@ public final class ConfigValidator {
         int maxEntities = nonNegativeInt(yaml, "perf.budget.max_entities", 200, issues);
         int maxItems = nonNegativeInt(yaml, "perf.budget.max_items", 128, issues);
         int maxProjectiles = nonNegativeInt(yaml, "perf.budget.max_projectiles", 64, issues);
+        CoreConfig.ArenaSettings.SpawnProtectionSettings spawnProtection = parseSpawnProtection(yaml, issues);
 
         boolean ioVirtual = yaml.getBoolean("threads.io_virtual", yaml.getBoolean("executors.io.virtual", false));
         int ioPool = positiveInt(yaml, "threads.io_pool", yaml.getInt("executors.io.maxThreads", 3), issues, false);
@@ -249,10 +257,17 @@ public final class ConfigValidator {
 
         try {
             arenaSettings = new CoreConfig.ArenaSettings(hudHz, scoreboardHz, particlesSoft, particlesHard,
-                    maxEntities, maxItems, maxProjectiles);
+                    maxEntities, maxItems, maxProjectiles, spawnProtection);
         } catch (IllegalArgumentException exception) {
             issues.error("perf", exception.getMessage());
-            arenaSettings = new CoreConfig.ArenaSettings(5, 3, 1200, 2000, 200, 128, 64);
+            arenaSettings = new CoreConfig.ArenaSettings(5, 3, 1200, 2000, 200, 128, 64,
+                    new CoreConfig.ArenaSettings.SpawnProtectionSettings(true,
+                            Duration.ofSeconds(DEFAULT_SPAWN_PROTECTION_DURATION_SECONDS),
+                            DEFAULT_SPAWN_PROTECTION_RESISTANCE,
+                            DEFAULT_SPAWN_PROTECTION_GLOW,
+                            DEFAULT_SPAWN_PROTECTION_PARTICLE,
+                            DEFAULT_SPAWN_PROTECTION_MESSAGE,
+                            DEFAULT_SPAWN_PROTECTION_INTERVAL_TICKS));
         }
         CoreConfig.ExecutorSettings.IoSettings ioSettings;
         try {
@@ -436,6 +451,67 @@ public final class ConfigValidator {
         return new CoreConfig(mode, serverId, locale, zone, arenaSettings, executorSettings, databaseSettings,
                 redisSettings, rateLimitSettings, serviceSettings, securitySettings, backupSettings, timeoutSettings,
                 degradedModeSettings, queueSettings, hologramSettings, analyticsSettings, uiSettings, healthCheckSettings);
+    }
+
+    private CoreConfig.ArenaSettings.SpawnProtectionSettings parseSpawnProtection(YamlConfiguration yaml,
+                                                                                 IssueCollector issues) {
+        ConfigurationSection section = yaml.getConfigurationSection("perf.spawn_protection");
+        boolean enabled = true;
+        int durationSeconds = DEFAULT_SPAWN_PROTECTION_DURATION_SECONDS;
+        int resistance = DEFAULT_SPAWN_PROTECTION_RESISTANCE;
+        boolean glow = DEFAULT_SPAWN_PROTECTION_GLOW;
+        Particle particle = DEFAULT_SPAWN_PROTECTION_PARTICLE;
+        String message = DEFAULT_SPAWN_PROTECTION_MESSAGE;
+        int interval = DEFAULT_SPAWN_PROTECTION_INTERVAL_TICKS;
+
+        if (section != null) {
+            enabled = section.getBoolean("enabled", true);
+            durationSeconds = readPositive(section, "duration_seconds", "perf.spawn_protection.duration_seconds",
+                    DEFAULT_SPAWN_PROTECTION_DURATION_SECONDS, issues);
+            resistance = readNonNegative(section, "resistance_level", "perf.spawn_protection.resistance_level",
+                    DEFAULT_SPAWN_PROTECTION_RESISTANCE, issues);
+            glow = section.getBoolean("glow", DEFAULT_SPAWN_PROTECTION_GLOW);
+            String particleRaw = readString(section, "particle", DEFAULT_SPAWN_PROTECTION_PARTICLE.name(),
+                    "perf.spawn_protection.particle", issues);
+            Particle parsedParticle = parseParticle(particleRaw, "perf.spawn_protection.particle", issues);
+            particle = parsedParticle;
+            message = readString(section, "actionbar_message", DEFAULT_SPAWN_PROTECTION_MESSAGE,
+                    "perf.spawn_protection.actionbar_message", issues);
+            interval = readPositive(section, "actionbar_interval_ticks",
+                    "perf.spawn_protection.actionbar_interval_ticks",
+                    DEFAULT_SPAWN_PROTECTION_INTERVAL_TICKS, issues);
+        } else {
+            issues.warn("perf.spawn_protection", "Section manquante, utilisation des valeurs par défaut");
+        }
+
+        return new CoreConfig.ArenaSettings.SpawnProtectionSettings(enabled,
+                Duration.ofSeconds(Math.max(1, durationSeconds)),
+                resistance,
+                glow,
+                particle,
+                message,
+                interval);
+    }
+
+    private Particle parseParticle(String value, String path, IssueCollector issues) {
+        if (value == null) {
+            return DEFAULT_SPAWN_PROTECTION_PARTICLE;
+        }
+        String trimmed = value.trim();
+        if (trimmed.isEmpty()) {
+            issues.warn(path, "Valeur vide, utilisation de " + DEFAULT_SPAWN_PROTECTION_PARTICLE.name());
+            return DEFAULT_SPAWN_PROTECTION_PARTICLE;
+        }
+        if (trimmed.equalsIgnoreCase("none")) {
+            return null;
+        }
+        try {
+            return Particle.valueOf(trimmed.toUpperCase(Locale.ROOT));
+        } catch (IllegalArgumentException exception) {
+            issues.error(path, "Particule inconnue: " + trimmed + ". Utilisation de "
+                    + DEFAULT_SPAWN_PROTECTION_PARTICLE.name());
+            return DEFAULT_SPAWN_PROTECTION_PARTICLE;
+        }
     }
 
     private CoreConfig.SecuritySettings parseSecuritySettings(YamlConfiguration yaml, IssueCollector issues) {

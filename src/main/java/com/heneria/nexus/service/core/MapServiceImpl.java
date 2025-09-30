@@ -329,12 +329,104 @@ public final class MapServiceImpl implements MapService {
         Double x = getDouble(section, "x");
         Double y = getDouble(section, "y");
         Double z = getDouble(section, "z");
+        CoordinateTriple coordinates = extractCoordinates(section);
+        if (coordinates != null) {
+            if (x == null) {
+                x = coordinates.x();
+            }
+            if (y == null) {
+                y = coordinates.y();
+            }
+            if (z == null) {
+                z = coordinates.z();
+            }
+        }
         Float yaw = getFloat(section, "yaw");
         Float pitch = getFloat(section, "pitch");
         if (x == null && y == null && z == null && yaw == null && pitch == null) {
             return null;
         }
         return new MapVector(x, y, z, yaw, pitch);
+    }
+
+    private CoordinateTriple extractCoordinates(ConfigurationSection section) {
+        Double x = getDouble(section, "x");
+        Double y = getDouble(section, "y");
+        Double z = getDouble(section, "z");
+        if (x != null || y != null || z != null) {
+            return new CoordinateTriple(x, y, z);
+        }
+        CoordinateTriple fromSection = null;
+        ConfigurationSection posSection = section.getConfigurationSection("pos");
+        if (posSection != null) {
+            fromSection = extractCoordinates(posSection);
+        }
+        if (fromSection != null) {
+            return fromSection;
+        }
+        Object rawPos = section.get("pos");
+        if (rawPos == null) {
+            return null;
+        }
+        return extractCoordinates(rawPos);
+    }
+
+    private CoordinateTriple extractCoordinates(Object value) {
+        if (value instanceof CoordinateTriple triple) {
+            return triple;
+        }
+        if (value instanceof ConfigurationSection configurationSection) {
+            return extractCoordinates(configurationSection);
+        }
+        if (value instanceof Map<?, ?> map) {
+            Double x = parseCoordinate(map.get("x"));
+            Double y = parseCoordinate(map.get("y"));
+            Double z = parseCoordinate(map.get("z"));
+            if (x != null || y != null || z != null) {
+                return new CoordinateTriple(x, y, z);
+            }
+        }
+        if (value instanceof List<?> list && list.size() >= 3) {
+            Double x = parseCoordinate(list.get(0));
+            Double y = parseCoordinate(list.get(1));
+            Double z = parseCoordinate(list.get(2));
+            if (x != null || y != null || z != null) {
+                return new CoordinateTriple(x, y, z);
+            }
+        }
+        if (value instanceof String string) {
+            String[] parts = string.split(",");
+            if (parts.length >= 3) {
+                Double x = parseCoordinate(parts[0]);
+                Double y = parseCoordinate(parts[1]);
+                Double z = parseCoordinate(parts[2]);
+                if (x != null || y != null || z != null) {
+                    return new CoordinateTriple(x, y, z);
+                }
+            }
+        }
+        return null;
+    }
+
+    private Double parseCoordinate(Object value) {
+        if (value instanceof Number number) {
+            return number.doubleValue();
+        }
+        if (value instanceof String string) {
+            String trimmed = string.trim();
+            if (trimmed.isEmpty()) {
+                return null;
+            }
+            try {
+                return Double.parseDouble(trimmed);
+            } catch (NumberFormatException ignored) {
+                return null;
+            }
+        }
+        return null;
+    }
+
+    private record CoordinateTriple(Double x, Double y, Double z) {
     }
 
     private Map<String, Object> extractMetadata(ConfigurationSection section) {
