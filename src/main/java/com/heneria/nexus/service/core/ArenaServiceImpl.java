@@ -15,17 +15,23 @@ import com.heneria.nexus.api.ArenaMode;
 import com.heneria.nexus.api.ArenaPhase;
 import com.heneria.nexus.api.ArenaService;
 import com.heneria.nexus.api.EconomyService;
+import com.heneria.nexus.api.MapDefinition;
 import com.heneria.nexus.api.MapService;
 import com.heneria.nexus.api.ProfileService;
 import com.heneria.nexus.api.QueueService;
 import com.heneria.nexus.api.TeleportService;
 import com.heneria.nexus.api.events.NexusArenaEndEvent;
 import com.heneria.nexus.api.events.NexusArenaStartEvent;
+import com.heneria.nexus.api.map.MapBlueprint;
+import com.heneria.nexus.api.map.MapBlueprint.MapTeam;
+import com.heneria.nexus.api.map.MapBlueprint.MapVector;
 import com.heneria.nexus.db.repository.MatchRepository;
+import com.heneria.nexus.match.MatchSnapshot;
+import com.heneria.nexus.scheduler.GamePhase;
+import com.heneria.nexus.scheduler.RingScheduler;
 import com.heneria.nexus.util.NexusLogger;
 import com.heneria.nexus.watchdog.WatchdogService;
 import com.heneria.nexus.watchdog.WatchdogTimeoutException;
-import com.heneria.nexus.match.MatchSnapshot;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Collection;
@@ -36,11 +42,21 @@ import java.util.OptionalLong;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.bukkit.entity.Player;
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.format.NamedTextColor;
+import net.kyori.adventure.title.Title;
+import org.bukkit.Bukkit;
+import org.bukkit.GameRule;
+import org.bukkit.Location;
+import org.bukkit.World;
 import org.bukkit.plugin.PluginManager;
 import org.bukkit.plugin.java.JavaPlugin;
+import org.bukkit.scheduler.BukkitTask;
 
 /**
  * Default arena orchestration service.
@@ -52,6 +68,7 @@ public final class ArenaServiceImpl implements ArenaService {
     private final MapService mapService;
     private final QueueService queueService;
     private final TeleportService teleportService;
+    private final RingScheduler ringScheduler;
     private final Optional<ProfileService> profileService;
     private final EconomyService economyService;
     private final ExecutorManager executorManager;
@@ -59,6 +76,9 @@ public final class ArenaServiceImpl implements ArenaService {
     private final MatchRepository matchRepository;
     private final WatchdogService watchdogService;
     private final ConcurrentHashMap<UUID, ArenaHandle> arenas = new ConcurrentHashMap<>();
+    private final ConcurrentMap<UUID, BukkitTask> countdownTasks = new ConcurrentHashMap<>();
+    private final ConcurrentMap<UUID, Instant> completionTimes = new ConcurrentHashMap<>();
+    private final ConcurrentMap<UUID, FreezeState> frozenPlayers = new ConcurrentHashMap<>();
     private final CopyOnWriteArrayList<ArenaListener> listeners = new CopyOnWriteArrayList<>();
     private final AtomicReference<CoreConfig.ArenaSettings> settingsRef;
     private final AtomicReference<CoreConfig.TimeoutSettings.WatchdogSettings> watchdogSettingsRef;
@@ -70,6 +90,7 @@ public final class ArenaServiceImpl implements ArenaService {
                             MapService mapService,
                             QueueService queueService,
                             TeleportService teleportService,
+                            RingScheduler ringScheduler,
                             Optional<ProfileService> profileService,
                             EconomyService economyService,
                             ExecutorManager executorManager,
@@ -84,6 +105,7 @@ public final class ArenaServiceImpl implements ArenaService {
         this.mapService = Objects.requireNonNull(mapService, "mapService");
         this.queueService = Objects.requireNonNull(queueService, "queueService");
         this.teleportService = Objects.requireNonNull(teleportService, "teleportService");
+        this.ringScheduler = Objects.requireNonNull(ringScheduler, "ringScheduler");
         this.profileService = Objects.requireNonNull(profileService, "profileService");
         this.economyService = Objects.requireNonNull(economyService, "economyService");
         this.executorManager = Objects.requireNonNull(executorManager, "executorManager");
@@ -130,14 +152,24 @@ public final class ArenaServiceImpl implements ArenaService {
     public void transition(ArenaHandle handle, ArenaPhase nextPhase) {
         Objects.requireNonNull(handle, "handle");
         Objects.requireNonNull(nextPhase, "nextPhase");
-        if (!plugin.getServer().isPrimaryThread()) {
+        if (!Bukkit.isPrimaryThread()) {
             throw new IllegalStateException("Les transitions d'arène doivent être réalisées sur le main thread");
         }
         ArenaPhase previous = handle.setPhase(nextPhase);
-        PluginManager pluginManager = plugin.getServer().getPluginManager();
-        if (nextPhase == ArenaPhase.PLAYING) {
-            pluginManager.callEvent(new NexusArenaStartEvent(handle));
+        GamePhase schedulerPhase = GamePhase.valueOf(nextPhase.name());
+        ringScheduler.setPhase(schedulerPhase);
+        logger.debug(() -> "Transition d'arène " + handle.id() + " : " + previous + " -> " + nextPhase);
+
+        switch (nextPhase) {
+            case LOBBY -> enterLobby(handle);
+            case STARTING -> beginStarting(handle);
+            case PLAYING -> beginPlaying(handle);
+            case SCORED -> enterScored(handle);
+            case RESET -> beginReset(handle);
+            case END -> prepareEnd(handle, previous);
+            default -> { }
         }
+
         listeners.forEach(listener -> safe(() -> listener.onPhaseChange(handle, previous, nextPhase)));
         if (nextPhase == ArenaPhase.RESET) {
             listeners.forEach(listener -> safe(() -> listener.onResetStart(handle)));
@@ -145,35 +177,19 @@ public final class ArenaServiceImpl implements ArenaService {
             executorManager.compute().execute(() -> logger.debug(() -> "Préparation du reset pour " + handle.id()));
         } else if (previous == ArenaPhase.RESET && nextPhase != ArenaPhase.RESET) {
             listeners.forEach(listener -> safe(() -> listener.onResetEnd(handle)));
-        } else if (nextPhase == ArenaPhase.SCORED) {
-            if (economyService.isDegraded()) {
-                logger.warn("Économie en mode dégradé lors du score pour " + handle.id());
-            }
-        } else if (nextPhase == ArenaPhase.END) {
-            pluginManager.callEvent(new NexusArenaEndEvent(handle, null));
-            Instant completedAt = Instant.now();
-            analyticsService.ifPresent(service -> service.record(new MatchCompletedEvent(
-                    handle.id(),
-                    handle.mapId(),
-                    handle.mode().name(),
-                    handle.createdAt(),
-                    completedAt)));
-            persistMatchSnapshot(handle, completedAt);
-            budgetService.unregisterArena(handle);
-            arenas.remove(handle.id());
-            teleportPlayersToHub();
-            executorManager.compute().execute(() -> queueService.tryMatch(handle.mode()).ifPresent(plan ->
-                    logger.info("Match prêt après fin d'arène " + handle.id() + " -> " + plan.matchId())));
-            profileService.ifPresent(service -> {
-                if (service.isDegraded()) {
-                    logger.warn("Profil en mode dégradé détecté lors de la fermeture de " + handle.id());
-                }
-            });
+        }
+        if (nextPhase == ArenaPhase.END) {
+            finishArena(handle);
         }
     }
 
-    private void teleportPlayersToHub() {
-        plugin.getServer().getOnlinePlayers().forEach(player -> {
+    private void teleportPlayersToHub(ArenaHandle handle) {
+        List<Player> players = playersInArena(handle);
+        if (players.isEmpty()) {
+            logger.debug(() -> "Aucun joueur à rapatrier pour l'arène " + handle.id());
+            return;
+        }
+        players.forEach(player -> {
             UUID playerId = player.getUniqueId();
             teleportService.returnToHub(playerId).whenComplete((result, throwable) ->
                     executorManager.mainThread().runNow(() -> handleHubTeleportResult(player, result, throwable)));
@@ -196,6 +212,284 @@ public final class ArenaServiceImpl implements ArenaService {
         String reason = result.message().isBlank() ? "Destination indisponible" : result.message();
         logger.warn("Retour hub refusé pour " + player.getName() + " : " + reason
                 + " (" + result.status() + ")");
+    }
+
+    private void enterLobby(ArenaHandle handle) {
+        cancelCountdown(handle);
+        unfreezePlayers(handle);
+        completionTimes.remove(handle.id());
+        applyLobbyWorldRules(handle);
+        setWorldPvP(handle, false);
+    }
+
+    private void beginStarting(ArenaHandle handle) {
+        cancelCountdown(handle);
+        setWorldPvP(handle, false);
+        applyLobbyWorldRules(handle);
+        teleportPlayersToSpawns(handle);
+        distributeStartingKits(handle);
+        startCountdown(handle);
+    }
+
+    private void beginPlaying(ArenaHandle handle) {
+        cancelCountdown(handle);
+        unfreezePlayers(handle);
+        setWorldPvP(handle, true);
+        plugin.getServer().getPluginManager().callEvent(new NexusArenaStartEvent(handle));
+    }
+
+    private void enterScored(ArenaHandle handle) {
+        cancelCountdown(handle);
+        setWorldPvP(handle, false);
+        freezePlayers(handle);
+        showScoreTitles(handle);
+        Instant completedAt = Instant.now();
+        completionTimes.put(handle.id(), completedAt);
+        persistMatchSnapshot(handle, completedAt);
+        if (economyService.isDegraded()) {
+            logger.warn("Économie en mode dégradé lors du score pour " + handle.id());
+        }
+    }
+
+    private void beginReset(ArenaHandle handle) {
+        cancelCountdown(handle);
+        unfreezePlayers(handle);
+        setWorldPvP(handle, false);
+        teleportPlayersToHub(handle);
+    }
+
+    private void prepareEnd(ArenaHandle handle, ArenaPhase previous) {
+        cancelCountdown(handle);
+        unfreezePlayers(handle);
+        setWorldPvP(handle, false);
+        if (previous != ArenaPhase.RESET) {
+            teleportPlayersToHub(handle);
+        }
+    }
+
+    private void finishArena(ArenaHandle handle) {
+        PluginManager pluginManager = plugin.getServer().getPluginManager();
+        pluginManager.callEvent(new NexusArenaEndEvent(handle, null));
+        Instant completedAt = completionTimes.remove(handle.id());
+        if (completedAt == null) {
+            completedAt = Instant.now();
+            persistMatchSnapshot(handle, completedAt);
+        }
+        Instant finalCompletedAt = completedAt;
+        analyticsService.ifPresent(service -> service.record(new MatchCompletedEvent(
+                handle.id(),
+                handle.mapId(),
+                handle.mode().name(),
+                handle.createdAt(),
+                finalCompletedAt)));
+        budgetService.unregisterArena(handle);
+        arenas.remove(handle.id());
+        executorManager.compute().execute(() -> queueService.tryMatch(handle.mode()).ifPresent(plan ->
+                logger.info("Match prêt après fin d'arène " + handle.id() + " -> " + plan.matchId())));
+        profileService.ifPresent(service -> {
+            if (service.isDegraded()) {
+                logger.warn("Profil en mode dégradé détecté lors de la fermeture de " + handle.id());
+            }
+        });
+    }
+
+    private void applyLobbyWorldRules(ArenaHandle handle) {
+        resolveArenaWorld(handle).ifPresentOrElse(world -> {
+            world.setGameRule(GameRule.DO_TILE_DROPS, false);
+            world.setGameRule(GameRule.DO_ENTITY_DROPS, false);
+            world.setGameRule(GameRule.DO_MOB_SPAWNING, false);
+        }, () -> logger.debug(() -> "Impossible d'appliquer les règles de lobby pour l'arène " + handle.id()));
+    }
+
+    private void setWorldPvP(ArenaHandle handle, boolean enabled) {
+        resolveArenaWorld(handle).ifPresent(world -> {
+            if (world.getPVP() != enabled) {
+                world.setPVP(enabled);
+            }
+        });
+    }
+
+    private void teleportPlayersToSpawns(ArenaHandle handle) {
+        Optional<MapDefinition> definitionOptional = mapService.getMap(handle.mapId());
+        if (definitionOptional.isEmpty()) {
+            logger.warn("Impossible de téléporter les joueurs: map " + handle.mapId() + " inconnue");
+            return;
+        }
+        Optional<World> worldOptional = resolveArenaWorld(handle);
+        if (worldOptional.isEmpty()) {
+            logger.debug(() -> "Monde introuvable pour téléporter les joueurs de l'arène " + handle.id());
+            return;
+        }
+        World world = worldOptional.get();
+        List<Player> players = List.copyOf(world.getPlayers());
+        if (players.isEmpty()) {
+            return;
+        }
+        MapBlueprint blueprint = definitionOptional.get().blueprint();
+        if (blueprint == null || blueprint.teams().isEmpty()) {
+            logger.warn("Aucun point de spawn défini pour l'arène " + handle.id());
+            return;
+        }
+        List<MapVector> spawns = blueprint.teams().stream()
+                .map(MapTeam::spawn)
+                .filter(Objects::nonNull)
+                .filter(MapVector::hasCoordinates)
+                .toList();
+        if (spawns.isEmpty()) {
+            logger.warn("Points de spawn invalides pour l'arène " + handle.id());
+            return;
+        }
+        for (int index = 0; index < players.size(); index++) {
+            Player player = players.get(index);
+            MapVector spawn = spawns.get(index % spawns.size());
+            Location location = toLocation(world, spawn);
+            if (location != null) {
+                player.teleport(location);
+            }
+        }
+    }
+
+    private void distributeStartingKits(ArenaHandle handle) {
+        List<Player> players = playersInArena(handle);
+        if (players.isEmpty()) {
+            return;
+        }
+        logger.debug(() -> "Distribution des kits de départ planifiée pour l'arène " + handle.id());
+        Component actionBar = Component.text("Préparation de votre classe...", NamedTextColor.AQUA);
+        players.forEach(player -> player.sendActionBar(actionBar));
+    }
+
+    private void startCountdown(ArenaHandle handle) {
+        cancelCountdown(handle);
+        AtomicInteger remainingSeconds = new AtomicInteger(15);
+        BukkitTask task = executorManager.mainThread().runRepeating(() -> {
+            int current = remainingSeconds.getAndDecrement();
+            if (current < 0) {
+                cancelCountdown(handle);
+                return;
+            }
+            Title title = Title.title(
+                    Component.text("La partie commence", NamedTextColor.GOLD),
+                    Component.text(current > 0 ? current + "s" : "Combat !", NamedTextColor.YELLOW),
+                    Title.Times.times(Duration.ofMillis(250), Duration.ofSeconds(1), Duration.ofMillis(250)));
+            Component actionBar = current > 0
+                    ? Component.text("Début dans " + current + "s", NamedTextColor.GOLD)
+                    : Component.text("Bonne chance !", NamedTextColor.GREEN);
+            playersInArena(handle).forEach(player -> {
+                player.showTitle(title);
+                player.sendActionBar(actionBar);
+            });
+            if (current <= 0) {
+                cancelCountdown(handle);
+            }
+        }, 0L, 20L);
+        if (task != null) {
+            countdownTasks.put(handle.id(), task);
+        }
+    }
+
+    private void cancelCountdown(ArenaHandle handle) {
+        BukkitTask task = countdownTasks.remove(handle.id());
+        if (task != null) {
+            task.cancel();
+        }
+    }
+
+    private void freezePlayers(ArenaHandle handle) {
+        playersInArena(handle).forEach(player -> freezePlayer(handle, player));
+    }
+
+    private void freezePlayer(ArenaHandle handle, Player player) {
+        UUID playerId = player.getUniqueId();
+        frozenPlayers.computeIfAbsent(playerId, id -> {
+            FreezeState state = new FreezeState(handle.id(),
+                    player.getWalkSpeed(),
+                    player.getFlySpeed(),
+                    player.getAllowFlight(),
+                    player.isFlying(),
+                    player.getFreezeTicks());
+            player.setSprinting(false);
+            player.setAllowFlight(false);
+            player.setFlying(false);
+            player.setWalkSpeed(0F);
+            player.setFlySpeed(0F);
+            player.setFreezeTicks(Integer.MAX_VALUE / 4);
+            return state;
+        });
+    }
+
+    private void unfreezePlayers(ArenaHandle handle) {
+        frozenPlayers.entrySet().removeIf(entry -> {
+            FreezeState state = entry.getValue();
+            if (!state.arenaId().equals(handle.id())) {
+                return false;
+            }
+            Player player = plugin.getServer().getPlayer(entry.getKey());
+            if (player != null) {
+                restorePlayerState(player, state);
+            }
+            return true;
+        });
+    }
+
+    private void restorePlayerState(Player player, FreezeState state) {
+        try {
+            player.setWalkSpeed(state.walkSpeed());
+        } catch (IllegalArgumentException ignored) {
+            player.setWalkSpeed(0.2F);
+        }
+        try {
+            player.setFlySpeed(state.flySpeed());
+        } catch (IllegalArgumentException ignored) {
+            player.setFlySpeed(0.1F);
+        }
+        player.setAllowFlight(state.allowFlight());
+        if (state.allowFlight()) {
+            player.setFlying(state.wasFlying());
+        }
+        player.setFreezeTicks(Math.max(0, state.freezeTicks()));
+    }
+
+    private void showScoreTitles(ArenaHandle handle) {
+        Title title = Title.title(
+                Component.text("Partie terminée", NamedTextColor.GOLD),
+                Component.text("Bravo à tous !", NamedTextColor.GREEN),
+                Title.Times.times(Duration.ofMillis(500), Duration.ofSeconds(3), Duration.ofMillis(500)));
+        Component actionBar = Component.text("Sauvegarde des résultats...", NamedTextColor.YELLOW);
+        playersInArena(handle).forEach(player -> {
+            player.showTitle(title);
+            player.sendActionBar(actionBar);
+        });
+    }
+
+    private List<Player> playersInArena(ArenaHandle handle) {
+        return resolveArenaWorld(handle)
+                .map(world -> List.copyOf(world.getPlayers()))
+                .orElse(List.of());
+    }
+
+    private Optional<World> resolveArenaWorld(ArenaHandle handle) {
+        World world = Bukkit.getWorld(handle.id().toString());
+        if (world != null) {
+            return Optional.of(world);
+        }
+        world = Bukkit.getWorld(handle.mapId());
+        if (world != null) {
+            return Optional.of(world);
+        }
+        return Optional.empty();
+    }
+
+    private Location toLocation(World world, MapVector vector) {
+        if (vector == null || !vector.hasCoordinates()) {
+            return null;
+        }
+        double x = vector.x();
+        double y = vector.y();
+        double z = vector.z();
+        float yaw = vector.yaw() != null ? vector.yaw() : 0F;
+        float pitch = vector.pitch() != null ? vector.pitch() : 0F;
+        return new Location(world, x, y, z, yaw, pitch);
     }
 
     private void safe(Runnable runnable) {
@@ -225,6 +519,7 @@ public final class ArenaServiceImpl implements ArenaService {
     @Override
     public void applyArenaSettings(CoreConfig.ArenaSettings settings) {
         settingsRef.set(Objects.requireNonNull(settings, "settings"));
+        ringScheduler.applyPerfSettings(settings);
         logger.info("Paramètres d'arène mis à jour: hud=" + settings.hudHz() + " scoreboard=" + settings.scoreboardHz());
     }
 
@@ -265,6 +560,7 @@ public final class ArenaServiceImpl implements ArenaService {
         watchdogService.monitor(taskName, timeout, () -> performReset(handle)).whenComplete((unused, throwable) -> {
             if (throwable == null) {
                 logArenaReset(handle, "reset-complete", null);
+                executorManager.mainThread().runLater(() -> transition(handle, ArenaPhase.END), 1L);
                 return;
             }
             if (throwable instanceof WatchdogTimeoutException timeoutException) {
@@ -326,5 +622,13 @@ public final class ArenaServiceImpl implements ArenaService {
                 handle.id(),
                 null,
                 details.toString()));
+    }
+
+    private record FreezeState(UUID arenaId,
+                               float walkSpeed,
+                               float flySpeed,
+                               boolean allowFlight,
+                               boolean wasFlying,
+                               int freezeTicks) {
     }
 }

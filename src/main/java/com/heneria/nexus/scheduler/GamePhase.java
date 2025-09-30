@@ -7,6 +7,7 @@ public enum GamePhase {
     LOBBY,
     STARTING,
     PLAYING,
+    SCORED,
     RESET,
     END
 }
