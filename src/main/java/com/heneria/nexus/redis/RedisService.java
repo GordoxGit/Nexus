@@ -301,8 +301,7 @@ public final class RedisService implements LifecycleAware {
         }
         int attempt = reconnectAttempts.incrementAndGet();
         long delaySeconds = computeBackoffSeconds(attempt);
-        final ScheduledFuture<?>[] holder = new ScheduledFuture<?>[1];
-        ScheduledFuture<?> task = null;
+        final AtomicReference<ScheduledFuture<?>> taskRef = new AtomicReference<>();
         Runnable reconnectTask = () -> {
             try {
                 CoreConfig.RedisSettings current = settingsRef.get();
@@ -312,11 +311,11 @@ public final class RedisService implements LifecycleAware {
                 updateState(ConnectionState.CONNECTING);
                 executorManager.runIo(() -> connect(current));
             } finally {
-                reconnectFuture.compareAndSet(holder[0], null);
+                reconnectFuture.compareAndSet(taskRef.get(), null);
             }
         };
-        task = reconnectScheduler.schedule(reconnectTask, delaySeconds, TimeUnit.SECONDS);
-        holder[0] = task;
+        ScheduledFuture<?> task = reconnectScheduler.schedule(reconnectTask, delaySeconds, TimeUnit.SECONDS);
+        taskRef.set(task);
         reconnectFuture.set(task);
     }
 
