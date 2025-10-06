@@ -15,7 +15,6 @@ import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Map;
 import java.util.Objects;
@@ -25,6 +24,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.Locale;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.messaging.PluginMessageListener;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -200,7 +200,7 @@ public final class TeleportServiceImpl implements TeleportService, PluginMessage
         }
         TeleportResultPayload data = payload.get();
         if (data.requestId() == null) {
-            logger.warn("PluginMessage reçu sans identifiant de requête sur {}", CHANNEL);
+            logger.warn("PluginMessage reçu sans identifiant de requête sur " + CHANNEL);
             return;
         }
         TeleportStatus status = parseStatus(data.status());
@@ -215,7 +215,7 @@ public final class TeleportServiceImpl implements TeleportService, PluginMessage
         try (DataInputStream input = new DataInputStream(new ByteArrayInputStream(message))) {
             String token = input.readUTF();
             if (token == null || token.isBlank()) {
-                logger.warn("PluginMessage reçu sans contenu sur {}", CHANNEL);
+                logger.warn("PluginMessage reçu sans contenu sur " + CHANNEL);
                 return Optional.empty();
             }
             if (token.trim().startsWith("{")) {
@@ -339,7 +339,7 @@ public final class TeleportServiceImpl implements TeleportService, PluginMessage
         if (raw == null || raw.isBlank()) {
             return TeleportStatus.FAILED;
         }
-        String normalized = raw.trim().toUpperCase(StandardCharsets.US_ASCII);
+        String normalized = raw.trim().toUpperCase(Locale.ROOT);
         return switch (normalized) {
             case "SUCCESS", "OK" -> TeleportStatus.SUCCESS;
             case "RETRY", "RETRYABLE", "BUSY" -> TeleportStatus.RETRYABLE;
