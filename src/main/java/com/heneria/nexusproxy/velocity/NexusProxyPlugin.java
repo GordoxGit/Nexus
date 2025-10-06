@@ -32,7 +32,7 @@ import org.slf4j.Logger;
 public final class NexusProxyPlugin {
 
     private static final ChannelIdentifier HEALTH_CHANNEL =
-            MinecraftChannelIdentifier.from("nexus", "health");
+            MinecraftChannelIdentifier.from("nexus:health");
     private static final Duration STATUS_TIMEOUT = Duration.ofSeconds(15);
 
     private final ProxyServer proxyServer;

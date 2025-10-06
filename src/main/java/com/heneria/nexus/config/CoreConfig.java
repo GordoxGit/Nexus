@@ -420,8 +420,7 @@ public final class CoreConfig {
                     .filter(channel -> !channel.isEmpty())
                     .map(channel -> channel.toLowerCase(Locale.ROOT))
                     .collect(Collectors.toCollection(LinkedHashSet::new));
-            this.allowedChannels = Collections.unmodifiableSet(normalized);
-            this.networkRateLimitSettings = networkRateLimitSettings;
+            allowedChannels = Collections.unmodifiableSet(normalized);
         }
 
         public record NetworkRateLimitSettings(boolean enabled, boolean failOpen, Map<String, Integer> limits) {
@@ -442,7 +441,7 @@ public final class CoreConfig {
                     }
                     sanitized.put(normalized.toLowerCase(Locale.ROOT), limit);
                 });
-                this.limits = Collections.unmodifiableMap(sanitized);
+                limits = Collections.unmodifiableMap(sanitized);
             }
         }
     }

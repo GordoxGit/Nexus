@@ -44,7 +44,7 @@ public final class ConfigValidator {
     private static final int DEFAULT_SPAWN_PROTECTION_DURATION_SECONDS = 4;
     private static final int DEFAULT_SPAWN_PROTECTION_RESISTANCE = 10;
     private static final boolean DEFAULT_SPAWN_PROTECTION_GLOW = true;
-    private static final Particle DEFAULT_SPAWN_PROTECTION_PARTICLE = Particle.TOTEM;
+    private static final Particle DEFAULT_SPAWN_PROTECTION_PARTICLE = Particle.TOTEM_OF_UNDYING;
     private static final String DEFAULT_SPAWN_PROTECTION_MESSAGE = "<gold>Invulnérable pendant <seconds>s</gold>";
     private static final int DEFAULT_SPAWN_PROTECTION_INTERVAL_TICKS = 5;
 

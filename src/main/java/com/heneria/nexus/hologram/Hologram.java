@@ -198,7 +198,7 @@ public final class Hologram {
         return lines.stream().anyMatch(Line::dynamic);
     }
 
-    void destroy() {
+    public void destroy() {
         if (disposed) {
             return;
         }

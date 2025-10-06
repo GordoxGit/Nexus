@@ -140,7 +140,7 @@ public final class NexusCore {
             return;
         }
         Location center = blockLocation.clone().add(0.5D, 1.0D, 0.5D);
-        world.spawnParticle(Particle.CRIT_MAGIC, center, 20, 0.2D, 0.3D, 0.2D, 0.01D);
+        world.spawnParticle(Particle.MAGIC_CRIT, center, 20, 0.2D, 0.3D, 0.2D, 0.01D);
     }
 
     public void playDestructionEffects() {
@@ -149,7 +149,7 @@ public final class NexusCore {
             return;
         }
         Location center = blockLocation.clone().add(0.5D, 0.5D, 0.5D);
-        world.spawnParticle(Particle.EXPLOSION_LARGE, center, 1);
+        world.spawnParticle(Particle.EXPLOSION, center, 1);
         world.playSound(center, Sound.ENTITY_GENERIC_EXPLODE, 1.0F, 1.0F);
     }
 

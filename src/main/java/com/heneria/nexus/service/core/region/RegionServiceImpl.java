@@ -103,7 +103,8 @@ public final class RegionServiceImpl implements RegionService {
         if (state == null) {
             return Map.of();
         }
-        Map<RegionFlag, Object> resolved = new EnumMap<>(state.defaults());
+        Map<RegionFlag, Object> resolved = new EnumMap<>(RegionFlag.class);
+        resolved.putAll(state.defaults());
         List<Region> stack = resolveRegions(state.regions(), location);
         for (Region region : stack) {
             region.flags().forEach(resolved::put);
