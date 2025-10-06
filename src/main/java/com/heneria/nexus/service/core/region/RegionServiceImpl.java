@@ -224,7 +224,11 @@ public final class RegionServiceImpl implements RegionService {
             return;
         }
         Map<PotionEffectType, PotionEffect> desiredMap = desired.stream()
-                .collect(Collectors.toMap(PotionEffect::getType, effect -> effect, (first, second) -> second));
+                .collect(Collectors.toMap(
+                        PotionEffect::getType,
+                        effect -> effect,
+                        (first, second) -> second,
+                        () -> new EnumMap<>(PotionEffectType.class)));
         boolean changed = force;
         for (PotionEffect effect : desired) {
             PotionEffect current = active.get(effect.getType());
