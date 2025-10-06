@@ -11,12 +11,13 @@ import com.velocitypowered.api.command.CommandMeta;
 import com.velocitypowered.api.event.Subscribe;
 import com.velocitypowered.api.event.proxy.ProxyInitializeEvent;
 import com.velocitypowered.api.event.proxy.ProxyShutdownEvent;
-import com.velocitypowered.api.event.player.PluginMessageEvent;
+import com.velocitypowered.api.event.connection.PluginMessageEvent;
 import com.velocitypowered.api.plugin.Plugin;
 import com.velocitypowered.api.proxy.ProxyServer;
 import com.velocitypowered.api.proxy.ServerConnection;
 import com.velocitypowered.api.scheduler.ScheduledTask;
-import com.velocitypowered.api.util.Identifier;
+import com.velocitypowered.api.proxy.messages.ChannelIdentifier;
+import com.velocitypowered.api.proxy.messages.MinecraftChannelIdentifier;
 import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
 import java.io.IOException;
@@ -30,7 +31,8 @@ import org.slf4j.Logger;
 @Plugin(id = "nexusproxy", name = "Nexus Proxy", version = "0.1.0-SNAPSHOT", authors = {"Heneria"})
 public final class NexusProxyPlugin {
 
-    private static final Identifier HEALTH_CHANNEL = Identifier.from("nexus", "health");
+    private static final ChannelIdentifier HEALTH_CHANNEL =
+            MinecraftChannelIdentifier.from("nexus", "health");
     private static final Duration STATUS_TIMEOUT = Duration.ofSeconds(15);
 
     private final ProxyServer proxyServer;
