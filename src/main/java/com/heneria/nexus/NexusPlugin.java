@@ -61,6 +61,9 @@ import com.heneria.nexus.listener.FirstWinBonusListener;
 import com.heneria.nexus.listener.PlayerRespawnListener;
 import com.heneria.nexus.listener.NexusDamageListener;
 import com.heneria.nexus.listener.SpawnProtectionListener;
+import com.heneria.nexus.listener.region.RegionBuildListener;
+import com.heneria.nexus.listener.region.RegionCombatListener;
+import com.heneria.nexus.listener.region.RegionMovementListener;
 import com.heneria.nexus.scheduler.GamePhase;
 import com.heneria.nexus.scheduler.RingScheduler;
 import com.heneria.nexus.scheduler.RingScheduler.TaskProfile;
@@ -78,6 +81,7 @@ import com.heneria.nexus.api.RewardService;
 import com.heneria.nexus.api.QueueService;
 import com.heneria.nexus.api.TeleportService;
 import com.heneria.nexus.api.ShopService;
+import com.heneria.nexus.api.region.RegionService;
 import com.heneria.nexus.api.service.TimerService;
 import com.heneria.nexus.service.core.AntiSpawnKillServiceImpl;
 import com.heneria.nexus.service.core.ArenaServiceImpl;
@@ -92,6 +96,7 @@ import com.heneria.nexus.service.core.ProfileServiceImpl;
 import com.heneria.nexus.service.core.QueueServiceImpl;
 import com.heneria.nexus.service.core.RewardServiceImpl;
 import com.heneria.nexus.service.core.ShopServiceImpl;
+import com.heneria.nexus.service.core.region.RegionServiceImpl;
 import com.heneria.nexus.service.core.TimerServiceImpl;
 import com.heneria.nexus.service.core.TeleportServiceImpl;
 import com.heneria.nexus.service.core.nexus.NexusManager;
@@ -387,10 +392,14 @@ public final class NexusPlugin extends JavaPlugin {
         PluginManager manager = getServer().getPluginManager();
         AntiSpawnKillService spawnKillService = serviceRegistry.get(AntiSpawnKillService.class);
         ArenaService arenaService = serviceRegistry.get(ArenaService.class);
+        RegionService regionService = serviceRegistry.get(RegionService.class);
         manager.registerEvents(new HologramVisibilityListener(serviceRegistry.get(HoloService.class)), this);
         manager.registerEvents(new FirstWinBonusListener(logger, serviceRegistry.get(FirstWinBonusService.class)), this);
         manager.registerEvents(new PlayerRespawnListener(logger, arenaService, spawnKillService, executorManager), this);
         manager.registerEvents(new SpawnProtectionListener(spawnKillService), this);
+        manager.registerEvents(new RegionBuildListener(regionService), this);
+        manager.registerEvents(new RegionCombatListener(regionService), this);
+        manager.registerEvents(new RegionMovementListener(regionService), this);
         manager.registerEvents(new NexusDamageListener(serviceRegistry.get(NexusManager.class)), this);
     }
 
@@ -1486,6 +1495,7 @@ public final class NexusPlugin extends JavaPlugin {
         serviceRegistry.registerService(AntiSpawnKillService.class, AntiSpawnKillServiceImpl.class);
         serviceRegistry.registerService(HoloService.class, HoloServiceImpl.class);
         serviceRegistry.registerService(NexusManager.class, NexusManager.class);
+        serviceRegistry.registerService(RegionService.class, RegionServiceImpl.class);
         serviceRegistry.registerService(ArenaService.class, ArenaServiceImpl.class);
         serviceRegistry.registerService(RewardService.class, RewardServiceImpl.class);
         serviceRegistry.registerService(FirstWinBonusService.class, FirstWinBonusServiceImpl.class);
