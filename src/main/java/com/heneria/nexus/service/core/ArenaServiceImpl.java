@@ -21,6 +21,7 @@ import com.heneria.nexus.api.MapService;
 import com.heneria.nexus.api.ProfileService;
 import com.heneria.nexus.api.QueueService;
 import com.heneria.nexus.api.TeleportService;
+import com.heneria.nexus.api.region.RegionService;
 import com.heneria.nexus.api.events.NexusArenaEndEvent;
 import com.heneria.nexus.api.events.NexusArenaStartEvent;
 import com.heneria.nexus.api.map.MapBlueprint;
@@ -99,6 +100,7 @@ public final class ArenaServiceImpl implements ArenaService {
     private final Optional<AnalyticsService> analyticsService;
     private final AuditService auditService;
     private final NexusManager nexusManager;
+    private final RegionService regionService;
 
     public ArenaServiceImpl(JavaPlugin plugin,
                             NexusLogger logger,
@@ -116,6 +118,7 @@ public final class ArenaServiceImpl implements ArenaService {
                             WatchdogService watchdogService,
                             AuditService auditService,
                             NexusManager nexusManager,
+                            RegionService regionService,
                             CoreConfig config) {
         this.plugin = Objects.requireNonNull(plugin, "plugin");
         this.logger = Objects.requireNonNull(logger, "logger");
@@ -133,6 +136,7 @@ public final class ArenaServiceImpl implements ArenaService {
         this.watchdogService = Objects.requireNonNull(watchdogService, "watchdogService");
         this.auditService = Objects.requireNonNull(auditService, "auditService");
         this.nexusManager = Objects.requireNonNull(nexusManager, "nexusManager");
+        this.regionService = Objects.requireNonNull(regionService, "regionService");
         this.settingsRef = new AtomicReference<>(config.arenaSettings());
         this.watchdogSettingsRef = new AtomicReference<>(config.timeoutSettings().watchdog());
         this.nexusManager.registerListener(core -> executorManager.mainThread().runNow(() -> {
@@ -154,12 +158,12 @@ public final class ArenaServiceImpl implements ArenaService {
     public ArenaHandle createInstance(String mapId, ArenaMode mode, OptionalLong seed) throws ArenaCreationException {
         Objects.requireNonNull(mapId, "mapId");
         Objects.requireNonNull(mode, "mode");
-        if (mapService.getMap(mapId).isEmpty()) {
-            throw new ArenaCreationException("Map inconnue: " + mapId);
-        }
+        MapDefinition definition = mapService.getMap(mapId)
+                .orElseThrow(() -> new ArenaCreationException("Map inconnue: " + mapId));
         ArenaHandle handle = new ArenaHandle(UUID.randomUUID(), mapId, mode, ArenaPhase.LOBBY);
         arenas.put(handle.id(), handle);
         budgetService.registerArena(handle);
+        regionService.registerArena(handle.id(), definition);
         logger.info("Nouvelle arène " + handle.id() + " sur map " + mapId + " mode " + mode);
         seed.ifPresent(value -> logger.debug(() -> "Seed déterministe appliqué à " + handle.id() + " -> " + value));
         return handle;
@@ -327,6 +331,7 @@ public final class ArenaServiceImpl implements ArenaService {
                 handle.createdAt(),
                 finalCompletedAt)));
         budgetService.unregisterArena(handle);
+        regionService.unregisterArena(handle);
         arenas.remove(handle.id());
         executorManager.compute().execute(() -> queueService.tryMatch(handle.mode()).ifPresent(plan ->
                 logger.info("Match prêt après fin d'arène " + handle.id() + " -> " + plan.matchId())));

@@ -14,8 +14,11 @@ import com.heneria.nexus.api.map.MapBlueprint.MapRegion;
 import com.heneria.nexus.api.map.MapBlueprint.MapRules;
 import com.heneria.nexus.api.map.MapBlueprint.MapTeam;
 import com.heneria.nexus.api.map.MapBlueprint.MapVector;
+import com.heneria.nexus.api.region.Region;
+import com.heneria.nexus.api.region.RegionFlag;
 import com.heneria.nexus.concurrent.ExecutorManager;
 import com.heneria.nexus.util.NexusLogger;
+import com.heneria.nexus.service.core.region.RegionFactory;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -111,7 +114,11 @@ public final class MapServiceImpl implements MapService {
                     logReport(key, displayName, report);
                     continue;
                 }
-                MapDefinition definition = new MapDefinition(key, displayName, mapFolder, metadata, blueprint);
+                List<Region> regions = RegionFactory.fromBlueprint(key, blueprint.regions(), logger);
+                Map<RegionFlag, Object> defaults = blueprint.rules() != null
+                        ? RegionFactory.extractFlagDefaults(blueprint.rules().properties())
+                        : Map.of();
+                MapDefinition definition = new MapDefinition(key, displayName, mapFolder, metadata, blueprint, regions, defaults);
                 ValidationReport report = validatorService.validate(definition, blueprint);
                 logReport(key, displayName, report);
                 if (report.valid()) {
@@ -190,7 +197,13 @@ public final class MapServiceImpl implements MapService {
             return report;
         }
         MapDefinition definition = getMap(mapId)
-                .orElse(new MapDefinition(mapId, mapId, mapFolder, Map.of(), blueprint));
+                .orElseGet(() -> {
+                    List<Region> regions = RegionFactory.fromBlueprint(mapId, blueprint.regions(), logger);
+                    Map<RegionFlag, Object> defaults = blueprint.rules() != null
+                            ? RegionFactory.extractFlagDefaults(blueprint.rules().properties())
+                            : Map.of();
+                    return new MapDefinition(mapId, mapId, mapFolder, Map.of(), blueprint, regions, defaults);
+                });
         ValidationReport report = validatorService.validate(definition, blueprint);
         lastValidation.set(report);
         return report;

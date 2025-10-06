@@ -1,6 +1,9 @@
 package com.heneria.nexus.api;
 
 import com.heneria.nexus.api.map.MapBlueprint;
+import com.heneria.nexus.api.region.Region;
+import com.heneria.nexus.api.region.RegionFlag;
+import java.util.List;
 import java.nio.file.Path;
 import java.util.Map;
 import java.util.Objects;
@@ -18,7 +21,9 @@ public record MapDefinition(String id,
                             String displayName,
                             Path folder,
                             Map<String, Object> metadata,
-                            MapBlueprint blueprint) {
+                            MapBlueprint blueprint,
+                            List<Region> regions,
+                            Map<RegionFlag, Object> regionDefaults) {
 
     /**
      * Validates constructor arguments.
@@ -29,5 +34,7 @@ public record MapDefinition(String id,
         Objects.requireNonNull(folder, "folder");
         Objects.requireNonNull(metadata, "metadata");
         Objects.requireNonNull(blueprint, "blueprint");
+        Objects.requireNonNull(regions, "regions");
+        Objects.requireNonNull(regionDefaults, "regionDefaults");
     }
 }
