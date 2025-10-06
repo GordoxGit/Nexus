@@ -288,8 +288,9 @@ public final class MapServiceImpl implements MapService {
         ConfigurationSection positionSection = section.getConfigurationSection("position");
         MapVector position = positionSection != null ? parseVector(positionSection) : parseVector(section);
         Integer hp = getInteger(section, "hp");
+        Integer radius = getInteger(section, "radius");
         Map<String, Object> properties = extractMetadata(section);
-        return new MapNexus(position, hp, properties);
+        return new MapNexus(position, hp, radius, properties);
     }
 
     private List<MapRegion> parseRegions(ConfigurationSection section) {

@@ -189,6 +189,13 @@ public final class MapValidatorServiceImpl implements MapValidatorService {
         } else if (hp <= 0) {
             errors.add("[" + definition.id() + "] Le nexus de l'équipe " + team.id() + " doit avoir un hp positif");
         }
+        Integer radius = nexus.radius();
+        if (radius == null) {
+            errors.add("[" + definition.id() + "] Le nexus de l'équipe " + team.id() + " doit définir radius");
+        } else if (radius <= 0) {
+            errors.add("[" + definition.id() + "] Le radius du nexus de l'équipe " + team.id()
+                    + " doit être supérieur à 0");
+        }
     }
 
     private boolean areValidCoordinates(MapVector vector) {

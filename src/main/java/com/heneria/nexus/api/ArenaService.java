@@ -100,6 +100,18 @@ public interface ArenaService extends LifecycleAware {
         Objects.requireNonNull(settings, "settings");
     }
 
+    /**
+     * Notifies the arena that an energy overload has been delivered for the
+     * given team, progressively exposing the nexus.
+     *
+     * @param handle arena receiving the overload
+     * @param teamId identifier of the team whose nexus should evolve
+     */
+    default void applyNexusOverload(ArenaHandle handle, String teamId) {
+        Objects.requireNonNull(handle, "handle");
+        Objects.requireNonNull(teamId, "teamId");
+    }
+
     interface ArenaListener {
         /**
          * Called whenever the arena phase changes.

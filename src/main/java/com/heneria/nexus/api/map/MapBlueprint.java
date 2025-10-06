@@ -87,7 +87,7 @@ public record MapBlueprint(boolean configurationPresent,
     /**
      * Configuration of the nexus associated with a team.
      */
-    public record MapNexus(MapVector position, Integer hitPoints, Map<String, Object> properties) {
+    public record MapNexus(MapVector position, Integer hitPoints, Integer radius, Map<String, Object> properties) {
 
         public MapNexus {
             Objects.requireNonNull(properties, "properties");
