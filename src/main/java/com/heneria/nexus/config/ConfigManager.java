@@ -278,6 +278,7 @@ teams:
       z: 0
     nexus:
       hp: 100
+      radius: 3
       position:
         x: 5
         y: 65
@@ -290,6 +291,7 @@ teams:
       z: 10
     nexus:
       hp: 100
+      radius: 3
       position:
         x: 15
         y: 65

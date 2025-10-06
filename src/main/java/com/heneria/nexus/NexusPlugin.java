@@ -59,6 +59,7 @@ import com.heneria.nexus.hologram.Hologram;
 import com.heneria.nexus.hologram.HologramVisibilityListener;
 import com.heneria.nexus.listener.FirstWinBonusListener;
 import com.heneria.nexus.listener.PlayerRespawnListener;
+import com.heneria.nexus.listener.NexusDamageListener;
 import com.heneria.nexus.listener.SpawnProtectionListener;
 import com.heneria.nexus.scheduler.GamePhase;
 import com.heneria.nexus.scheduler.RingScheduler;
@@ -93,6 +94,7 @@ import com.heneria.nexus.service.core.RewardServiceImpl;
 import com.heneria.nexus.service.core.ShopServiceImpl;
 import com.heneria.nexus.service.core.TimerServiceImpl;
 import com.heneria.nexus.service.core.TeleportServiceImpl;
+import com.heneria.nexus.service.core.nexus.NexusManager;
 import com.heneria.nexus.service.core.HealthCheckService;
 import com.heneria.nexus.service.core.VaultEconomyService;
 import com.heneria.nexus.redis.RedisManager;
@@ -389,6 +391,7 @@ public final class NexusPlugin extends JavaPlugin {
         manager.registerEvents(new FirstWinBonusListener(logger, serviceRegistry.get(FirstWinBonusService.class)), this);
         manager.registerEvents(new PlayerRespawnListener(logger, arenaService, spawnKillService, executorManager), this);
         manager.registerEvents(new SpawnProtectionListener(spawnKillService), this);
+        manager.registerEvents(new NexusDamageListener(serviceRegistry.get(NexusManager.class)), this);
     }
 
     private boolean checkDependencies() {
@@ -1481,8 +1484,9 @@ public final class NexusPlugin extends JavaPlugin {
         serviceRegistry.registerService(DailyStatsRepository.class, DailyStatsRepository.class);
         serviceRegistry.registerService(DailyStatsAggregatorService.class, DailyStatsAggregatorService.class);
         serviceRegistry.registerService(AntiSpawnKillService.class, AntiSpawnKillServiceImpl.class);
-        serviceRegistry.registerService(ArenaService.class, ArenaServiceImpl.class);
         serviceRegistry.registerService(HoloService.class, HoloServiceImpl.class);
+        serviceRegistry.registerService(NexusManager.class, NexusManager.class);
+        serviceRegistry.registerService(ArenaService.class, ArenaServiceImpl.class);
         serviceRegistry.registerService(RewardService.class, RewardServiceImpl.class);
         serviceRegistry.registerService(FirstWinBonusService.class, FirstWinBonusServiceImpl.class);
     }

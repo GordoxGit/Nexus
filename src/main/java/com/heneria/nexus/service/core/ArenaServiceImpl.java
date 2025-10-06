@@ -30,6 +30,7 @@ import com.heneria.nexus.db.repository.MatchRepository;
 import com.heneria.nexus.match.MatchSnapshot;
 import com.heneria.nexus.scheduler.GamePhase;
 import com.heneria.nexus.scheduler.RingScheduler;
+import com.heneria.nexus.service.core.nexus.NexusManager;
 import com.heneria.nexus.util.NexusLogger;
 import com.heneria.nexus.watchdog.WatchdogService;
 import com.heneria.nexus.watchdog.WatchdogTimeoutException;
@@ -97,6 +98,7 @@ public final class ArenaServiceImpl implements ArenaService {
     private final AtomicReference<CoreConfig.TimeoutSettings.WatchdogSettings> watchdogSettingsRef;
     private final Optional<AnalyticsService> analyticsService;
     private final AuditService auditService;
+    private final NexusManager nexusManager;
 
     public ArenaServiceImpl(JavaPlugin plugin,
                             NexusLogger logger,
@@ -113,6 +115,7 @@ public final class ArenaServiceImpl implements ArenaService {
                             Optional<AnalyticsService> analyticsService,
                             WatchdogService watchdogService,
                             AuditService auditService,
+                            NexusManager nexusManager,
                             CoreConfig config) {
         this.plugin = Objects.requireNonNull(plugin, "plugin");
         this.logger = Objects.requireNonNull(logger, "logger");
@@ -129,8 +132,17 @@ public final class ArenaServiceImpl implements ArenaService {
         this.analyticsService = Objects.requireNonNull(analyticsService, "analyticsService");
         this.watchdogService = Objects.requireNonNull(watchdogService, "watchdogService");
         this.auditService = Objects.requireNonNull(auditService, "auditService");
+        this.nexusManager = Objects.requireNonNull(nexusManager, "nexusManager");
         this.settingsRef = new AtomicReference<>(config.arenaSettings());
         this.watchdogSettingsRef = new AtomicReference<>(config.timeoutSettings().watchdog());
+        this.nexusManager.registerListener(core -> executorManager.mainThread().runNow(() -> {
+            ArenaHandle arena = core.arena();
+            ArenaPhase phase = arena.phase();
+            if (phase == ArenaPhase.SCORED || phase == ArenaPhase.RESET || phase == ArenaPhase.END) {
+                return;
+            }
+            transition(arena, ArenaPhase.SCORED);
+        }));
     }
 
     @Override
@@ -237,6 +249,7 @@ public final class ArenaServiceImpl implements ArenaService {
         completionTimes.remove(handle.id());
         applyLobbyWorldRules(handle);
         setWorldPvP(handle, false);
+        nexusManager.clearArena(handle);
     }
 
     private void beginStarting(ArenaHandle handle) {
@@ -256,6 +269,13 @@ public final class ArenaServiceImpl implements ArenaService {
             spawnLocations.putIfAbsent(player.getUniqueId(), player.getLocation().clone());
             antiSpawnKillService.applyProtection(player);
         });
+        mapService.getMap(handle.mapId()).ifPresent(definition -> {
+            MapBlueprint blueprint = definition.blueprint();
+            if (blueprint == null) {
+                return;
+            }
+            resolveArenaWorld(handle).ifPresent(world -> nexusManager.initializeArena(handle, world, blueprint));
+        });
         plugin.getServer().getPluginManager().callEvent(new NexusArenaStartEvent(handle));
     }
 
@@ -267,6 +287,7 @@ public final class ArenaServiceImpl implements ArenaService {
         Instant completedAt = Instant.now();
         completionTimes.put(handle.id(), completedAt);
         persistMatchSnapshot(handle, completedAt);
+        nexusManager.clearArena(handle);
         if (economyService.isDegraded()) {
             logger.warn("Économie en mode dégradé lors du score pour " + handle.id());
         }
@@ -277,6 +298,7 @@ public final class ArenaServiceImpl implements ArenaService {
         unfreezePlayers(handle);
         setWorldPvP(handle, false);
         teleportPlayersToHub(handle);
+        nexusManager.clearArena(handle);
     }
 
     private void prepareEnd(ArenaHandle handle, ArenaPhase previous) {
@@ -286,6 +308,7 @@ public final class ArenaServiceImpl implements ArenaService {
         if (previous != ArenaPhase.RESET) {
             teleportPlayersToHub(handle);
         }
+        nexusManager.clearArena(handle);
     }
 
     private void finishArena(ArenaHandle handle) {
@@ -678,6 +701,13 @@ public final class ArenaServiceImpl implements ArenaService {
     public void applyWatchdogSettings(CoreConfig.TimeoutSettings.WatchdogSettings settings) {
         watchdogSettingsRef.set(Objects.requireNonNull(settings, "settings"));
         logger.info("Timeouts watchdog mis à jour: reset=" + settings.resetMs() + "ms paste=" + settings.pasteMs() + "ms");
+    }
+
+    @Override
+    public void applyNexusOverload(ArenaHandle handle, String teamId) {
+        Objects.requireNonNull(handle, "handle");
+        Objects.requireNonNull(teamId, "teamId");
+        nexusManager.applyOverload(handle, teamId);
     }
 
     private void persistMatchSnapshot(ArenaHandle handle, Instant completedAt) {

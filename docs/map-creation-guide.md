@@ -48,6 +48,33 @@ asset:
 - Le dossier doit contenir un monde Minecraft valide, au minimum un fichier `level.dat`.
 - Si le dossier ou `level.dat` sont absents, la carte est désactivée et une erreur détaillée est affichée dans la console.
 
+## Définir les équipes et leur Nexus
+
+Chaque entrée de la section `teams` doit maintenant préciser la position du Nexus de l'équipe. Exemple minimal :
+
+```yaml
+teams:
+  blue:
+    name: "Bleus"
+    spawn:
+      x: -12
+      y: 64
+      z: 8
+    nexus:
+      hp: 75
+      radius: 2
+      position:
+        x: -25
+        y: 65
+        z: 0
+```
+
+- `hp` : points de vie initiaux du Nexus.
+- `radius` : rayon utilisé pour la zone de surcharge (livraison de Cellules).
+- `position` : coordonnées du bloc **Beacon** représentant le Nexus. Les coordonnées doivent pointer vers un beacon présent sur la carte.
+
+Le validateur refuse les cartes qui ne définissent pas ces trois champs ou qui fournissent des valeurs invalides (HP/radius ≤ 0, coordonnées manquantes, etc.).
+
 ## Conseils de validation
 
 - Utilisez `maps.yml` pour répertorier vos cartes et leurs métadonnées (nom d'affichage, modes, etc.).
