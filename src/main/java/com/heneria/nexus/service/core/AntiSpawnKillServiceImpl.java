@@ -55,7 +55,7 @@ public final class AntiSpawnKillServiceImpl implements AntiSpawnKillService {
         revokeProtection(player.getUniqueId());
 
         int durationTicks = Math.max(1, (int) Math.ceil(settings.duration().toMillis() / 50.0));
-        PotionEffect resistance = new PotionEffect(PotionEffectType.DAMAGE_RESISTANCE, durationTicks,
+        PotionEffect resistance = new PotionEffect(PotionEffectType.RESISTANCE, durationTicks,
                 settings.resistanceAmplifier(), false, false, true);
         player.addPotionEffect(resistance, true);
         boolean glowApplied = false;
@@ -90,7 +90,7 @@ public final class AntiSpawnKillServiceImpl implements AntiSpawnKillService {
         state.cancel();
         Player player = Bukkit.getPlayer(playerId);
         if (player != null) {
-            player.removePotionEffect(PotionEffectType.DAMAGE_RESISTANCE);
+            player.removePotionEffect(PotionEffectType.RESISTANCE);
             if (state.glowApplied()) {
                 player.removePotionEffect(PotionEffectType.GLOWING);
             }

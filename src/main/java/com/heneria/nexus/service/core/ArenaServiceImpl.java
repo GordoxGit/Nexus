@@ -331,7 +331,7 @@ public final class ArenaServiceImpl implements ArenaService {
                 handle.createdAt(),
                 finalCompletedAt)));
         budgetService.unregisterArena(handle);
-        regionService.unregisterArena(handle);
+        regionService.unregisterArena(handle.id());
         arenas.remove(handle.id());
         executorManager.compute().execute(() -> queueService.tryMatch(handle.mode()).ifPresent(plan ->
                 logger.info("Match prêt après fin d'arène " + handle.id() + " -> " + plan.matchId())));

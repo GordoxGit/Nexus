@@ -493,8 +493,9 @@ public final class RedisService implements LifecycleAware {
                         @Override
                         public void onMessage(String channel, String message) {
                             if (!channelSecurityManager.isChannelAllowed(channel)) {
-                                logger.warn("Message Redis ignoré sur un canal non autorisé: {} (subscription={})",
-                                        channel, id);
+                                logger.warn(String.format(
+                                        "Message Redis ignoré sur un canal non autorisé: %s (subscription=%d)",
+                                        channel, id));
                                 return;
                             }
                             try {

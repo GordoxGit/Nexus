@@ -170,13 +170,14 @@ public final class TeleportServiceImpl implements TeleportService, PluginMessage
     public void onPluginMessageReceived(String channel, Player player, byte[] message) {
         if (!channelSecurityManager.isChannelAllowed(channel)) {
             String origin = player != null ? player.getName() + "/" + player.getUniqueId() : "<inconnu>";
-            logger.warn("PluginMessage reçu sur un canal non autorisé: {} (origine: {})", channel, origin);
+            logger.warn(String.format(
+                    "PluginMessage reçu sur un canal non autorisé: %s (origine: %s)", channel, origin));
             return;
         }
         String sourceServerId = resolveSourceServerId(player);
         networkRateLimiter.isAllowed(sourceServerId, channel).whenComplete((allowed, throwable) -> {
             if (throwable != null) {
-                logger.warn("Erreur lors du contrôle du débit réseau sur {}", channel, throwable);
+                logger.warn(String.format("Erreur lors du contrôle du débit réseau sur %s", channel), throwable);
                 return;
             }
             if (!Boolean.TRUE.equals(allowed)) {

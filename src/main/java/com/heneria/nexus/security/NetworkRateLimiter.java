@@ -126,8 +126,9 @@ public final class NetworkRateLimiter {
         long now = System.currentTimeMillis();
         throttledLogs.compute(key, (k, last) -> {
             if (last == null || now - last >= LOG_THROTTLE_INTERVAL_MS) {
-                logger.warn("Limite réseau dépassée sur {} par {} ({} messages dans la fenêtre, limite={})",
-                        channel, source, count, limit);
+                logger.warn(String.format(
+                        "Limite réseau dépassée sur %s par %s (%d messages dans la fenêtre, limite=%d)",
+                        channel, source, count, limit));
                 return now;
             }
             return last;
