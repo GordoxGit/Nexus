@@ -469,8 +469,8 @@ public final class RedisService implements LifecycleAware {
             if (current != null && !current.isDone()) {
                 return;
             }
-            CompletableFuture<Void> task = executorManager.runIo(this::runLoop)
-                    .whenComplete((ignored, throwable) -> taskRef.compareAndSet(task, null));
+            CompletableFuture<Void> task = executorManager.runIo(this::runLoop);
+            task.whenComplete((ignored, throwable) -> taskRef.compareAndSet(task, null));
             taskRef.set(task);
         }
 
