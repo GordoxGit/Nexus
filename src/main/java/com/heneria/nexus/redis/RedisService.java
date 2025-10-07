@@ -314,7 +314,8 @@ public final class RedisService implements LifecycleAware {
                 reconnectFuture.compareAndSet(taskRef.get(), null);
             }
         };
-        ScheduledFuture<?> task = reconnectScheduler.schedule(reconnectTask, delaySeconds, TimeUnit.SECONDS);
+        ScheduledFuture<?> task = null;
+        task = reconnectScheduler.schedule(reconnectTask, delaySeconds, TimeUnit.SECONDS);
         taskRef.set(task);
         reconnectFuture.set(task);
     }

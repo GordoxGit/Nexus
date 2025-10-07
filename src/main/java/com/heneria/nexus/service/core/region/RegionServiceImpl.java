@@ -11,6 +11,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.EnumMap;
 import java.util.EnumSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -44,7 +45,7 @@ public final class RegionServiceImpl implements RegionService {
     private final RingScheduler ringScheduler;
     private final ConcurrentMap<UUID, ArenaRegionState> arenas = new ConcurrentHashMap<>();
     private final ConcurrentMap<String, UUID> worldToArena = new ConcurrentHashMap<>();
-    private final ConcurrentMap<UUID, EnumMap<PotionEffectType, PotionEffect>> playerEffects = new ConcurrentHashMap<>();
+    private final ConcurrentMap<UUID, Map<PotionEffectType, PotionEffect>> playerEffects = new ConcurrentHashMap<>();
     private final ConcurrentMap<UUID, UUID> playerArena = new ConcurrentHashMap<>();
 
     public RegionServiceImpl(NexusLogger logger, RingScheduler ringScheduler) {
@@ -214,8 +215,8 @@ public final class RegionServiceImpl implements RegionService {
         Object raw = flags.get(RegionFlag.EFFECTS_APPLY);
         Collection<PotionEffect> desired = resolveEffects(raw);
         UUID playerId = player.getUniqueId();
-        EnumMap<PotionEffectType, PotionEffect> active = playerEffects.computeIfAbsent(playerId,
-                ignored -> new EnumMap<>(PotionEffectType.class));
+        Map<PotionEffectType, PotionEffect> active = playerEffects.computeIfAbsent(playerId,
+                ignored -> new LinkedHashMap<>());
         if (desired.isEmpty()) {
             if (!active.isEmpty()) {
                 active.keySet().forEach(player::removePotionEffect);
@@ -228,7 +229,7 @@ public final class RegionServiceImpl implements RegionService {
                         PotionEffect::getType,
                         effect -> effect,
                         (first, second) -> second,
-                        () -> new EnumMap<>(PotionEffectType.class)));
+                        LinkedHashMap::new));
         boolean changed = force;
         for (PotionEffect effect : desired) {
             PotionEffect current = active.get(effect.getType());
@@ -338,7 +339,7 @@ public final class RegionServiceImpl implements RegionService {
     }
 
     private void clearPlayerEffects(UUID playerId) {
-        EnumMap<PotionEffectType, PotionEffect> effects = playerEffects.remove(playerId);
+        Map<PotionEffectType, PotionEffect> effects = playerEffects.remove(playerId);
         if (effects == null || effects.isEmpty()) {
             return;
         }
