@@ -295,29 +295,26 @@ public final class RedisService implements LifecycleAware {
         if (settings == null || !settings.enabled()) {
             return;
         }
-        ScheduledFuture<?> existing = reconnectFuture.get();
-        if (existing != null && !existing.isDone()) {
-            return;
+        // Annule toute tentative de reconnexion déjà planifiée
+        ScheduledFuture<?> existing = reconnectFuture.getAndSet(null);
+        if (existing != null) {
+            existing.cancel(false);
         }
+
         int attempt = reconnectAttempts.incrementAndGet();
         long delaySeconds = computeBackoffSeconds(attempt);
-        final AtomicReference<ScheduledFuture<?>> taskRef = new AtomicReference<>();
+
         Runnable reconnectTask = () -> {
-            try {
-                CoreConfig.RedisSettings current = settingsRef.get();
-                if (current == null || !current.enabled() || !started.get()) {
-                    return;
-                }
+            CoreConfig.RedisSettings current = settingsRef.get();
+            if (current != null && current.enabled() && started.get()) {
                 updateState(ConnectionState.CONNECTING);
                 executorManager.runIo(() -> connect(current));
-            } finally {
-                reconnectFuture.compareAndSet(taskRef.get(), null);
             }
         };
-        ScheduledFuture<?> task = null;
-        task = reconnectScheduler.schedule(reconnectTask, delaySeconds, TimeUnit.SECONDS);
-        taskRef.set(task);
-        reconnectFuture.set(task);
+
+        ScheduledFuture<?> future = reconnectScheduler.schedule(reconnectTask, delaySeconds, TimeUnit.SECONDS);
+        // On stocke la nouvelle tâche pour pouvoir l'annuler si besoin
+        reconnectFuture.set(future);
     }
 
     private void cancelReconnect() {
