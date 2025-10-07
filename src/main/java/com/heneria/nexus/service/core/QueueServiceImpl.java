@@ -14,6 +14,7 @@ import com.heneria.nexus.api.QueueStats;
 import com.heneria.nexus.api.QueueTicket;
 import com.heneria.nexus.api.ProfileService;
 import com.heneria.nexus.api.TeleportService;
+import com.heneria.nexus.service.ServiceRegistry;
 import com.heneria.nexus.redis.RedisService;
 import com.heneria.nexus.util.NexusLogger;
 import com.heneria.nexus.util.MessageFacade;
@@ -63,7 +64,7 @@ public final class QueueServiceImpl implements QueueService {
     private final MessageFacade messageFacade;
     private final RedisService redisService;
     private final Optional<LuckPerms> luckPerms;
-    private final GlobalMatchmaker globalMatchmaker;
+    private final ServiceRegistry serviceRegistry;
     private final MapRotationService mapRotationService;
     private final Map<ArenaMode, ConcurrentLinkedQueue<QueueTicket>> queues = new EnumMap<>(ArenaMode.class);
     private final ConcurrentHashMap<UUID, QueueTicket> ticketsByPlayer = new ConcurrentHashMap<>();
@@ -74,6 +75,7 @@ public final class QueueServiceImpl implements QueueService {
     private final String serverId;
     private final Deque<String> recentMaps = new ConcurrentLinkedDeque<>();
     private volatile BukkitTask tickerTask;
+    private GlobalMatchmaker globalMatchmaker;
 
     public QueueServiceImpl(JavaPlugin plugin,
                             NexusLogger logger,
@@ -82,7 +84,7 @@ public final class QueueServiceImpl implements QueueService {
                             TeleportService teleportService,
                             MessageFacade messageFacade,
                             RedisService redisService,
-                            HealthCheckService healthCheckService,
+                            ServiceRegistry serviceRegistry,
                             MapRotationService mapRotationService,
                             CoreConfig config,
                             Optional<LuckPerms> luckPerms) {
@@ -94,19 +96,11 @@ public final class QueueServiceImpl implements QueueService {
         this.messageFacade = Objects.requireNonNull(messageFacade, "messageFacade");
         this.redisService = Objects.requireNonNull(redisService, "redisService");
         this.luckPerms = Objects.requireNonNull(luckPerms, "luckPerms");
+        this.serviceRegistry = Objects.requireNonNull(serviceRegistry, "serviceRegistry");
         this.mapRotationService = Objects.requireNonNull(mapRotationService, "mapRotationService");
-        Objects.requireNonNull(healthCheckService, "healthCheckService");
         Objects.requireNonNull(config, "config");
         this.settingsRef = new AtomicReference<>(config.queueSettings());
         this.serverId = Objects.requireNonNull(config.serverId(), "serverId");
-        this.globalMatchmaker = new GlobalMatchmaker(logger,
-                executorManager,
-                this.redisService,
-                healthCheckService,
-                settingsRef::get,
-                this::findLocalTicket,
-                this::isPlayerOnlineLocally,
-                this.serverId);
         for (ArenaMode mode : ArenaMode.values()) {
             queues.put(mode, new ConcurrentLinkedQueue<>());
         }
@@ -114,6 +108,18 @@ public final class QueueServiceImpl implements QueueService {
 
     @Override
     public CompletableFuture<Void> start() {
+        if (this.globalMatchmaker == null) {
+            HealthCheckService healthCheckService = serviceRegistry.get(HealthCheckService.class);
+            Objects.requireNonNull(healthCheckService, "healthCheckService");
+            this.globalMatchmaker = new GlobalMatchmaker(logger,
+                    executorManager,
+                    this.redisService,
+                    healthCheckService,
+                    settingsRef::get,
+                    this::findLocalTicket,
+                    this::isPlayerOnlineLocally,
+                    this.serverId);
+        }
         return executorManager.runCompute(this::scheduleTicker);
     }
 
@@ -196,7 +202,7 @@ public final class QueueServiceImpl implements QueueService {
         if (playersNeeded <= 0) {
             return Optional.empty();
         }
-        if (shouldUseCrossShard()) {
+        if (shouldUseCrossShard() && globalMatchmaker != null) {
             Optional<GlobalMatchmaker.MatchResult> result = globalMatchmaker.tryMatch(mode, playersNeeded);
             result.ifPresent(this::handleGlobalMatch);
             return result.map(GlobalMatchmaker.MatchResult::plan);

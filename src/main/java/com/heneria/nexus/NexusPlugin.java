@@ -1398,6 +1398,7 @@ public final class NexusPlugin extends JavaPlugin {
     private void registerSingletons() {
         serviceRegistry.registerSingleton(JavaPlugin.class, this);
         serviceRegistry.registerSingleton(NexusPlugin.class, this);
+        serviceRegistry.registerSingleton(ServiceRegistry.class, serviceRegistry);
         serviceRegistry.registerSingleton(NexusLogger.class, logger);
         serviceRegistry.registerSingleton(ConfigManager.class, configManager);
         serviceRegistry.registerSingleton(ConfigBundle.class, bundle);
