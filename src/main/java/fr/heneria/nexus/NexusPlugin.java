@@ -1,5 +1,8 @@
 package fr.heneria.nexus;
 
+import fr.heneria.nexus.core.config.ConfigurationService;
+import fr.heneria.nexus.core.config.MainConfig;
+import fr.heneria.nexus.core.config.MessagesConfig;
 import fr.heneria.nexus.core.service.*;
 import org.bukkit.plugin.java.JavaPlugin;
 
@@ -73,6 +76,9 @@ public final class NexusPlugin extends JavaPlugin {
     private void registerServices() {
         getLogger().info("Enregistrement des services...");
 
+        // Configuration en premier car les autres services en dépendent
+        serviceRegistry.register(ConfigurationService.class, new ConfigurationService(this));
+
         serviceRegistry.register(MapService.class, new MapService(this));
         serviceRegistry.register(ProfileService.class, new ProfileService(this));
         serviceRegistry.register(EconomyService.class, new EconomyService(this));
@@ -99,5 +105,23 @@ public final class NexusPlugin extends JavaPlugin {
      */
     public ServiceRegistry getServiceRegistry() {
         return serviceRegistry;
+    }
+
+    /**
+     * Raccourci vers la configuration principale.
+     *
+     * @return Instance de MainConfig
+     */
+    public MainConfig getMainConfig() {
+        return getServiceRegistry().get(ConfigurationService.class).getMainConfig();
+    }
+
+    /**
+     * Raccourci vers la configuration des messages.
+     *
+     * @return Instance de MessagesConfig
+     */
+    public MessagesConfig getMessagesConfig() {
+        return getServiceRegistry().get(ConfigurationService.class).getMessagesConfig();
     }
 }
