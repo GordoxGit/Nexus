@@ -1,21 +1,25 @@
-# =============================================
-#  Catalogue des maps Nexus
-# =============================================
+#========================================
+# Configuration des Maps - Nexus
+#========================================
 
-config-version: 1
+# Version (ne pas modifier)
+version: 1
 
+# Pool de rotation des maps
 rotation:
   enabled: true
-  weighted_pick: true
-  veto_vote: true
-  min_votes_to_pick: 1
+  mode: 'WEIGHTED' # WEIGHTED (pondéré) ou SEQUENTIAL (séquentiel)
 
-maps:
-  - id: "temple_ancien"
-    display: "Temple Ancien"
-    weight: 3
-    modes: ["2v2", "4v4"]
-  - id: "caverne_glacee"
-    display: "Caverne Glacée"
-    weight: 2
-    modes: ["2v2"]
+# Liste des maps (sera rempli par l'admin GUI)
+maps: []
+
+# Exemple de structure (à remplir via /nexus admin):
+# maps:
+#   - id: 'ancient_temple'
+#     name: '&6Temple Antique'
+#     enabled: true
+#     weight: 10
+#     min-players: 2
+#     max-players: 8
+#     game-modes: ['NORMAL', 'RANKED']
+#     path: 'ancient_temple'

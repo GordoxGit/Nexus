@@ -1,172 +1,33 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0"
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 
+         http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
-    <groupId>com.heneria</groupId>
+    <groupId>fr.heneria</groupId>
     <artifactId>nexus</artifactId>
-    <version>0.1.0-SNAPSHOT</version>
-    <name>Nexus</name>
-    <description>Nexus core plugin for PaperMC servers</description>
-    <url>https://example.com/nexus</url>
+    <version>1.0.0-ALPHA</version>
     <packaging>jar</packaging>
 
-    <licenses>
-        <license>
-            <name>All Rights Reserved</name>
-            <distribution>repo</distribution>
-        </license>
-    </licenses>
+    <name>Nexus</name>
+    <description>Mode de jeu PvP compétitif par équipes</description>
 
     <properties>
         <java.version>21</java.version>
-        <maven.compiler.release>21</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <paper.version>1.21.1-R0.1-SNAPSHOT</paper.version>
-        <velocity.version>3.3.0-SNAPSHOT</velocity.version>
-        <mariadb.version>3.3.3</mariadb.version>
-        <hikari.version>5.1.0</hikari.version>
-        <caffeine.version>3.1.8</caffeine.version>
-        <placeholderapi.version>2.11.5</placeholderapi.version>
-        <resilience4j.version>2.2.0</resilience4j.version>
-        <jedis.version>5.1.3</jedis.version>
-
-        <!--
-            Keep a fixed timestamp to guarantee that identical sources always produce identical
-            shaded artifacts. CI can override reproducible.build.outputTimestamp (for example with
-            SOURCE_DATE_EPOCH) when a deterministic but informative timestamp is required.
-            The earliest timestamp allowed by the JAR specification is 1980-01-01T00:00:02Z.
-        -->
-        <reproducible.build.outputTimestamp>1980-01-01T00:00:02Z</reproducible.build.outputTimestamp>
-        <project.build.outputTimestamp>${reproducible.build.outputTimestamp}</project.build.outputTimestamp>
+        <paper.version>1.21.3-R0.1-SNAPSHOT</paper.version>
     </properties>
 
-    <repositories>
-        <repository>
-            <id>papermc-repo</id>
-            <url>https://repo.papermc.io/repository/maven-public/</url>
-        </repository>
-        <repository>
-            <id>placeholderapi</id>
-            <url>https://repo.extendedclip.com/content/repositories/placeholderapi/</url>
-        </repository>
-        <repository>
-            <id>jitpack.io</id>
-            <url>https://jitpack.io</url>
-        </repository>
-        <repository>
-            <id>luckperms</id>
-            <url>https://repo.lucko.me/</url>
-        </repository>
-    </repositories>
-
-    <dependencies>
-        <dependency>
-            <groupId>io.papermc.paper</groupId>
-            <artifactId>paper-api</artifactId>
-            <version>${paper.version}</version>
-            <scope>provided</scope>
-        </dependency>
-        <dependency>
-            <groupId>com.zaxxer</groupId>
-            <artifactId>HikariCP</artifactId>
-            <version>${hikari.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>org.mariadb.jdbc</groupId>
-            <artifactId>mariadb-java-client</artifactId>
-            <version>${mariadb.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>com.github.ben-manes.caffeine</groupId>
-            <artifactId>caffeine</artifactId>
-            <version>${caffeine.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>me.clip</groupId>
-            <artifactId>placeholderapi</artifactId>
-            <version>${placeholderapi.version}</version>
-            <scope>provided</scope>
-        </dependency>
-        <dependency>
-            <groupId>com.github.MilkBowl</groupId>
-            <artifactId>VaultAPI</artifactId>
-            <version>1.7</version>
-            <scope>provided</scope>
-        </dependency>
-        <dependency>
-            <groupId>net.luckperms</groupId>
-            <artifactId>api</artifactId>
-            <version>5.4</version>
-            <scope>provided</scope>
-        </dependency>
-        <dependency>
-            <groupId>com.fasterxml.jackson.core</groupId>
-            <artifactId>jackson-databind</artifactId>
-            <version>2.17.1</version>
-        </dependency>
-        <dependency>
-            <groupId>com.fasterxml.jackson.dataformat</groupId>
-            <artifactId>jackson-dataformat-yaml</artifactId>
-            <version>2.17.1</version>
-        </dependency>
-        <dependency>
-            <groupId>com.velocitypowered</groupId>
-            <artifactId>velocity-api</artifactId>
-            <version>${velocity.version}</version>
-            <scope>provided</scope>
-        </dependency>
-        <dependency>
-            <groupId>io.github.resilience4j</groupId>
-            <artifactId>resilience4j-retry</artifactId>
-            <version>${resilience4j.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>io.github.resilience4j</groupId>
-            <artifactId>resilience4j-circuitbreaker</artifactId>
-            <version>${resilience4j.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>io.github.resilience4j</groupId>
-            <artifactId>resilience4j-all</artifactId>
-            <version>${resilience4j.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>redis.clients</groupId>
-            <artifactId>jedis</artifactId>
-            <version>${jedis.version}</version>
-        </dependency>
-    </dependencies>
-
     <build>
-        <pluginManagement>
-            <plugins>
-                <plugin>
-                    <groupId>org.apache.maven.plugins</groupId>
-                    <artifactId>maven-compiler-plugin</artifactId>
-                    <version>3.11.0</version>
-                    <configuration>
-                        <release>${java.version}</release>
-                        <compilerArgs>
-                            <arg>-parameters</arg>
-                        </compilerArgs>
-                    </configuration>
-                </plugin>
-            </plugins>
-        </pluginManagement>
         <plugins>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
-            </plugin>
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-resources-plugin</artifactId>
-                <version>3.3.1</version>
+                <version>3.11.0</version>
                 <configuration>
-                    <encoding>${project.build.sourceEncoding}</encoding>
-                    <useDefaultDelimiters>true</useDefaultDelimiters>
+                    <source>${java.version}</source>
+                    <target>${java.version}</target>
                 </configuration>
             </plugin>
             <plugin>
@@ -180,13 +41,16 @@
                             <goal>shade</goal>
                         </goals>
                         <configuration>
-                            <createDependencyReducedPom>false</createDependencyReducedPom>
-                            <!--
-                                minimizeJar must stay disabled. Enabling it removes classes that are
-                                detected as unused during shading, which breaks runtime loading for
-                                libraries such as HikariCP.
-                            -->
-                            <minimizeJar>false</minimizeJar>
+                            <relocations>
+                                <relocation>
+                                    <pattern>com.zaxxer.hikari</pattern>
+                                    <shadedPattern>fr.heneria.nexus.lib.hikari</shadedPattern>
+                                </relocation>
+                                <relocation>
+                                    <pattern>org.mariadb</pattern>
+                                    <shadedPattern>fr.heneria.nexus.lib.mariadb</shadedPattern>
+                                </relocation>
+                            </relocations>
                             <filters>
                                 <filter>
                                     <artifact>*:*</artifact>
@@ -197,65 +61,63 @@
                                     </excludes>
                                 </filter>
                             </filters>
-                            <relocations>
-                                <relocation>
-                                    <pattern>com.zaxxer.hikari</pattern>
-                                    <shadedPattern>com.heneria.nexus.lib.hikari</shadedPattern>
-                                </relocation>
-                                <relocation>
-                                    <pattern>org.mariadb.jdbc</pattern>
-                                    <shadedPattern>com.heneria.nexus.lib.mariadb</shadedPattern>
-                                </relocation>
-                                <relocation>
-                                    <pattern>com.github.benmanes.caffeine</pattern>
-                                    <shadedPattern>com.heneria.nexus.lib.caffeine</shadedPattern>
-                                </relocation>
-                                <relocation>
-                                    <pattern>io.github.resilience4j</pattern>
-                                    <shadedPattern>com.heneria.nexus.lib.resilience4j</shadedPattern>
-                                </relocation>
-                                <relocation>
-                                    <pattern>io.vavr</pattern>
-                                    <shadedPattern>com.heneria.nexus.lib.vavr</shadedPattern>
-                                </relocation>
-                                <relocation>
-                                    <pattern>redis.clients.jedis</pattern>
-                                    <shadedPattern>com.heneria.nexus.lib.jedis</shadedPattern>
-                                </relocation>
-                                <relocation>
-                                    <pattern>org.apache.commons.pool2</pattern>
-                                    <shadedPattern>com.heneria.nexus.lib.commons.pool2</shadedPattern>
-                                </relocation>
-                            </relocations>
-                            <transformers>
-                                <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
-                                    <manifestEntries>
-                                        <Implementation-Title>${project.name}</Implementation-Title>
-                                        <Implementation-Version>${project.version}</Implementation-Version>
-                                        <Implementation-Vendor>${project.groupId}</Implementation-Vendor>
-                                        <Build-Timestamp>${project.build.outputTimestamp}</Build-Timestamp>
-                                    </manifestEntries>
-                                </transformer>
-                            </transformers>
                         </configuration>
                     </execution>
                 </executions>
             </plugin>
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-jar-plugin</artifactId>
-                <version>3.3.0</version>
-                <configuration>
-                    <archive>
-                        <manifest>
-                            <addDefaultImplementationEntries>true</addDefaultImplementationEntries>
-                        </manifest>
-                        <manifestEntries>
-                            <Build-Timestamp>${project.build.outputTimestamp}</Build-Timestamp>
-                        </manifestEntries>
-                    </archive>
-                </configuration>
-            </plugin>
         </plugins>
+        <resources>
+            <resource>
+                <directory>src/main/resources</directory>
+                <filtering>true</filtering>
+            </resource>
+        </resources>
     </build>
+
+    <repositories>
+        <repository>
+            <id>papermc-repo</id>
+            <url>https://repo.papermc.io/repository/maven-public/</url>
+        </repository>
+    </repositories>
+
+    <dependencies>
+        <!-- Paper API -->
+        <dependency>
+            <groupId>io.papermc.paper</groupId>
+            <artifactId>paper-api</artifactId>
+            <version>${paper.version}</version>
+            <scope>provided</scope>
+        </dependency>
+
+        <!-- HikariCP (Connection Pooling) -->
+        <dependency>
+            <groupId>com.zaxxer</groupId>
+            <artifactId>HikariCP</artifactId>
+            <version>5.1.0</version>
+        </dependency>
+
+        <!-- MariaDB JDBC Driver -->
+        <dependency>
+            <groupId>org.mariadb.jdbc</groupId>
+            <artifactId>mariadb-java-client</artifactId>
+            <version>3.3.2</version>
+        </dependency>
+
+        <!-- Vault API (Optional Economy) -->
+        <dependency>
+            <groupId>com.github.MilkBowl</groupId>
+            <artifactId>VaultAPI</artifactId>
+            <version>1.7.1</version>
+            <scope>provided</scope>
+        </dependency>
+
+        <!-- LuckPerms API -->
+        <dependency>
+            <groupId>net.luckperms</groupId>
+            <artifactId>api</artifactId>
+            <version>5.4</version>
+            <scope>provided</scope>
+        </dependency>
+    </dependencies>
 </project>

@@ -1,0 +1,22 @@
+#========================================
+# Classes - Nexus
+#========================================
+
+# Version
+version: 1
+
+# Configuration globale
+global:
+  mastery-max-level: 100
+  ability-cooldown-display: true
+
+# Classes (sera rempli automatiquement par le système)
+classes: []
+
+# Exemple de structure (géré par le code):
+# classes:
+#   - id: 'vanguard'
+#     name: 'Vanguard'
+#     tier: 'FREE'
+#     price: 0
+#     ...
