@@ -1,71 +1,44 @@
 name: Nexus
-version: ${project.version}
-main: com.heneria.nexus.NexusPlugin
-softdepend: [Vault, PlaceholderAPI, LuckPerms]
-description: Plugin noyau Nexus pour PaperMC.
-authors: [Heneria]
+version: '${project.version}'
+main: fr.heneria.nexus.NexusPlugin
 api-version: '1.21'
+authors: [GordoxGit]
+description: Mode de jeu PvP compétitif par équipes avec système de classes, économie et progression
+
+depend: []
+
+softdepend:
+  - Vault
+  - LuckPerms
+  - WorldEdit
+  - FastAsyncWorldEdit
+  - PlaceholderAPI
+
 load: POSTWORLD
+
 commands:
   nexus:
-    description: Commande principale du plugin Nexus.
-    usage: /<command> help|reload|dump|budget [arena]|holo|admin
-    permission: nexus.use
+    description: Commande principale du plugin Nexus
+    usage: /<command> [args]
     aliases: [nx]
-  hub:
-    description: Retourner vers le serveur hub.
-    usage: /<command>
-    permission: nexus.commands.hub
-    aliases: [l, lobby]
+    permission: nexus.use
+    permission-message: "§cVous n'avez pas la permission d'utiliser cette commande."
+
 permissions:
   nexus.use:
-    description: Accéder aux commandes publiques de Nexus.
+    description: Permission de base pour utiliser le plugin
     default: true
-  nexus.commands.hub:
-    description: Retourner vers le hub via /hub.
-    default: true
-  nexus.admin.reload:
-    description: Recharger la configuration Nexus.
-    default: op
-  nexus.admin.dump:
-    description: Afficher un dump d'état Nexus.
-    default: op
-  nexus.admin.budget:
-    description: Inspecter les budgets des arènes.
-    default: op
-  nexus.admin.player.export:
-    description: Exporter les données d'un joueur.
-    default: op
-  nexus.admin.player.import:
-    description: Importer les données d'un joueur.
-    default: op
-  nexus.admin.audit.view:
-    description: Consulter les logs d'audit Nexus.
-    default: op
-  nexus.admin.config.manage_backups:
-    description: Gérer les sauvegardes de configuration Nexus.
-    default: op
-  nexus.admin.redis:
-    description: Inspecter l'état de Redis et des communications inter-serveurs.
-    default: op
-  nexus.admin.*:
-    description: Accès complet aux commandes d'administration Nexus.
+
+  nexus.admin:
+    description: Accès complet aux commandes d'administration
     default: op
     children:
-      nexus.admin.reload: true
-      nexus.admin.dump: true
-      nexus.admin.budget: true
-      nexus.admin.player.export: true
-      nexus.admin.player.import: true
-      nexus.admin.audit.view: true
-      nexus.admin.config.manage_backups: true
-      nexus.admin.redis: true
-  nexus.holo.manage:
-    description: Gérer les hologrammes Nexus via /nexus holo.
-    default: op
-  nexus.holo.view.default:
-    description: Voir les hologrammes du groupe default.
+      nexus.use: true
+
+  nexus.vip:
+    description: Avantages VIP (priorité file, cosmétiques)
+    default: false
+
+  nexus.play:
+    description: Permission de jouer aux parties Nexus
     default: true
-  nexus.holo.view.*:
-    description: Voir tous les hologrammes, indépendamment du groupe.
-    default: op

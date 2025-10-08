@@ -1,30 +1,48 @@
-# =============================================
-#  Configuration économie Nexus
-# =============================================
+#========================================
+# Économie - Nexus Coins
+#========================================
 
-config-version: 1
+# Version
+version: 1
 
-coins:
-  win_per_match: 20
-  lose_per_match: 5
-  first_win_bonus: 50
+# Monnaie
+currency:
+  name: 'Nexus Coins'
+  symbol: '⬡'
+  starting-balance: 1000
 
-battlepass:
-  season_days: 90
-  tiers: 65
-  xp_per_match:
-    win: 120
-    lose: 60
+# Gains par partie
+rewards:
+  victory:
+    normal: 100
+    ranked: 250
+    elite: 500
 
-shop:
-  classes:
-    warrior: 500
-    archer: 750
-    mage: 900
-  cosmetics:
-    flame_trail:
-      cost: 300
-      type: "ARROW_TRAIL"
-    emerald_aura:
-      cost: 450
-      type: "KILL_EFFECT"
+  defeat:
+    normal: 25
+    ranked: 50
+    elite: 0
+
+  # Bonus performance
+  performance:
+    kill: 5
+    assist: 2
+    cell-capture: 10
+    cell-delivery: 15
+    nexus-damage: 3
+    mvp-bonus: 50
+
+  # Première victoire du jour
+  first-win-of-day:
+    enabled: true
+    bonus: 200
+    reset-time: '04:00' # 4h du matin (UTC)
+
+# Tarifs des classes (par tiers)
+class-prices:
+  free: 0
+  tier-1: 2500
+  tier-2: 7500
+  tier-3: 15000
+  tier-4: 30000
+  legendary: 75000

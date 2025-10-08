@@ -1,184 +1,61 @@
-# =============================================
-#  Configuration principale du plugin Nexus
-#  PaperMC 1.21.x — Java 21
-# =============================================
+#========================================
+# Configuration Principale - Nexus
+#========================================
 
-config-version: 5
+# Version de la configuration (ne pas modifier)
+config-version: 1
 
-server:
-  id: "nexus-1"
-  mode: "nexus"
-  language: "fr"
-  timezone: "Europe/Paris"
-
-security:
-  # Liste des canaux de communication autorisés pour les PluginMessages et Redis.
-  # Seuls les messages provenant de ces canaux seront traités.
-  allowed_channels:
-    - "nexus:main"
-    - "nexus:health"
-  network_rate_limits:
-    enabled: true
-    # true = autorise le trafic en cas de panne Redis, false = bloque tout
-    fail_open: true
-    limits:
-      "nexus:health": 2
-      "nexus:main": 100
-
-config:
-  backups:
-    # Nombre maximum de sauvegardes à conserver par fichier. Mettre à 0 pour désactiver.
-    max_backups_per_file: 10
-
-perf:
-  hud_hz: 5
-  scoreboard_hz: 3
-  particles_soft_cap: 1200
-  particles_hard_cap: 2000
-  budget:
-    max_entities: 200
-    max_items: 128
-    max_projectiles: 64
-  spawn_protection:
-    enabled: true
-    duration_seconds: 4
-    resistance_level: 10
-    glow: true
-    particle: "TOTEM"
-    actionbar_message: "<gold>Invulnérable pendant <seconds>s</gold>"
-    actionbar_interval_ticks: 5
-
-threads:
-  io_virtual: false
-  io_pool: 12
-  io_keep_alive_ms: 30000
-  compute_pool: 4
-  shutdown:
-    await_seconds: 5
-    force_cancel_seconds: 3
-  scheduler:
-    main_check_interval_ticks: 1
-
+# Base de données
 database:
   enabled: true
-  jdbc: "jdbc:mariadb://127.0.0.1:3306/nexus"
-  user: "nexus"
-  password: "change_me"
-  monitoring:
-    # Si activé, toutes les requêtes SQL seront loggées au niveau DEBUG.
-    # À n'utiliser que pour le débogage !
-    enable_sql_tracing: false
-    # Seuil en millisecondes pour les requêtes lentes.
-    # Si une requête dépasse ce temps, un avertissement sera loggé.
-    # Mettre à 0 pour désactiver.
-    slow_query_threshold_ms: 500
-  pool:
-    maxSize: 10
-    minIdle: 2
-    connTimeoutMs: 3000
-  resilience:
-    retry:
-      max_attempts: 5
-      initial_interval_ms: 1000
-      max_interval_ms: 8000
-      multiplier: 2.0
-    circuit_breaker:
-      failure_rate_threshold: 50.0
-      minimum_number_of_calls: 5
-      sliding_window_seconds: 30
-      wait_duration_open_state_seconds: 60
-      permitted_calls_in_half_open_state: 1
-  write_behind_interval_seconds: 60
-  cache:
-    profiles:
-      max_size: 1000
-      expire_after_access_minutes: 15
-  retention_policy:
-    # Durée de conservation des historiques de matchs en jours. Mettre à 0 pour désactiver la purge.
-    match_history_days: 90
+  host: 'localhost'
+  port: 3306
+  database: 'nexus'
+  username: 'root'
+  password: ''
 
-redis:
+  # HikariCP Pool Settings
+  pool:
+    maximum-pool-size: 10
+    minimum-idle: 2
+    connection-timeout: 30000
+    idle-timeout: 600000
+    max-lifetime: 1800000
+    leak-detection-threshold: 60000
+
+# Performance
+performance:
+  # Milliseconds Per Tick - Seuils d'alerte
+  mspt-thresholds:
+    warning: 40
+    critical: 50
+
+  # Budgets par arène
+  budgets:
+    max-entities-per-arena: 100
+    max-particles-per-player: 50
+    max-items-on-ground: 50
+
+  # Schedulers (Hz = fois par seconde)
+  schedulers:
+    hud-update-rate: 5
+    scoreboard-update-rate: 2
+    queue-tick-rate: 10
+
+# Monde
+world:
+  # Reset method: DELTA (rapide) ou REPASTE (complet)
+  reset-method: 'DELTA'
+  reset-threshold-modifications: 5000
+
+  # Paths
+  paths:
+    maps: 'plugins/Nexus/maps'
+    schematics: 'plugins/Nexus/schematics'
+    world-templates: 'plugins/Nexus/world_templates'
+
+# Debug
+debug:
   enabled: false
-  host: "127.0.0.1"
-  port: 6379
-  password: ""
-  timeout_ms: 2000
-
-rate-limits:
-  enabled: true
-  cleanup:
-    interval_minutes: 60
-    retention_minutes: 1440
-  actions:
-    'purchase:class': 3
-    'purchase:cosmetic': 3
-    'shop:refresh': 60
-    'quest:reroll_daily': 300
-
-services:
-  expose-bukkit-services: false
-
-timeouts:
-  startMs: 5000
-  stopMs: 3000
-  watchdog:
-    reset_ms: 10000
-    paste_ms: 8000
-
-degraded-mode:
-  enabled: true
-  banner: true
-
-queue:
-  tick_hz: 5
-  vip_weight: 1
-  target_server: "nexus-1"
-  hub_group: "hub"
-  cross_shard:
-    enabled: false
-    redis_key_prefix: "nexus:queue"
-    lock_ttl_ms: 2000
-
-healthcheck:
-  enabled: true
-  interval_seconds: 5
-
-analytics:
-  outbox:
-    enabled: false
-    flush_interval_seconds: 30
-    max_batch_size: 200
-
-holograms:
-  update_hz: 5
-  max_visible_per_instance: 80
-  line_spacing: 0.27
-  view_range: 48.0
-  pool:
-    max_text_displays: 64
-    max_interactions: 32
-
-ui:
-  minimessage:
-    strict: true
-  title:
-    times:
-      short:
-        fadeIn: 5
-        stay: 40
-        fadeOut: 10
-      normal:
-        fadeIn: 10
-        stay: 60
-        fadeOut: 20
-      long:
-        fadeIn: 20
-        stay: 100
-        fadeOut: 40
-  bossbar:
-    defaults:
-      color: PURPLE
-      overlay: NOTCHED_20
-      flags:
-        - DARKEN_SCREEN
-      updateEveryTicks: 10
+  verbose-logging: false
+  sql-logging: false
