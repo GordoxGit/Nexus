@@ -1,5 +1,6 @@
 package fr.heneria.nexus;
 
+import fr.heneria.nexus.core.service.*;
 import org.bukkit.plugin.java.JavaPlugin;
 
 /**
@@ -12,6 +13,7 @@ import org.bukkit.plugin.java.JavaPlugin;
 public final class NexusPlugin extends JavaPlugin {
 
     private static NexusPlugin instance;
+    private ServiceRegistry serviceRegistry;
 
     @Override
     public void onLoad() {
@@ -27,24 +29,58 @@ public final class NexusPlugin extends JavaPlugin {
     public void onEnable() {
         getLogger().info("Démarrage du plugin Nexus...");
 
-        // TODO: Phase 1 - Initialisation des services
-        // TODO: Phase 1 - Chargement de la configuration
-        // TODO: Phase 1 - Connexion à la base de données
-        // TODO: Phase 1 - Enregistrement des commandes
-        // TODO: Phase 1 - Enregistrement des listeners
+        try {
+            this.serviceRegistry = new ServiceRegistry(this);
 
-        getLogger().info("Nexus activé avec succès !");
+            registerServices();
+
+            serviceRegistry.initializeAll();
+
+            serviceRegistry.startAll();
+
+            getLogger().info("========================================");
+            getLogger().info("✓ Nexus activé avec succès !");
+            getLogger().info("========================================");
+
+        } catch (ServiceException e) {
+            getLogger().severe("========================================");
+            getLogger().severe("✗ ERREUR FATALE lors du démarrage !");
+            getLogger().severe("Service : " + e.getServiceName());
+            getLogger().severe("Phase : " + e.getPhase().getDisplayName());
+            getLogger().severe("Raison : " + e.getMessage());
+            getLogger().severe("========================================");
+            getServer().getPluginManager().disablePlugin(this);
+        }
     }
 
     @Override
     public void onDisable() {
         getLogger().info("Arrêt du plugin Nexus...");
 
-        // TODO: Phase 1 - Shutdown des services
-        // TODO: Phase 1 - Fermeture des connexions DB
-        // TODO: Phase 1 - Sauvegarde des données en attente
+        if (serviceRegistry != null) {
+            serviceRegistry.shutdownAll();
+        }
 
+        getLogger().info("========================================");
         getLogger().info("Nexus désactivé.");
+        getLogger().info("========================================");
+    }
+
+    /**
+     * Enregistre tous les services dans le registre.
+     * L'ordre est important : services sans dépendances d'abord.
+     */
+    private void registerServices() {
+        getLogger().info("Enregistrement des services...");
+
+        serviceRegistry.register(MapService.class, new MapService(this));
+        serviceRegistry.register(ProfileService.class, new ProfileService(this));
+        serviceRegistry.register(EconomyService.class, new EconomyService(this));
+
+        serviceRegistry.register(ArenaService.class, new ArenaService(this));
+        serviceRegistry.register(QueueService.class, new QueueService(this));
+
+        getLogger().info("Tous les services enregistrés.");
     }
 
     /**
@@ -54,5 +90,14 @@ public final class NexusPlugin extends JavaPlugin {
      */
     public static NexusPlugin getInstance() {
         return instance;
+    }
+
+    /**
+     * Récupère le registre de services
+     *
+     * @return ServiceRegistry du plugin
+     */
+    public ServiceRegistry getServiceRegistry() {
+        return serviceRegistry;
     }
 }
