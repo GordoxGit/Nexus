@@ -1,5 +1,6 @@
 package fr.heneria.nexus;
 
+import fr.heneria.nexus.arena.phase.SchedulerService;
 import fr.heneria.nexus.core.config.ConfigurationService;
 import fr.heneria.nexus.core.config.MainConfig;
 import fr.heneria.nexus.core.config.MessagesConfig;
@@ -83,6 +84,8 @@ public final class NexusPlugin extends JavaPlugin {
         serviceRegistry.register(fr.heneria.nexus.core.executor.ExecutorService.class,
             new fr.heneria.nexus.core.executor.ExecutorService(this));
 
+        serviceRegistry.register(SchedulerService.class, new SchedulerService(this));
+
         serviceRegistry.register(MapService.class, new MapService(this));
         serviceRegistry.register(ProfileService.class, new ProfileService(this));
         serviceRegistry.register(EconomyService.class, new EconomyService(this));
@@ -138,5 +141,14 @@ public final class NexusPlugin extends JavaPlugin {
      */
     public MessagesConfig getMessagesConfig() {
         return getServiceRegistry().get(ConfigurationService.class).getMessagesConfig();
+    }
+
+    /**
+     * Raccourci pour obtenir le SchedulerService.
+     *
+     * @return SchedulerService
+     */
+    public SchedulerService getSchedulerService() {
+        return getServiceRegistry().get(SchedulerService.class);
     }
 }
