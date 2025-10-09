@@ -3,6 +3,7 @@ package fr.heneria.nexus;
 import fr.heneria.nexus.core.config.ConfigurationService;
 import fr.heneria.nexus.core.config.MainConfig;
 import fr.heneria.nexus.core.config.MessagesConfig;
+import fr.heneria.nexus.core.executor.ExecutorManager;
 import fr.heneria.nexus.core.service.*;
 import org.bukkit.plugin.java.JavaPlugin;
 
@@ -79,6 +80,9 @@ public final class NexusPlugin extends JavaPlugin {
         // Configuration en premier car les autres services en dépendent
         serviceRegistry.register(ConfigurationService.class, new ConfigurationService(this));
 
+        serviceRegistry.register(fr.heneria.nexus.core.executor.ExecutorService.class,
+            new fr.heneria.nexus.core.executor.ExecutorService(this));
+
         serviceRegistry.register(MapService.class, new MapService(this));
         serviceRegistry.register(ProfileService.class, new ProfileService(this));
         serviceRegistry.register(EconomyService.class, new EconomyService(this));
@@ -105,6 +109,17 @@ public final class NexusPlugin extends JavaPlugin {
      */
     public ServiceRegistry getServiceRegistry() {
         return serviceRegistry;
+    }
+
+    /**
+     * Raccourci pour obtenir l'ExecutorManager.
+     *
+     * @return ExecutorManager
+     */
+    public ExecutorManager getExecutorManager() {
+        return getServiceRegistry()
+            .get(fr.heneria.nexus.core.executor.ExecutorService.class)
+            .getExecutorManager();
     }
 
     /**
