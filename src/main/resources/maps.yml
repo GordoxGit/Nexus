@@ -1,0 +1,5 @@
+maps:
+  default_arena:
+    name: "Arène Principale"
+    description: "L'arène de combat classique."
+    sourceFolder: "arena_1"
