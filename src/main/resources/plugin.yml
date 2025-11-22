@@ -1,0 +1,12 @@
+name: Nexus
+version: '${project.version}'
+main: fr.heneria.nexus.NexusPlugin
+api-version: '1.21'
+commands:
+  nexus:
+    description: Main command for Nexus plugin
+    usage: /nexus <subcommand>
+permissions:
+  nexus.admin:
+    description: Allows use of administrative commands
+    default: op
