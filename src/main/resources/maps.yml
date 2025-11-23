@@ -3,3 +3,38 @@ maps:
     name: "Arène Principale"
     description: "L'arène de combat classique."
     sourceFolder: "arena_1"
+    teams:
+      BLUE:
+        spawnLocation:
+          x: 10.5
+          y: 100.0
+          z: 0.5
+          yaw: 90.0
+          pitch: 0.0
+      RED:
+        spawnLocation:
+          x: -10.5
+          y: 100.0
+          z: 0.5
+          yaw: -90.0
+          pitch: 0.0
+    nexus:
+      BLUE:
+        location:
+          x: 20.0
+          y: 100.0
+          z: 0.0
+        maxHealth: 100.0
+      RED:
+        location:
+          x: -20.0
+          y: 100.0
+          z: 0.0
+        maxHealth: 100.0
+    captures:
+      mid:
+        centerLocation:
+          x: 0.5
+          y: 100.0
+          z: 0.5
+        radius: 8.0
