@@ -5,6 +5,7 @@ import fr.heneria.nexus.game.team.GameTeam;
 import fr.heneria.nexus.holo.HoloService;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
+import net.kyori.adventure.text.format.TextColor;
 import org.bukkit.Location;
 import org.bukkit.Particle;
 import org.bukkit.Sound;
@@ -65,9 +66,11 @@ public class NexusCore {
 
     private void onDestroy() {
         // Temporary end game logic
+        Component teamName = owner != null ? Component.text(owner.getName(), owner.getColor()) : Component.text("Neutre", NamedTextColor.WHITE);
+
         plugin.getServer().broadcast(
-                Component.text("Le Nexus de l'équipe ", NamedTextColor.YELLOW)
-                        .append(Component.text(owner.getName(), owner.getColor()))
+                Component.text("Le Nexus ", NamedTextColor.YELLOW)
+                        .append(teamName)
                         .append(Component.text(" a été détruit !", NamedTextColor.YELLOW))
         );
         // Trigger game end in GameManager (todo)
@@ -75,7 +78,8 @@ public class NexusCore {
     }
 
     private Component getHologramText() {
-        return Component.text("Nexus : ", owner.getColor())
+        TextColor color = owner != null ? owner.getColor() : NamedTextColor.WHITE;
+        return Component.text("Nexus : ", color)
                 .append(Component.text((int)currentHealth + "/" + (int)maxHealth + " ❤", NamedTextColor.WHITE));
     }
 }

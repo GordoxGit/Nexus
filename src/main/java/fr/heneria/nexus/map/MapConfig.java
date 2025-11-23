@@ -52,9 +52,12 @@ public class MapConfig {
                 for (String teamKey : teamsSec.getKeys(false)) {
                     try {
                         GameTeam team = GameTeam.valueOf(teamKey.toUpperCase());
-                        ConfigurationSection locSec = teamsSec.getConfigurationSection(teamKey + ".spawnLocation");
-                        if (locSec != null) {
-                            teamSpawns.put(team, loadLocation(locSec));
+                        ConfigurationSection teamSec = teamsSec.getConfigurationSection(teamKey);
+                        if (teamSec != null) {
+                            NexusMap.ConfigLocation loc = parseConfigLocation(teamSec, "spawn");
+                            if (loc != null) {
+                                teamSpawns.put(team, loc);
+                            }
                         }
                     } catch (IllegalArgumentException ignored) {
                         plugin.getLogger().warning("Invalid team in map config: " + teamKey);
@@ -62,23 +65,15 @@ public class MapConfig {
                 }
             }
 
-            // Load Nexus
-            Map<GameTeam, NexusMap.NexusConfig> nexusConfigs = new HashMap<>();
+            // Load Nexus (Single)
+            NexusMap.NexusConfig nexusConfig = null;
             if (section.isConfigurationSection("nexus")) {
-                ConfigurationSection nexusSec = section.getConfigurationSection("nexus");
-                for (String teamKey : nexusSec.getKeys(false)) {
-                    try {
-                        GameTeam team = GameTeam.valueOf(teamKey.toUpperCase());
-                        ConfigurationSection nSec = nexusSec.getConfigurationSection(teamKey);
-                        if (nSec != null) {
-                            ConfigurationSection locSec = nSec.getConfigurationSection("location");
-                            double hp = nSec.getDouble("maxHealth", 100);
-                            if (locSec != null) {
-                                nexusConfigs.put(team, new NexusMap.NexusConfig(loadLocation(locSec), hp));
-                            }
-                        }
-                    } catch (IllegalArgumentException ignored) {
-                        plugin.getLogger().warning("Invalid team in nexus config: " + teamKey);
+                ConfigurationSection nSec = section.getConfigurationSection("nexus");
+                if (nSec != null) {
+                    NexusMap.ConfigLocation loc = parseConfigLocation(nSec, "location");
+                    double hp = nSec.getDouble("maxHealth", 100);
+                    if (loc != null) {
+                        nexusConfig = new NexusMap.NexusConfig(loc, hp);
                     }
                 }
             }
@@ -90,27 +85,32 @@ public class MapConfig {
                 for (String capKey : capsSec.getKeys(false)) {
                     ConfigurationSection cSec = capsSec.getConfigurationSection(capKey);
                     if (cSec != null) {
-                        ConfigurationSection locSec = cSec.getConfigurationSection("centerLocation");
+                        NexusMap.ConfigLocation loc = parseConfigLocation(cSec, "location");
                         double radius = cSec.getDouble("radius", 10);
-                        if (locSec != null) {
-                            captureConfigs.add(new NexusMap.CaptureConfig(capKey, loadLocation(locSec), radius));
+                        if (loc != null) {
+                            captureConfigs.add(new NexusMap.CaptureConfig(capKey, loc, radius));
                         }
                     }
                 }
             }
 
-            maps.put(key, new NexusMap(key, name, description, sourceFolder, teamSpawns, nexusConfigs, captureConfigs));
+            maps.put(key, new NexusMap(key, name, description, sourceFolder, teamSpawns, nexusConfig, captureConfigs));
         }
     }
 
-    private NexusMap.ConfigLocation loadLocation(ConfigurationSection sec) {
-        return new NexusMap.ConfigLocation(
-                sec.getDouble("x"),
-                sec.getDouble("y"),
-                sec.getDouble("z"),
-                (float) sec.getDouble("yaw", 0),
-                (float) sec.getDouble("pitch", 0)
-        );
+    private NexusMap.ConfigLocation parseConfigLocation(ConfigurationSection section, String path) {
+        if (section.isList(path)) {
+            List<Double> coords = section.getDoubleList(path);
+            if (coords.size() >= 3) {
+                 double x = coords.get(0);
+                 double y = coords.get(1);
+                 double z = coords.get(2);
+                 float yaw = (float) section.getDouble("yaw", 0.0);
+                 float pitch = (float) section.getDouble("pitch", 0.0);
+                 return new NexusMap.ConfigLocation(x, y, z, yaw, pitch);
+            }
+        }
+        return null;
     }
 
     public NexusMap getMap(String id) {
@@ -132,11 +132,10 @@ public class MapConfig {
             section = config.createSection(fullPath);
         }
 
-        // Ensure map entry exists with basic fields if creating new
         if (!config.contains("maps." + mapId + ".name")) {
             config.set("maps." + mapId + ".name", mapId);
             config.set("maps." + mapId + ".description", "Created via Setup Editor");
-            config.set("maps." + mapId + ".sourceFolder", mapId); // Assumption
+            config.set("maps." + mapId + ".sourceFolder", mapId);
         }
 
         LocationUtils.saveLocation(section, loc);
@@ -144,7 +143,7 @@ public class MapConfig {
         try {
             config.save(configFile);
             if (reload) {
-                load(); // Reload maps to reflect changes
+                load();
             }
         } catch (IOException e) {
             plugin.getLogger().severe("Failed to save maps.yml: " + e.getMessage());
