@@ -1,6 +1,7 @@
 package fr.heneria.nexus.commands;
 
 import fr.heneria.nexus.NexusPlugin;
+import fr.heneria.nexus.commands.subcommands.SetupCommand;
 import fr.heneria.nexus.game.GameState;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
@@ -21,15 +22,29 @@ import java.util.stream.Collectors;
 public class NexusCommand implements CommandExecutor {
 
     private final NexusPlugin plugin;
+    private final SetupCommand setupCommand;
 
     public NexusCommand(NexusPlugin plugin) {
         this.plugin = plugin;
+        this.setupCommand = new SetupCommand(plugin);
     }
 
     @Override
     public boolean onCommand(@NotNull CommandSender sender, @NotNull Command command, @NotNull String label, @NotNull String[] args) {
         if (args.length == 0) {
+            // Default to help if no args? Or return false to show usage
+            // The ticket says "Si arg 0 : Proposer game, map, holo, setup, help." in tab completion.
+            // But if empty, we can just return false.
             return false;
+        }
+
+        if (args[0].equalsIgnoreCase("help")) {
+            MiniMessage mm = MiniMessage.miniMessage();
+            sender.sendMessage(mm.deserialize("<gradient:#00E7FF:#7A00FF><bold>NEXUS HELP</bold></gradient>"));
+            sender.sendMessage(mm.deserialize("<gray>/nexus game <start|stop></gray> - <white>Gérer la partie</white>"));
+            sender.sendMessage(mm.deserialize("<gray>/nexus map <load|unload></gray> - <white>Charger un monde</white>"));
+            sender.sendMessage(mm.deserialize("<gray>/nexus setup editor <map_id></gray> - <white>Ouvrir le GUI de config</white>"));
+            return true;
         }
 
         // /nexus debug setstate <state>
@@ -105,6 +120,17 @@ public class NexusCommand implements CommandExecutor {
                 plugin.getHoloService().createHologram(player.getLocation(), Collections.singletonList(component));
                 sender.sendMessage(Component.text("Hologram created.", NamedTextColor.GREEN));
                 return true;
+            }
+        }
+        // /nexus setup editor <map_id>
+        else if (args[0].equalsIgnoreCase("setup")) {
+            // Forward relevant arguments to SetupCommand
+            // args[0] is "setup", so we pass the subarray from index 1
+            if (args.length > 1) {
+                return setupCommand.execute(sender, Arrays.copyOfRange(args, 1, args.length));
+            } else {
+                 sender.sendMessage(Component.text("Usage: /nexus setup editor <map_id>", NamedTextColor.RED));
+                 return true;
             }
         }
 

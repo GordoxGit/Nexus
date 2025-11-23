@@ -49,23 +49,34 @@ public class GameManager {
     }
 
     private void handleStarting() {
+        NexusMap map = plugin.getMapManager().getMapConfig().getMap("default_arena");
+        if (map == null) {
+            plugin.getLogger().warning("Aucune map configurée. Utilisez /nexus setup editor <nom> pour en créer une.");
+            // Revert state or stay in LOBBY? Ideally revert to LOBBY to allow retry
+            // But if we are in STARTING, we might have been triggered.
+            // The instruction says "Empêcher le passage à l'état STARTING tant qu'une map valide n'est pas chargée."
+            // But setState checks happen here. If we are already in handleStarting, we are in STARTING.
+            // So we should probably revert to LOBBY.
+            // However, this is inside handleStarting which is called AFTER state change.
+            // So we should change state back to LOBBY safely.
+            plugin.getServer().getScheduler().runTask(plugin, () -> this.setState(GameState.LOBBY));
+            return;
+        }
+
         plugin.getMapManager().loadMap("default_arena").thenAccept(world -> {
              plugin.getLogger().info("Map loaded for game start.");
 
-             NexusMap map = plugin.getMapManager().getMapConfig().getMap("default_arena");
-             if (map != null) {
-                 // Ensure we are on main thread for Bukkit API calls
-                 plugin.getServer().getScheduler().runTask(plugin, () -> {
-                     plugin.getObjectiveManager().loadObjectives(map, world);
-                     // Automatically transition to PLAYING
-                     setState(GameState.PLAYING);
-                 });
-             } else {
-                 plugin.getLogger().severe("Map config not found for default_arena");
-             }
+             // Ensure we are on main thread for Bukkit API calls
+             plugin.getServer().getScheduler().runTask(plugin, () -> {
+                 plugin.getObjectiveManager().loadObjectives(map, world);
+                 // Automatically transition to PLAYING
+                 setState(GameState.PLAYING);
+             });
 
         }).exceptionally(e -> {
             plugin.getLogger().severe("Failed to load map: " + e.getMessage());
+            // Revert to LOBBY on failure
+            plugin.getServer().getScheduler().runTask(plugin, () -> this.setState(GameState.LOBBY));
             return null;
         });
     }
