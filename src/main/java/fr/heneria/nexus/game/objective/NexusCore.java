@@ -28,6 +28,15 @@ public class NexusCore {
     private double currentHealth;
     private UUID hologramId;
 
+    public enum State {
+        PROTECTED,
+        VULNERABLE
+    }
+
+    @Getter
+    private State state = State.PROTECTED;
+    private int shieldLayers = 2;
+
     public NexusCore(NexusPlugin plugin, Location location, GameTeam owner, double maxHealth) {
         this.plugin = plugin;
         this.location = location;
@@ -44,7 +53,29 @@ public class NexusCore {
         ));
     }
 
+    public void overload() {
+        if (state == State.VULNERABLE) return;
+
+        shieldLayers--;
+        if (shieldLayers <= 0) {
+            state = State.VULNERABLE;
+            location.getWorld().spawnParticle(Particle.EXPLOSION_EMITTER, location.clone().add(0.5, 0.5, 0.5), 1);
+            plugin.getServer().broadcast(Component.text("Le Nexus est désormais VULNÉRABLE !", NamedTextColor.RED));
+        } else {
+            location.getWorld().playSound(location, Sound.BLOCK_BEACON_DEACTIVATE, 1f, 1f);
+        }
+
+        if (hologramId != null) {
+            plugin.getHoloService().updateLine(hologramId, 0, getHologramText());
+        }
+    }
+
     public void damage(double amount, Player attacker) {
+        if (state == State.PROTECTED) {
+            location.getWorld().playSound(location, Sound.BLOCK_ANVIL_LAND, 1f, 0.5f);
+            return;
+        }
+
         if (currentHealth <= 0) return;
 
         currentHealth -= amount;
@@ -79,7 +110,13 @@ public class NexusCore {
 
     private Component getHologramText() {
         TextColor color = owner != null ? owner.getColor() : NamedTextColor.WHITE;
-        return Component.text("Nexus : ", color)
-                .append(Component.text((int)currentHealth + "/" + (int)maxHealth + " ❤", NamedTextColor.WHITE));
+        Component status;
+        if (state == State.PROTECTED) {
+            status = Component.text("PROTECTED (" + shieldLayers + ")", NamedTextColor.GOLD);
+        } else {
+            status = Component.text((int)currentHealth + "/" + (int)maxHealth + " ❤", NamedTextColor.WHITE);
+        }
+
+        return Component.text("Nexus : ", color).append(status);
     }
 }

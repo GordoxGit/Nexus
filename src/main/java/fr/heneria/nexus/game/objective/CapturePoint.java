@@ -3,11 +3,14 @@ package fr.heneria.nexus.game.objective;
 import fr.heneria.nexus.NexusPlugin;
 import fr.heneria.nexus.game.team.GameTeam;
 import fr.heneria.nexus.game.team.TeamManager;
+import fr.heneria.nexus.utils.ItemBuilder;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Location;
+import org.bukkit.Material;
 import org.bukkit.Particle;
 import org.bukkit.entity.Player;
+import org.bukkit.inventory.ItemStack;
 import org.bukkit.util.BoundingBox;
 import lombok.Getter;
 
@@ -113,8 +116,16 @@ public class CapturePoint implements Runnable {
             if (owningTeam != capturingTeam) {
                 owningTeam = capturingTeam;
                 plugin.getServer().broadcast(Component.text("La zone " + id + " a été capturée par " + owningTeam.getName() + " !", owningTeam.getColor()));
+                spawnCellule();
             }
         }
+    }
+
+    private void spawnCellule() {
+        ItemStack cell = new ItemBuilder(Material.BEACON)
+                .name(Component.text("Cellule d'Énergie", NamedTextColor.GOLD))
+                .build();
+        center.getWorld().dropItemNaturally(center.clone().add(0, 1, 0), cell);
     }
 
     private void updateVisuals() {

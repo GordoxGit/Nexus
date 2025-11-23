@@ -62,6 +62,12 @@ public class SetupGUI implements InventoryHolder {
                 .name(Component.text("Sauvegarder & Recharger", NamedTextColor.GREEN))
                 .lore(Component.text("Appliquer les modifications", NamedTextColor.GRAY))
                 .build());
+
+        // Slot 24: Ajouter Cellule
+        inventory.setItem(24, new ItemBuilder(Material.GOLD_BLOCK)
+                .name(Component.text("Ajouter une Cellule", NamedTextColor.GOLD))
+                .lore(Component.text("Clic pour ajouter une zone de capture ici", NamedTextColor.GRAY))
+                .build());
     }
 
     public void open(Player player) {
