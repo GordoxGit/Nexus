@@ -3,6 +3,7 @@ package fr.heneria.nexus.commands;
 import fr.heneria.nexus.NexusPlugin;
 import fr.heneria.nexus.commands.subcommands.SetupCommand;
 import fr.heneria.nexus.game.GameState;
+import fr.heneria.nexus.map.NexusMap;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.minimessage.MiniMessage;
@@ -50,16 +51,29 @@ public class NexusCommand implements CommandExecutor {
         // /nexus debug setstate <state>
         if (args[0].equalsIgnoreCase("debug")) {
             if (!sender.hasPermission("nexus.admin")) {
-                sender.sendMessage(Component.text("You do not have permission to use this command.", NamedTextColor.RED));
+                sender.sendMessage(Component.text("Vous n'avez pas la permission d'utiliser cette commande.", NamedTextColor.RED));
                 return true;
             }
             if (args.length >= 3 && args[1].equalsIgnoreCase("setstate")) {
                 try {
                     GameState state = GameState.valueOf(args[2].toUpperCase());
+
+                    if (state == GameState.STARTING) {
+                        NexusMap activeMap = plugin.getGameManager().getActiveMap();
+                        if (activeMap == null) {
+                            sender.sendMessage(Component.text("Impossible de passer en STARTING : aucune map active.", NamedTextColor.RED));
+                            return true;
+                        }
+                        if (plugin.getMapManager().getCurrentWorld() == null) {
+                            sender.sendMessage(Component.text("Impossible de passer en STARTING : le monde de la map n'est pas chargé.", NamedTextColor.RED));
+                            return true;
+                        }
+                    }
+
                     plugin.getGameManager().setState(state);
-                    sender.sendMessage(Component.text("Game state set to " + state, NamedTextColor.GREEN));
+                    sender.sendMessage(Component.text("Etat du jeu défini sur " + state, NamedTextColor.GREEN));
                 } catch (IllegalArgumentException e) {
-                    sender.sendMessage(Component.text("Invalid game state.", NamedTextColor.RED));
+                    sender.sendMessage(Component.text("Etat du jeu invalide.", NamedTextColor.RED));
                 }
                 return true;
             }
@@ -70,7 +84,7 @@ public class NexusCommand implements CommandExecutor {
                 if (sender instanceof Player player) {
                     plugin.getClassManager().equipClass(player, args[2]);
                 } else {
-                    sender.sendMessage(Component.text("Only players can choose a class.", NamedTextColor.RED));
+                    sender.sendMessage(Component.text("Seuls les joueurs peuvent choisir une classe.", NamedTextColor.RED));
                 }
                 return true;
             }
@@ -79,46 +93,46 @@ public class NexusCommand implements CommandExecutor {
         // /nexus map unload
         else if (args[0].equalsIgnoreCase("map")) {
             if (!sender.hasPermission("nexus.admin")) {
-                sender.sendMessage(Component.text("You do not have permission to use this command.", NamedTextColor.RED));
+                sender.sendMessage(Component.text("Vous n'avez pas la permission d'utiliser cette commande.", NamedTextColor.RED));
                 return true;
             }
             if (args.length >= 3 && args[1].equalsIgnoreCase("load")) {
                 String template = args[2];
-                sender.sendMessage(Component.text("Loading map " + template + "...", NamedTextColor.YELLOW));
+                sender.sendMessage(Component.text("Chargement de la map " + template + "...", NamedTextColor.YELLOW));
                 plugin.getMapManager().loadMap(template).thenAccept(world -> {
-                    sender.sendMessage(Component.text("Map loaded: " + world.getName(), NamedTextColor.GREEN));
+                    sender.sendMessage(Component.text("Map chargée : " + world.getName(), NamedTextColor.GREEN));
                     if (sender instanceof Player player) {
                         plugin.getServer().getScheduler().runTask(plugin, () -> {
                              player.teleport(world.getSpawnLocation());
                         });
                     }
                 }).exceptionally(e -> {
-                    sender.sendMessage(Component.text("Failed to load map: " + e.getMessage(), NamedTextColor.RED));
+                    sender.sendMessage(Component.text("Echec du chargement de la map : " + e.getMessage(), NamedTextColor.RED));
                     return null;
                 });
                 return true;
             } else if (args.length >= 2 && args[1].equalsIgnoreCase("unload")) {
-                sender.sendMessage(Component.text("Unloading map...", NamedTextColor.YELLOW));
+                sender.sendMessage(Component.text("Déchargement de la map...", NamedTextColor.YELLOW));
                 plugin.getMapManager().unloadWorld();
-                sender.sendMessage(Component.text("Map unloaded.", NamedTextColor.GREEN));
+                sender.sendMessage(Component.text("Map déchargée.", NamedTextColor.GREEN));
                 return true;
             }
         }
         // /nexus holo create <text>
         else if (args[0].equalsIgnoreCase("holo")) {
             if (!sender.hasPermission("nexus.admin")) {
-                sender.sendMessage(Component.text("You do not have permission to use this command.", NamedTextColor.RED));
+                sender.sendMessage(Component.text("Vous n'avez pas la permission d'utiliser cette commande.", NamedTextColor.RED));
                 return true;
             }
             if (args.length >= 3 && args[1].equalsIgnoreCase("create")) {
                 if (!(sender instanceof Player player)) {
-                    sender.sendMessage(Component.text("Only players can create holograms.", NamedTextColor.RED));
+                    sender.sendMessage(Component.text("Seuls les joueurs peuvent créer des hologrammes.", NamedTextColor.RED));
                     return true;
                 }
                 String text = String.join(" ", Arrays.copyOfRange(args, 2, args.length));
                 Component component = MiniMessage.miniMessage().deserialize(text);
                 plugin.getHoloService().createHologram(player.getLocation(), Collections.singletonList(component));
-                sender.sendMessage(Component.text("Hologram created.", NamedTextColor.GREEN));
+                sender.sendMessage(Component.text("Hologramme créé.", NamedTextColor.GREEN));
                 return true;
             }
         }
