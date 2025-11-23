@@ -37,7 +37,7 @@ public class GuiListener implements Listener {
                 player.sendMessage(Component.text("Spawn Bleu enregistré.", NamedTextColor.BLUE));
                 break;
             case 13: // Nexus
-                Location nexusLoc = loc.clone().subtract(0, 1, 0); // Block under player
+                Location nexusLoc = loc.clone().add(0, 1.5, 0); // Float above player
                 nexusLoc.setYaw(0);
                 nexusLoc.setPitch(0);
 
