@@ -2,11 +2,14 @@ package fr.heneria.nexus.map;
 
 import fr.heneria.nexus.NexusPlugin;
 import fr.heneria.nexus.game.team.GameTeam;
+import fr.heneria.nexus.utils.LocationUtils;
+import org.bukkit.Location;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
 
 import java.io.File;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -116,5 +119,33 @@ public class MapConfig {
 
     public Map<String, NexusMap> getMaps() {
         return maps;
+    }
+
+    public void saveMapLocation(String mapId, String path, Location loc) {
+        if (config == null) {
+            config = YamlConfiguration.loadConfiguration(configFile);
+        }
+
+        String fullPath = "maps." + mapId + "." + path;
+        ConfigurationSection section = config.getConfigurationSection(fullPath);
+        if (section == null) {
+            section = config.createSection(fullPath);
+        }
+
+        // Ensure map entry exists with basic fields if creating new
+        if (!config.contains("maps." + mapId + ".name")) {
+            config.set("maps." + mapId + ".name", mapId);
+            config.set("maps." + mapId + ".description", "Created via Setup Editor");
+            config.set("maps." + mapId + ".sourceFolder", mapId); // Assumption
+        }
+
+        LocationUtils.saveLocation(section, loc);
+
+        try {
+            config.save(configFile);
+            load(); // Reload maps to reflect changes
+        } catch (IOException e) {
+            plugin.getLogger().severe("Failed to save maps.yml: " + e.getMessage());
+        }
     }
 }
