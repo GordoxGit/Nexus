@@ -120,7 +120,9 @@ public class GameManager {
             if (map.getTeamSpawns() != null && map.getTeamSpawns().containsKey(team)) {
                 teamSpawn = map.getTeamSpawns().get(team).toLocation(world);
             }
-            p.teleport(teamSpawn);
+
+            plugin.getLogger().info("[Nexus] Teleporting player " + p.getName() + " to " + team.getName() + " spawn: " + teamSpawn.toVector() + " in world " + teamSpawn.getWorld().getName());
+            p.teleportAsync(teamSpawn);
 
             // Give kit (TODO: using ClassManager later, for now just empty)
         }

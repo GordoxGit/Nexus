@@ -35,6 +35,7 @@ public class CapturePoint implements Runnable {
     private GameTeam owningTeam = null;
     private GameTeam capturingTeam = null;
     private double captureProgress = 0.0; // 0 to 100
+    private boolean spawning = false;
     private UUID hologramId;
 
     public CapturePoint(NexusPlugin plugin, String id, Location center, double radius, int respawnTime) {
@@ -113,8 +114,9 @@ public class CapturePoint implements Runnable {
             }
         }
 
-        if (captureProgress >= 100) {
+        if (captureProgress >= 100 && !spawning) {
             captureProgress = 100;
+            spawning = true;
             // Capture complete
             completeCapture(dominantTeam);
         }
@@ -180,6 +182,7 @@ public class CapturePoint implements Runnable {
         owningTeam = null;
         capturingTeam = null;
         captureProgress = 0;
+        spawning = false;
         spawn();
     }
 

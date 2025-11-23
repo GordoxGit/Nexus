@@ -56,13 +56,22 @@ public class NexusCore {
 
     public void spawn() {
         // Spawn BlockDisplay
-        Location spawnLoc = location.clone().add(0.5, 0.5, 0.5); // Center block
+        // Center horizontally (0.5, 0.5) and raise vertically to float (1.5)
+        Location spawnLoc = location.clone().add(0.5, 1.5, 0.5);
         displayEntity = (BlockDisplay) spawnLoc.getWorld().spawnEntity(spawnLoc, EntityType.BLOCK_DISPLAY);
         displayEntity.setBlock(Material.BEACON.createBlockData());
+
+        // Scale 1.0 and center the block relative to the entity pivot (which is at the feet of the entity)
+        // The entity is at x.5, y+1.5, z.5
+        // To center the block (1x1x1) on this pivot, we need to translate it by -0.5, -0.5, -0.5?
+        // Standard block display pivot is 0,0,0 (corner).
+        // Entity pivot is at its location.
+        // If we want the block center to be at Entity Location:
+        // We translate by -0.5, -0.5, -0.5.
         displayEntity.setTransformation(new Transformation(
                 new Vector3f(-0.5f, -0.5f, -0.5f), // Translation to center the block
                 new AxisAngle4f(0, 0, 1, 0), // Rotation left
-                new Vector3f(1f, 1f, 1f), // Scale
+                new Vector3f(1.0f, 1.0f, 1.0f), // Scale
                 new AxisAngle4f(0, 0, 1, 0) // Rotation right
         ));
 
