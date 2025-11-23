@@ -10,6 +10,7 @@ import org.bukkit.Location;
 import org.bukkit.World;
 import org.bukkit.entity.Player;
 import lombok.Getter;
+import lombok.Setter;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -19,6 +20,8 @@ public class GameManager {
     private final NexusPlugin plugin;
     @Getter
     private GameState state;
+    @Getter @Setter
+    private NexusMap activeMap;
 
     public GameManager(NexusPlugin plugin) {
         this.plugin = plugin;
@@ -49,36 +52,38 @@ public class GameManager {
     }
 
     private void handleStarting() {
-        NexusMap map = plugin.getMapManager().getMapConfig().getMap("default_arena");
-        if (map == null) {
-            plugin.getLogger().warning("Aucune map configurée. Utilisez /nexus setup editor <nom> pour en créer une.");
-            // Revert state or stay in LOBBY? Ideally revert to LOBBY to allow retry
-            // But if we are in STARTING, we might have been triggered.
-            // The instruction says "Empêcher le passage à l'état STARTING tant qu'une map valide n'est pas chargée."
-            // But setState checks happen here. If we are already in handleStarting, we are in STARTING.
-            // So we should probably revert to LOBBY.
-            // However, this is inside handleStarting which is called AFTER state change.
-            // So we should change state back to LOBBY safely.
+        if (activeMap == null) {
+            plugin.getLogger().warning("Aucune map active. Veuillez charger une map avec /nexus map load.");
             plugin.getServer().getScheduler().runTask(plugin, () -> this.setState(GameState.LOBBY));
             return;
         }
 
-        plugin.getMapManager().loadMap("default_arena").thenAccept(world -> {
-             plugin.getLogger().info("Map loaded for game start.");
+        // If the map is already loaded via map load, we should reuse the current world
+        World activeWorld = plugin.getMapManager().getCurrentWorld();
 
-             // Ensure we are on main thread for Bukkit API calls
-             plugin.getServer().getScheduler().runTask(plugin, () -> {
-                 plugin.getObjectiveManager().loadObjectives(map, world);
-                 // Automatically transition to PLAYING
-                 setState(GameState.PLAYING);
+        if (activeWorld == null) {
+             // Fallback: Try to load it if not loaded?
+             // The ticket says "La commande /nexus map load charge le monde... faire /nexus debug setstate STARTING juste après fonctionne"
+             // So it implies the world should already be loaded.
+             // But just in case, we can try loading it.
+             plugin.getLogger().info("World not loaded, loading map " + activeMap.getId());
+             plugin.getMapManager().loadMap(activeMap.getId()).thenAccept(world -> {
+                 plugin.getServer().getScheduler().runTask(plugin, () -> {
+                     plugin.getObjectiveManager().loadObjectives(activeMap, world);
+                     setState(GameState.PLAYING);
+                 });
+             }).exceptionally(e -> {
+                plugin.getLogger().severe("Failed to load map: " + e.getMessage());
+                plugin.getServer().getScheduler().runTask(plugin, () -> this.setState(GameState.LOBBY));
+                return null;
              });
+             return;
+        }
 
-        }).exceptionally(e -> {
-            plugin.getLogger().severe("Failed to load map: " + e.getMessage());
-            // Revert to LOBBY on failure
-            plugin.getServer().getScheduler().runTask(plugin, () -> this.setState(GameState.LOBBY));
-            return null;
-        });
+        plugin.getObjectiveManager().loadObjectives(activeMap, activeWorld);
+        // Automatically transition to PLAYING
+        // Maybe add a countdown here? For now, immediate transition as per previous code style
+        plugin.getServer().getScheduler().runTaskLater(plugin, () -> setState(GameState.PLAYING), 20L); // Small delay
     }
 
     private void handlePlaying() {
@@ -88,7 +93,13 @@ public class GameManager {
             return;
         }
 
-        NexusMap map = plugin.getMapManager().getMapConfig().getMap("default_arena");
+        NexusMap map = activeMap;
+        if (map == null) {
+            // Should not happen if we came from STARTING
+             plugin.getLogger().severe("Active map is null!");
+             return;
+        }
+
         Location fallbackSpawn = new Location(world, 0.5, 100, 0.5);
 
         // Assign Teams
@@ -106,7 +117,7 @@ public class GameManager {
 
             // Teleport to Team Spawn
             Location teamSpawn = fallbackSpawn;
-            if (map != null && map.getTeamSpawns() != null && map.getTeamSpawns().containsKey(team)) {
+            if (map.getTeamSpawns() != null && map.getTeamSpawns().containsKey(team)) {
                 teamSpawn = map.getTeamSpawns().get(team).toLocation(world);
             }
             p.teleport(teamSpawn);
@@ -121,6 +132,8 @@ public class GameManager {
         // Start Objective Loops
         plugin.getObjectiveManager().startLoops();
 
+        // Ideally this hologram logic should be dynamic or managed by ObjectiveManager/HoloService better
+        // But keeping it here as per previous code logic
         plugin.getHoloService().createHologram(fallbackSpawn, Collections.singletonList(
                 Component.text("Bienvenue sur Nexus", NamedTextColor.AQUA)
         ));
@@ -141,5 +154,6 @@ public class GameManager {
 
         plugin.getHoloService().removeAll();
         plugin.getMapManager().unloadWorld();
+        this.activeMap = null;
     }
 }

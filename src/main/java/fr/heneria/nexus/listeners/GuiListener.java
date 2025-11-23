@@ -54,18 +54,22 @@ public class GuiListener implements Listener {
                 player.sendMessage(Component.text("Spawn Rouge enregistré en mémoire (N'oubliez pas de sauvegarder).", NamedTextColor.RED));
                 break;
             case 22: // Save & Reload
+                // Save individually without reloading
                 if (gui.getBlueSpawn() != null) {
-                    plugin.getMapManager().getMapConfig().saveMapLocation(mapId, "teams.BLUE.spawnLocation", gui.getBlueSpawn());
+                    plugin.getMapManager().getMapConfig().saveMapLocation(mapId, "teams.BLUE.spawnLocation", gui.getBlueSpawn(), false);
                 }
                 if (gui.getRedSpawn() != null) {
-                    plugin.getMapManager().getMapConfig().saveMapLocation(mapId, "teams.RED.spawnLocation", gui.getRedSpawn());
+                    plugin.getMapManager().getMapConfig().saveMapLocation(mapId, "teams.RED.spawnLocation", gui.getRedSpawn(), false);
                 }
                 if (gui.getBlueNexus() != null) {
-                    plugin.getMapManager().getMapConfig().saveMapLocation(mapId, "nexus.BLUE.location", gui.getBlueNexus());
+                    plugin.getMapManager().getMapConfig().saveMapLocation(mapId, "nexus.BLUE.location", gui.getBlueNexus(), false);
                 }
                 if (gui.getRedNexus() != null) {
-                    plugin.getMapManager().getMapConfig().saveMapLocation(mapId, "nexus.RED.location", gui.getRedNexus());
+                    plugin.getMapManager().getMapConfig().saveMapLocation(mapId, "nexus.RED.location", gui.getRedNexus(), false);
                 }
+
+                // Reload once at the end
+                plugin.getMapManager().getMapConfig().load();
 
                 player.sendMessage(Component.text("Configuration sauvegardée et rechargée.", NamedTextColor.GREEN));
                 player.closeInventory();

@@ -47,8 +47,8 @@ public class MapConfig {
 
             // Load Teams Spawn
             Map<GameTeam, NexusMap.ConfigLocation> teamSpawns = new HashMap<>();
-            ConfigurationSection teamsSec = section.getConfigurationSection("teams");
-            if (teamsSec != null) {
+            if (section.isConfigurationSection("teams")) {
+                ConfigurationSection teamsSec = section.getConfigurationSection("teams");
                 for (String teamKey : teamsSec.getKeys(false)) {
                     try {
                         GameTeam team = GameTeam.valueOf(teamKey.toUpperCase());
@@ -64,8 +64,8 @@ public class MapConfig {
 
             // Load Nexus
             Map<GameTeam, NexusMap.NexusConfig> nexusConfigs = new HashMap<>();
-            ConfigurationSection nexusSec = section.getConfigurationSection("nexus");
-            if (nexusSec != null) {
+            if (section.isConfigurationSection("nexus")) {
+                ConfigurationSection nexusSec = section.getConfigurationSection("nexus");
                 for (String teamKey : nexusSec.getKeys(false)) {
                     try {
                         GameTeam team = GameTeam.valueOf(teamKey.toUpperCase());
@@ -85,8 +85,8 @@ public class MapConfig {
 
             // Load Captures
             List<NexusMap.CaptureConfig> captureConfigs = new ArrayList<>();
-            ConfigurationSection capsSec = section.getConfigurationSection("captures");
-            if (capsSec != null) {
+            if (section.isConfigurationSection("captures")) {
+                ConfigurationSection capsSec = section.getConfigurationSection("captures");
                 for (String capKey : capsSec.getKeys(false)) {
                     ConfigurationSection cSec = capsSec.getConfigurationSection(capKey);
                     if (cSec != null) {
@@ -121,7 +121,7 @@ public class MapConfig {
         return maps;
     }
 
-    public void saveMapLocation(String mapId, String path, Location loc) {
+    public void saveMapLocation(String mapId, String path, Location loc, boolean reload) {
         if (config == null) {
             config = YamlConfiguration.loadConfiguration(configFile);
         }
@@ -143,9 +143,15 @@ public class MapConfig {
 
         try {
             config.save(configFile);
-            load(); // Reload maps to reflect changes
+            if (reload) {
+                load(); // Reload maps to reflect changes
+            }
         } catch (IOException e) {
             plugin.getLogger().severe("Failed to save maps.yml: " + e.getMessage());
         }
+    }
+
+    public void saveMapLocation(String mapId, String path, Location loc) {
+        saveMapLocation(mapId, path, loc, true);
     }
 }

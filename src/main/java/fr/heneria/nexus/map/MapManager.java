@@ -77,6 +77,10 @@ public class MapManager {
 
                     this.currentWorld = world;
                     this.currentMap = map;
+
+                    // Set active map in GameManager
+                    plugin.getGameManager().setActiveMap(map);
+
                     future.complete(world);
                     plugin.getLogger().info("Map " + map.getName() + " loaded successfully!");
                 } else {
@@ -102,6 +106,9 @@ public class MapManager {
             plugin.getLogger().info("World " + worldName + " unloaded.");
             currentWorld = null;
             currentMap = null;
+            // Should we clear active map in GameManager? Yes, done in handleEnd, but if unloaded manually via map unload?
+            // The command map unload calls this. So we should update GameManager too.
+            plugin.getGameManager().setActiveMap(null);
 
             plugin.getServer().getScheduler().runTaskAsynchronously(plugin, () -> {
                 try {
