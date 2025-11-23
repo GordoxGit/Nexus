@@ -33,23 +33,19 @@ public class ObjectiveManager {
         nexusList.clear();
         capturePoints.clear();
 
-        // Load Nexus
-        if (map.getNexusConfigs() != null) {
-            for (Map.Entry<GameTeam, NexusMap.NexusConfig> entry : map.getNexusConfigs().entrySet()) {
-                GameTeam team = entry.getKey();
-                NexusMap.NexusConfig config = entry.getValue();
-                Location loc = config.getLocation().toLocation(world);
+        // Load Nexus (Single)
+        if (map.getNexusConfig() != null) {
+            NexusMap.NexusConfig config = map.getNexusConfig();
+            Location loc = config.getLocation().toLocation(world);
 
-                // Place Beacon block (visual)
-                Block block = loc.getBlock();
-                block.setType(Material.BEACON);
-                // Maybe put glass below/above for color? But spec says Beacon or Obsidian.
-                // Leaving as Beacon.
+            // Place Beacon block (visual)
+            Block block = loc.getBlock();
+            block.setType(Material.BEACON);
 
-                NexusCore nexus = new NexusCore(plugin, loc, team, config.getMaxHealth());
-                nexusList.add(nexus);
-                nexus.spawn();
-            }
+            // Pass null for owner as it is a central Nexus
+            NexusCore nexus = new NexusCore(plugin, loc, null, config.getMaxHealth());
+            nexusList.add(nexus);
+            nexus.spawn();
         }
 
         // Load Captures

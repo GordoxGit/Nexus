@@ -1,40 +1,33 @@
 maps:
-  default_arena:
+  arena1:
     name: "Arène Principale"
     description: "L'arène de combat classique."
-    sourceFolder: "arena_1"
+    sourceFolder: "arena1"
+
+    # Section Équipes (Isolée pour éviter le bug)
     teams:
       BLUE:
-        spawnLocation:
-          x: 10.5
-          y: 100.0
-          z: 0.5
-          yaw: 90.0
-          pitch: 0.0
+        name: "<blue>Équipe Bleue</blue>"
+        color: BLUE
+        spawn: [-0.5, 42.0, 59.4]  # Coordonnées Spawn Bleu (Image 1)
+        yaw: 180.0
+        pitch: 0.0
       RED:
-        spawnLocation:
-          x: -10.5
-          y: 100.0
-          z: 0.5
-          yaw: -90.0
-          pitch: 0.0
+        name: "<red>Équipe Rouge</red>"
+        color: RED
+        spawn: [-16.8, 51.0, -62.0] # Coordonnées Spawn Rouge (Image 3)
+        yaw: 0.0
+        pitch: 0.0
+
+    # Section Nexus (Séparée)
     nexus:
-      BLUE:
-        location:
-          x: 20.0
-          y: 100.0
-          z: 0.0
-        maxHealth: 100.0
-      RED:
-        location:
-          x: -20.0
-          y: 100.0
-          z: 0.0
-        maxHealth: 100.0
+      location: [0.5, 40.0, 0.5]    # Coordonnées Nexus (Image 2)
+      maxHealth: 100
+
+    # Section Captures (Séparée)
     captures:
-      mid:
-        centerLocation:
-          x: 0.5
-          y: 100.0
-          z: 0.5
+      mid_point:
+        name: "Centre"
+        location: [0.5, 40.0, 0.5]  # Zone autour du Nexus pour le test
         radius: 8.0
+        captureSpeed: 2.5

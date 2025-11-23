@@ -19,7 +19,7 @@ public class NexusMap {
 
     // Config data (Loaded from yaml)
     private final Map<GameTeam, ConfigLocation> teamSpawns;
-    private final Map<GameTeam, NexusConfig> nexusConfigs;
+    private final NexusConfig nexusConfig;
     private final List<CaptureConfig> captureConfigs;
 
     @Getter
