@@ -4,8 +4,10 @@ import fr.heneria.nexus.NexusPlugin;
 import fr.heneria.nexus.game.team.GameTeam;
 import fr.heneria.nexus.map.NexusMap;
 import fr.heneria.nexus.utils.ItemBuilder;
+import net.kyori.adventure.bossbar.BossBar;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
+import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.Particle;
@@ -37,6 +39,7 @@ public class CapturePoint implements Runnable {
     private double captureProgress = 0.0; // 0 to 100
     private boolean spawning = false;
     private UUID hologramId;
+    private BossBar bossBar;
 
     public CapturePoint(NexusPlugin plugin, String id, Location center, double radius, int respawnTime) {
         this.plugin = plugin;
@@ -58,11 +61,18 @@ public class CapturePoint implements Runnable {
             plugin.getHoloService().removeHologram(hologramId);
             hologramId = null;
         }
+        if (bossBar != null) {
+            for (Player p : Bukkit.getOnlinePlayers()) {
+                p.hideBossBar(bossBar);
+            }
+        }
     }
 
     @Override
     public void run() {
         if (!active) return;
+
+        updateBossBar();
 
         // Scan for players
         List<Player> players = center.getWorld().getNearbyEntities(boundingBox).stream()
@@ -184,6 +194,44 @@ public class CapturePoint implements Runnable {
         captureProgress = 0;
         spawning = false;
         spawn();
+    }
+
+    private void updateBossBar() {
+        if (bossBar == null) {
+            bossBar = BossBar.bossBar(Component.empty(), 0.0f, BossBar.Color.WHITE, BossBar.Overlay.PROGRESS);
+        }
+
+        double bluePerc = (capturingTeam == GameTeam.BLUE) ? captureProgress : 0;
+        double redPerc = (capturingTeam == GameTeam.RED) ? captureProgress : 0;
+
+        Component title = Component.text("Capture : ", NamedTextColor.GRAY)
+                .append(Component.text("Bleu " + (int)bluePerc + "%", NamedTextColor.BLUE))
+                .append(Component.text(" - ", NamedTextColor.GRAY))
+                .append(Component.text("Rouge " + (int)redPerc + "%", NamedTextColor.RED));
+
+        bossBar.name(title);
+        bossBar.progress((float) (captureProgress / 100.0));
+
+        if (capturingTeam == GameTeam.BLUE) {
+            bossBar.color(BossBar.Color.BLUE);
+        } else if (capturingTeam == GameTeam.RED) {
+            bossBar.color(BossBar.Color.RED);
+        } else {
+            bossBar.color(BossBar.Color.WHITE);
+        }
+
+        for (Player p : Bukkit.getOnlinePlayers()) {
+            if (p.getWorld().equals(center.getWorld())) {
+                double dist = p.getLocation().distance(center);
+                if (dist > 20) {
+                    p.showBossBar(bossBar);
+                } else {
+                    p.hideBossBar(bossBar);
+                }
+            } else {
+                p.hideBossBar(bossBar);
+            }
+        }
     }
 
     private void updateVisuals() {

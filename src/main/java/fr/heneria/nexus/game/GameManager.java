@@ -121,6 +121,13 @@ public class GameManager {
                 teamSpawn = map.getTeamSpawns().get(team).toLocation(world);
             }
 
+            // Fix Spawn Safety
+            teamSpawn.getWorld().getChunkAt(teamSpawn).load();
+            if (teamSpawn.getBlock().getType().isAir() && teamSpawn.clone().subtract(0, 1, 0).getBlock().getType().isAir()) {
+                 plugin.getLogger().warning("Unsafe spawn detected at " + teamSpawn + ". Adjusting...");
+                 teamSpawn.setY(teamSpawn.getWorld().getHighestBlockYAt(teamSpawn) + 1);
+            }
+
             plugin.getLogger().info("[Nexus] Teleporting player " + p.getName() + " to " + team.getName() + " spawn: " + teamSpawn.toVector() + " in world " + teamSpawn.getWorld().getName());
             p.teleportAsync(teamSpawn);
 

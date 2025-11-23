@@ -28,6 +28,8 @@ public class HoloService {
             entity.setBackgroundColor(org.bukkit.Color.fromARGB(100, 0, 0, 0)); // Semi-transparent dark background
             entity.setShadowed(true);
             entity.setPersistent(false); // Don't save to disk
+            entity.setViewRange(100.0f);
+            entity.setSeeThrough(true);
         });
 
         holograms.put(display.getUniqueId(), display);
