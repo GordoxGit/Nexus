@@ -127,10 +127,10 @@ public class MapConfig {
         }
 
         String fullPath = "maps." + mapId + "." + path;
-        ConfigurationSection section = config.getConfigurationSection(fullPath);
-        if (section == null) {
-            section = config.createSection(fullPath);
-        }
+        // If we are saving specifically 'location' for nexus or capture, use list format
+        // The path passed here includes 'location' at the end usually, or it's the parent section?
+        // GuiListener calls it with "nexus.location" or "captures.x.location".
+        // So 'fullPath' will end with ".location".
 
         if (!config.contains("maps." + mapId + ".name")) {
             config.set("maps." + mapId + ".name", mapId);
@@ -138,7 +138,36 @@ public class MapConfig {
             config.set("maps." + mapId + ".sourceFolder", mapId);
         }
 
-        LocationUtils.saveLocation(section, loc);
+        // Logic update: "spawnLocation" (Teams) needs Section (Yaw/Pitch).
+        // "nexus.location" and "captures.x.location" need List [x, y, z].
+        // Previous check `path.endsWith("location")` matched "spawnLocation".
+        // New check: strict check for ".location" or "location" as exact key.
+
+        boolean useListFormat = path.equals("location") || path.endsWith(".location");
+
+        if (useListFormat) {
+            // Use list format [x, y, z]
+            List<Double> coords = new ArrayList<>();
+            coords.add(loc.getX());
+            coords.add(loc.getY());
+            coords.add(loc.getZ());
+            config.set(fullPath, coords);
+
+            // Special case: if we just added a capture, we might want to set default radius.
+            if (path.contains("captures.")) {
+                 String radiusPath = fullPath.replace(".location", ".radius");
+                 if (!config.contains(radiusPath)) {
+                     config.set(radiusPath, 5);
+                 }
+            }
+        } else {
+             // Fallback to old Section based saving (supports Yaw/Pitch)
+             ConfigurationSection section = config.getConfigurationSection(fullPath);
+             if (section == null) {
+                 section = config.createSection(fullPath);
+             }
+             LocationUtils.saveLocation(section, loc);
+        }
 
         try {
             config.save(configFile);

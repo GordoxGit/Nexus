@@ -29,8 +29,8 @@ public class ObjectiveListener implements Listener {
     @EventHandler
     public void onNexusInteract(PlayerInteractEvent event) {
         if (plugin.getGameManager().getState() != GameState.PLAYING) return;
-        if (event.getAction() != Action.LEFT_CLICK_BLOCK) return;
         if (event.getClickedBlock() == null) return;
+        if (event.getAction() != Action.LEFT_CLICK_BLOCK && event.getAction() != Action.RIGHT_CLICK_BLOCK) return;
 
         Location blockLoc = event.getClickedBlock().getLocation();
 
@@ -44,6 +44,28 @@ public class ObjectiveListener implements Listener {
         }
 
         if (targetNexus != null) {
+            GameTeam attackerTeam = plugin.getTeamManager().getPlayerTeam(event.getPlayer());
+            if (attackerTeam == null) return;
+            if (targetNexus.getOwner() != null && targetNexus.getOwner() == attackerTeam) return;
+
+            if (event.getAction() == Action.RIGHT_CLICK_BLOCK) {
+                // Check for Energy Cell
+                if (event.getItem() != null && event.getItem().getType().name().equals("BEACON")) {
+                    // Improved item check
+                    if (event.getItem().hasItemMeta() && event.getItem().getItemMeta().hasDisplayName()) {
+                         String displayName = net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText().serialize(event.getItem().getItemMeta().displayName());
+                         if (displayName.contains("Cellule d'Énergie")) {
+                             event.setCancelled(true); // Prevent block placement
+                             event.getItem().setAmount(event.getItem().getAmount() - 1);
+                             targetNexus.overload();
+                             return;
+                         }
+                    }
+                }
+                return;
+            }
+
+            // Left Click = Attack
             // Check cooldown
             long now = System.currentTimeMillis();
             if (cooldowns.containsKey(event.getPlayer().getUniqueId())) {
@@ -53,11 +75,8 @@ public class ObjectiveListener implements Listener {
                 }
             }
 
-            GameTeam attackerTeam = plugin.getTeamManager().getPlayerTeam(event.getPlayer());
-            if (attackerTeam != null && attackerTeam != targetNexus.getOwner()) {
-                targetNexus.damage(1.0, event.getPlayer()); // 1 damage per hit
-                cooldowns.put(event.getPlayer().getUniqueId(), now);
-            }
+            targetNexus.damage(1.0, event.getPlayer()); // 1 damage per hit
+            cooldowns.put(event.getPlayer().getUniqueId(), now);
         }
     }
 
