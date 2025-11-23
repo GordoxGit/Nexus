@@ -5,10 +5,10 @@ import fr.heneria.nexus.gui.SetupGUI;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Location;
-import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
+import org.bukkit.event.inventory.ClickType;
 import org.bukkit.event.inventory.InventoryClickEvent;
 
 public class GuiListener implements Listener {
@@ -34,23 +34,26 @@ public class GuiListener implements Listener {
         switch (slot) {
             case 11: // Blue Spawn
                 gui.setBlueSpawn(loc);
-                player.sendMessage(Component.text("Spawn Bleu enregistré en mémoire (N'oubliez pas de sauvegarder).", NamedTextColor.BLUE));
+                player.sendMessage(Component.text("Spawn Bleu enregistré.", NamedTextColor.BLUE));
                 break;
             case 13: // Nexus
                 Location nexusLoc = loc.clone().subtract(0, 1, 0); // Block under player
                 nexusLoc.setYaw(0);
                 nexusLoc.setPitch(0);
 
-                // Simplification per requirements: Nexus (single)
-                gui.setBlueNexus(nexusLoc); // Using blue field to store it for now
-                player.sendMessage(Component.text("Nexus enregistré en mémoire (N'oubliez pas de sauvegarder).", NamedTextColor.AQUA));
+                if (event.getClick() == ClickType.LEFT) {
+                    gui.setBlueNexus(nexusLoc);
+                    player.sendMessage(Component.text("Nexus Bleu enregistré.", NamedTextColor.BLUE));
+                } else if (event.getClick() == ClickType.RIGHT) {
+                    gui.setRedNexus(nexusLoc);
+                    player.sendMessage(Component.text("Nexus Rouge enregistré.", NamedTextColor.RED));
+                }
                 break;
             case 15: // Red Spawn
                 gui.setRedSpawn(loc);
-                player.sendMessage(Component.text("Spawn Rouge enregistré en mémoire (N'oubliez pas de sauvegarder).", NamedTextColor.RED));
+                player.sendMessage(Component.text("Spawn Rouge enregistré.", NamedTextColor.RED));
                 break;
             case 22: // Save & Reload
-                // Save individually without reloading
                 if (gui.getBlueSpawn() != null) {
                     plugin.getMapManager().getMapConfig().saveMapLocation(mapId, "teams.BLUE.spawnLocation", gui.getBlueSpawn(), false);
                 }
@@ -58,35 +61,20 @@ public class GuiListener implements Listener {
                     plugin.getMapManager().getMapConfig().saveMapLocation(mapId, "teams.RED.spawnLocation", gui.getRedSpawn(), false);
                 }
                 if (gui.getBlueNexus() != null) {
-                    // Saving as single Nexus location per requirement
-                    plugin.getMapManager().getMapConfig().saveMapLocation(mapId, "nexus.location", gui.getBlueNexus(), false);
+                    plugin.getMapManager().getMapConfig().saveMapLocation(mapId, "teams.BLUE.nexusLocation", gui.getBlueNexus(), false);
+                }
+                if (gui.getRedNexus() != null) {
+                    plugin.getMapManager().getMapConfig().saveMapLocation(mapId, "teams.RED.nexusLocation", gui.getRedNexus(), false);
                 }
 
-                // Reload once at the end
                 plugin.getMapManager().getMapConfig().load();
-
                 player.sendMessage(Component.text("Configuration sauvegardée et rechargée.", NamedTextColor.GREEN));
                 player.closeInventory();
                 break;
             case 24: // Add Cellule
-                String cellId = "cell_" + System.currentTimeMillis();
+                String cellId = "mid_cell"; // Fixed ID for now as per req "mid_cell"
                 plugin.getMapManager().getMapConfig().saveMapLocation(mapId, "captures." + cellId + ".location", loc, false);
-                // We can't easily set radius via saveMapLocation if it only handles location.
-                // However, MapConfig parses radius with default 10 if missing.
-                // But requirement says: "Zone de capture ajoutée ici (Rayon par défaut: 5)".
-                // I should manually set the radius in config or add a method for it.
-                // For simplicity, I will assume MapConfig default is acceptable or I need to add radius.
-                // Wait, MapConfig reads "radius" (default 10). Requirement says default 5.
-                // I'll just let MapConfig handle the radius logic if I can't easily inject it,
-                // OR I can modify MapConfig to set a default radius when creating a capture if not present?
-                // Actually, I can't set radius with saveMapLocation.
-                // I will add a specialized method in MapConfig or use the fact that I can access config directly? No, MapConfig encapsulates it.
-
-                // Let's assume default is fine or modify MapConfig later if critical.
-                // Actually, I'll check MapConfig again. It doesn't have a generic set value method.
-                // But I can update MapConfig to set a default radius for new captures if I want to go the extra mile.
-
-                player.sendMessage(Component.text("Zone de capture ajoutée ici (Rayon par défaut: 5).", NamedTextColor.GOLD));
+                player.sendMessage(Component.text("Zone de capture 'mid_cell' définie.", NamedTextColor.GOLD));
                 break;
         }
     }

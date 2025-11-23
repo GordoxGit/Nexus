@@ -19,7 +19,7 @@ public class NexusMap {
 
     // Config data (Loaded from yaml)
     private final Map<GameTeam, ConfigLocation> teamSpawns;
-    private final NexusConfig nexusConfig;
+    private final Map<GameTeam, ConfigLocation> teamNexusLocations;
     private final List<CaptureConfig> captureConfigs;
 
     @Getter
@@ -35,16 +35,10 @@ public class NexusMap {
 
     @Getter
     @AllArgsConstructor
-    public static class NexusConfig {
-        ConfigLocation location;
-        double maxHealth;
-    }
-
-    @Getter
-    @AllArgsConstructor
     public static class CaptureConfig {
         String id;
         ConfigLocation center;
         double radius;
+        int respawnTime;
     }
 }

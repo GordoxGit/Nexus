@@ -2,7 +2,7 @@ package fr.heneria.nexus.game.objective;
 
 import fr.heneria.nexus.NexusPlugin;
 import fr.heneria.nexus.game.team.GameTeam;
-import fr.heneria.nexus.game.team.TeamManager;
+import fr.heneria.nexus.map.NexusMap;
 import fr.heneria.nexus.utils.ItemBuilder;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
@@ -24,51 +24,57 @@ public class CapturePoint implements Runnable {
     private final String id;
     private final Location center;
     private final double radius;
+    private final int respawnTime;
     private final BoundingBox boundingBox;
 
     @Getter
-    private GameTeam owningTeam = null; // Null if neutral
-    private double progress = 0; // -100 (Red) to 100 (Blue) ? Or 0-100 per team?
-    // Let's use 0-100 and keep track of who is capturing.
-    // Spec says: "Majority logic".
+    private boolean active = true;
+    private long lastCaptureTime = 0;
 
-    // To simplify: let's say progress is 0-100.
-    // If owningTeam is null, first team to step in starts capturing.
-    // If enemies step in, it contests or reduces progress.
-
-    // Simpler approach based on ticket:
-    // "La barre monte pour les Bleus" if more Blues than Reds.
-
+    @Getter
+    private GameTeam owningTeam = null;
     private GameTeam capturingTeam = null;
     private double captureProgress = 0.0; // 0 to 100
     private UUID hologramId;
 
-    public CapturePoint(NexusPlugin plugin, String id, Location center, double radius) {
+    public CapturePoint(NexusPlugin plugin, String id, Location center, double radius, int respawnTime) {
         this.plugin = plugin;
         this.id = id;
         this.center = center;
         this.radius = radius;
+        this.respawnTime = respawnTime;
         this.boundingBox = BoundingBox.of(center, radius, radius, radius);
     }
 
     public void spawn() {
-        hologramId = plugin.getHoloService().createHologram(center.clone().add(0, 3, 0), getHologramLines());
+        if (active) {
+            hologramId = plugin.getHoloService().createHologram(center.clone().add(0, 3, 0), getHologramLines());
+        }
+    }
+
+    public void despawn() {
+        if (hologramId != null) {
+            plugin.getHoloService().removeHologram(hologramId);
+            hologramId = null;
+        }
     }
 
     @Override
     public void run() {
+        if (!active) return;
+
         // Scan for players
         List<Player> players = center.getWorld().getNearbyEntities(boundingBox).stream()
                 .filter(e -> e instanceof Player)
                 .map(e -> (Player) e)
                 .collect(Collectors.toList());
 
-        TeamManager tm = plugin.getTeamManager();
+        // Simple majority logic
         int blueCount = 0;
         int redCount = 0;
 
         for (Player p : players) {
-            GameTeam team = tm.getPlayerTeam(p);
+            GameTeam team = plugin.getTeamManager().getPlayerTeam(p);
             if (team == GameTeam.BLUE) blueCount++;
             else if (team == GameTeam.RED) redCount++;
         }
@@ -78,24 +84,20 @@ public class CapturePoint implements Runnable {
         } else if (redCount > blueCount) {
             tickCapture(GameTeam.RED);
         } else {
-             // Tie or no one present. Decay? Or just stay?
-             // Spec doesn't specify decay, but usually it does.
-             // For now, let's just do nothing on tie.
+            // Decay if empty?
+            if (blueCount == 0 && redCount == 0 && capturingTeam != null && captureProgress > 0) {
+                 captureProgress = Math.max(0, captureProgress - 1.0);
+                 if (captureProgress == 0) capturingTeam = null;
+            }
         }
 
         updateVisuals();
     }
 
     private void tickCapture(GameTeam dominantTeam) {
-        double speed = 2.0; // 2% per second
-
-        if (owningTeam == dominantTeam) {
-            // Already owned, maybe heal to 100% if damaged?
-            if (captureProgress < 100) {
-                captureProgress = Math.min(100, captureProgress + speed);
-            }
-            return;
-        }
+        double speed = 5.0; // Faster capture for testing (5% per tick -> 20 ticks = 1s -> 100% in 20s if run every 20 ticks... wait run() is called every 20L? yes)
+        // If run() is every second, 5% is 20 seconds.
+        // Let's make it 10% per second.
 
         if (capturingTeam == null) {
             capturingTeam = dominantTeam;
@@ -107,41 +109,94 @@ public class CapturePoint implements Runnable {
             captureProgress -= speed;
             if (captureProgress <= 0) {
                 capturingTeam = dominantTeam; // Switch control
-                captureProgress = Math.abs(captureProgress); // Flip
+                captureProgress = Math.abs(captureProgress);
             }
         }
 
         if (captureProgress >= 100) {
             captureProgress = 100;
-            if (owningTeam != capturingTeam) {
-                owningTeam = capturingTeam;
-                plugin.getServer().broadcast(Component.text("La zone " + id + " a été capturée par " + owningTeam.getName() + " !", owningTeam.getColor()));
-                spawnCellule();
+            // Capture complete
+            completeCapture(dominantTeam);
+        }
+    }
+
+    private void completeCapture(GameTeam team) {
+        owningTeam = team;
+        active = false;
+        lastCaptureTime = System.currentTimeMillis();
+
+        plugin.getServer().broadcast(Component.text("La Cellule a été récupérée par " + team.getName() + " !", team.getColor()));
+
+        // Give cell to a player in the zone (priority to one who is there)
+        List<Player> players = center.getWorld().getNearbyEntities(boundingBox).stream()
+                .filter(e -> e instanceof Player)
+                .map(e -> (Player) e)
+                .filter(p -> plugin.getTeamManager().getPlayerTeam(p) == team)
+                .collect(Collectors.toList());
+
+        if (!players.isEmpty()) {
+            Player carrier = players.get(0); // Pick first one
+            giveCell(carrier);
+        } else {
+             // Drop it if no one? unexpected but safe fallback
+             ItemStack cell = ObjectiveManager.createCellItem();
+             center.getWorld().dropItemNaturally(center.clone().add(0, 1, 0), cell);
+        }
+
+        despawn();
+    }
+
+    private void giveCell(Player player) {
+        ItemStack cell = ObjectiveManager.createCellItem();
+        player.getInventory().addItem(cell);
+        player.sendMessage(Component.text("Vous portez la Cellule ! Apportez-la au Nexus ennemi !", NamedTextColor.GOLD));
+        // Force hold logic handled by listener? Or force held slot here.
+        // Listener will prevent switching away.
+        // We should ensure they hold it.
+        // But if we just addItem, it goes to first empty slot.
+        // We might want to clear a slot or swap.
+        // For now, let's just add it. The listener will enforce "if holding cell".
+        // Ah, requirement: "Impossible de changer d'arme quand on a la Cellule".
+        // Implies they must hold it.
+        // Best practice: Set it in hand.
+
+        int slot = player.getInventory().firstEmpty();
+        if (slot == -1) {
+            player.getWorld().dropItemNaturally(player.getLocation(), cell);
+            player.sendMessage(Component.text("Inventaire plein, la cellule est au sol !", NamedTextColor.RED));
+        } else {
+            // Put in hand?
+            // If we put it in hand, we swap whatever is in hand.
+            ItemStack held = player.getInventory().getItemInMainHand();
+            player.getInventory().setItemInMainHand(cell);
+            if (held != null && held.getType() != Material.AIR) {
+                player.getInventory().addItem(held);
             }
         }
     }
 
-    private void spawnCellule() {
-        ItemStack cell = new ItemBuilder(Material.BEACON)
-                .name(Component.text("Cellule d'Énergie", NamedTextColor.GOLD))
-                .build();
-        center.getWorld().dropItemNaturally(center.clone().add(0, 1, 0), cell);
+    public void reset() {
+        active = true;
+        owningTeam = null;
+        capturingTeam = null;
+        captureProgress = 0;
+        spawn();
     }
 
     private void updateVisuals() {
         // Particles
         GameTeam particleTeam = owningTeam != null ? owningTeam : (capturingTeam != null ? capturingTeam : null);
         if (particleTeam != null) {
-             // Spawn particles at corners (simplified to just center for now or 4 corners)
-             // Use DUST particle with color
              Particle.DustOptions dust = new Particle.DustOptions(
                      particleTeam == GameTeam.BLUE ? org.bukkit.Color.BLUE : org.bukkit.Color.RED,
                      1.5f
              );
-             center.getWorld().spawnParticle(Particle.DUST, center.clone().add(radius, 0, radius), 5, dust);
-             center.getWorld().spawnParticle(Particle.DUST, center.clone().add(-radius, 0, radius), 5, dust);
-             center.getWorld().spawnParticle(Particle.DUST, center.clone().add(radius, 0, -radius), 5, dust);
-             center.getWorld().spawnParticle(Particle.DUST, center.clone().add(-radius, 0, -radius), 5, dust);
+             // Draw circle or corners
+             for (double angle = 0; angle < 360; angle += 45) {
+                 double x = center.getX() + Math.cos(Math.toRadians(angle)) * radius;
+                 double z = center.getZ() + Math.sin(Math.toRadians(angle)) * radius;
+                 center.getWorld().spawnParticle(Particle.DUST, x, center.getY(), z, 1, dust);
+             }
         }
 
         // Hologram
@@ -156,46 +211,14 @@ public class CapturePoint implements Runnable {
     private List<Component> getHologramLines() {
         Component header = Component.text("Cellule", NamedTextColor.GRAY);
 
-        // Spec: <blue>Bleu: 50%</blue> | <red>Rouge: 10%</red>
-        // My logic tracks a single progress bar for the capturing team.
-        // I will adapt the display to match my logic but try to respect the request.
-
         double bluePerc = 0;
         double redPerc = 0;
 
-        if (owningTeam == GameTeam.BLUE) {
-            bluePerc = 100; // Owned
-             // If being contested by Red, maybe show that?
-             // But my logic is simpler: Single progress bar.
-        } else if (owningTeam == GameTeam.RED) {
-            redPerc = 100;
-        }
-
-        if (capturingTeam == GameTeam.BLUE) {
-            bluePerc = captureProgress;
-        } else if (capturingTeam == GameTeam.RED) {
-            redPerc = captureProgress;
-        }
-
-        // If owned by Blue (100%), and Red is capturing (progress goes down from 100 to 0 then up for red)
-        // With my logic `captureProgress` is 0-100 towards `capturingTeam`.
-        // If `owningTeam` is set, we need to decapture first.
-
-        // Let's stick to the prompt's suggested display format exactly:
-        // "<blue>Bleu: 50%</blue> | <red>Rouge: 10%</red>"
-
-        // If Blue is capturing (50%), Red is 0%.
         if (capturingTeam == GameTeam.BLUE) {
              bluePerc = captureProgress;
-             redPerc = 0;
         } else if (capturingTeam == GameTeam.RED) {
              redPerc = captureProgress;
-             bluePerc = 0;
         }
-
-        // If Owned
-        if (owningTeam == GameTeam.BLUE && capturingTeam == GameTeam.BLUE) bluePerc = 100;
-        if (owningTeam == GameTeam.RED && capturingTeam == GameTeam.RED) redPerc = 100;
 
         Component status = Component.text("Bleu: " + (int)bluePerc + "%", NamedTextColor.BLUE)
                 .append(Component.text(" | ", NamedTextColor.GRAY))
