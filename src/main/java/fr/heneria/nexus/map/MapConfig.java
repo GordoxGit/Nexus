@@ -45,8 +45,9 @@ public class MapConfig {
             String description = section.getString("description");
             String sourceFolder = section.getString("sourceFolder");
 
-            // Load Teams Spawn
+            // Load Teams Spawn and Nexus
             Map<GameTeam, NexusMap.ConfigLocation> teamSpawns = new HashMap<>();
+            Map<GameTeam, NexusMap.ConfigLocation> teamNexusLocations = new HashMap<>();
             if (section.isConfigurationSection("teams")) {
                 ConfigurationSection teamsSec = section.getConfigurationSection("teams");
                 for (String teamKey : teamsSec.getKeys(false)) {
@@ -54,26 +55,17 @@ public class MapConfig {
                         GameTeam team = GameTeam.valueOf(teamKey.toUpperCase());
                         ConfigurationSection teamSec = teamsSec.getConfigurationSection(teamKey);
                         if (teamSec != null) {
-                            NexusMap.ConfigLocation loc = parseConfigLocation(teamSec, "spawn");
-                            if (loc != null) {
-                                teamSpawns.put(team, loc);
+                            NexusMap.ConfigLocation spawnLoc = parseConfigLocation(teamSec, "spawn");
+                            if (spawnLoc != null) {
+                                teamSpawns.put(team, spawnLoc);
+                            }
+                            NexusMap.ConfigLocation nexusLoc = parseConfigLocation(teamSec, "nexusLocation");
+                            if (nexusLoc != null) {
+                                teamNexusLocations.put(team, nexusLoc);
                             }
                         }
                     } catch (IllegalArgumentException ignored) {
                         plugin.getLogger().warning("Invalid team in map config: " + teamKey);
-                    }
-                }
-            }
-
-            // Load Nexus (Single)
-            NexusMap.NexusConfig nexusConfig = null;
-            if (section.isConfigurationSection("nexus")) {
-                ConfigurationSection nSec = section.getConfigurationSection("nexus");
-                if (nSec != null) {
-                    NexusMap.ConfigLocation loc = parseConfigLocation(nSec, "location");
-                    double hp = nSec.getDouble("maxHealth", 100);
-                    if (loc != null) {
-                        nexusConfig = new NexusMap.NexusConfig(loc, hp);
                     }
                 }
             }
@@ -86,15 +78,16 @@ public class MapConfig {
                     ConfigurationSection cSec = capsSec.getConfigurationSection(capKey);
                     if (cSec != null) {
                         NexusMap.ConfigLocation loc = parseConfigLocation(cSec, "location");
-                        double radius = cSec.getDouble("radius", 10);
+                        double radius = cSec.getDouble("radius", 6.0);
+                        int respawnTime = cSec.getInt("respawnTime", 10);
                         if (loc != null) {
-                            captureConfigs.add(new NexusMap.CaptureConfig(capKey, loc, radius));
+                            captureConfigs.add(new NexusMap.CaptureConfig(capKey, loc, radius, respawnTime));
                         }
                     }
                 }
             }
 
-            maps.put(key, new NexusMap(key, name, description, sourceFolder, teamSpawns, nexusConfig, captureConfigs));
+            maps.put(key, new NexusMap(key, name, description, sourceFolder, teamSpawns, teamNexusLocations, captureConfigs));
         }
     }
 
@@ -127,10 +120,6 @@ public class MapConfig {
         }
 
         String fullPath = "maps." + mapId + "." + path;
-        // If we are saving specifically 'location' for nexus or capture, use list format
-        // The path passed here includes 'location' at the end usually, or it's the parent section?
-        // GuiListener calls it with "nexus.location" or "captures.x.location".
-        // So 'fullPath' will end with ".location".
 
         if (!config.contains("maps." + mapId + ".name")) {
             config.set("maps." + mapId + ".name", mapId);
@@ -138,12 +127,7 @@ public class MapConfig {
             config.set("maps." + mapId + ".sourceFolder", mapId);
         }
 
-        // Logic update: "spawnLocation" (Teams) needs Section (Yaw/Pitch).
-        // "nexus.location" and "captures.x.location" need List [x, y, z].
-        // Previous check `path.endsWith("location")` matched "spawnLocation".
-        // New check: strict check for ".location" or "location" as exact key.
-
-        boolean useListFormat = path.equals("location") || path.endsWith(".location");
+        boolean useListFormat = path.equals("location") || path.endsWith(".location") || path.endsWith("nexusLocation");
 
         if (useListFormat) {
             // Use list format [x, y, z]
@@ -153,11 +137,15 @@ public class MapConfig {
             coords.add(loc.getZ());
             config.set(fullPath, coords);
 
-            // Special case: if we just added a capture, we might want to set default radius.
+            // Special case for capture radius
             if (path.contains("captures.")) {
                  String radiusPath = fullPath.replace(".location", ".radius");
                  if (!config.contains(radiusPath)) {
                      config.set(radiusPath, 5);
+                 }
+                 String respawnPath = fullPath.replace(".location", ".respawnTime");
+                 if (!config.contains(respawnPath)) {
+                     config.set(respawnPath, 10);
                  }
             }
         } else {
